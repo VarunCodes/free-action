@@ -4,7 +4,7 @@ import { md } from './text.js';
 const AB=['str','dex','con','int','wis','cha'];
 const ABN={str:'Strength',dex:'Dexterity',con:'Constitution',int:'Intelligence',wis:'Wisdom',cha:'Charisma'};
 const SK=[['Acrobatics','dex'],['Animal Handling','wis'],['Arcana','int'],['Athletics','str'],['Deception','cha'],['History','int'],['Insight','wis'],['Intimidation','cha'],['Investigation','int'],['Medicine','wis'],['Nature','int'],['Perception','wis'],['Performance','cha'],['Persuasion','cha'],['Religion','int'],['Sleight of Hand','dex'],['Stealth','dex'],['Survival','wis']];
-const DEF=()=>({name:'New Hero',cls:'',sub:'',species:'',bg:'',level:1,mode:'play',ab:{str:10,dex:10,con:10,int:10,wis:10,cha:10},sv:{},sk:{},hp:{cur:10,max:10,temp:0},ac:10,speed:30,init:0,cast:'',slots:Array.from({length:9},()=>({m:0,u:0})),spells:[],items:[],notes:'',insp:false,feats:[],race:[],vtt:'foundry'});
+const DEF=()=>({name:'New Hero',cls:'',sub:'',species:'',bg:'',level:1,mode:'play',ab:{str:10,dex:10,con:10,int:10,wis:10,cha:10},sv:{},sk:{},hp:{cur:10,max:10,temp:0},ac:10,speed:30,init:0,cast:'',slots:Array.from({length:9},()=>({m:0,u:0})),spells:[],items:[],notes:'',insp:false,feats:[],race:[],vtt:'foundry',spc:false});
 let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null;const UP={};
 const SR=()=>({a:false,s:'',d:'',b:'',t:'',h:false,m:false,by:'slot',up:[]});
 try{const r=localStorage.getItem('sheet');if(r)S=Object.assign(DEF(),JSON.parse(r))}catch(e){}
@@ -61,7 +61,8 @@ function render(){
  <div class="ln"><span class="g">Passive Perception</span><span class="v">${10+mod(S.ab.wis)+(S.sk.Perception||0)*p}</span></div>`;
  cut('feat');h+=featSec('Features and feats','feats',true,ed);cut('race');h+=featSec('Racial features','race',false,ed);
  cut('spell');
- h+=`<h2>Spellcasting</h2><div class="row" style="margin-bottom:8px"><div style="flex:1"><label class="lab">Spellcasting ability</label><select data-k="cast"><option value="">None</option>${AB.map(a=>`<option value="${a}" ${ca===a?'selected':''}>${ABN[a]}</option>`).join('')}</select></div></div>`;
+ h+=`<h2><button class="hd" data-a="spc" aria-expanded="${!S.spc}">Spellcasting</button>${S.spc?`<small>${S.spells.length} spell${S.spells.length===1?'':'s'}${ca?`, save DC ${8+p+cm}`:''}</small>`:''}</h2>`;const sp0=h.length;
+ h+=`<div class="row" style="margin-bottom:8px"><div style="flex:1"><label class="lab">Spellcasting ability</label><select data-k="cast"><option value="">None</option>${AB.map(a=>`<option value="${a}" ${ca===a?'selected':''}>${ABN[a]}</option>`).join('')}</select></div></div>`;
  if(ca)h+=`<div class="cast"><span>Save DC <b>${8+p+cm}</b></span><span>Attack <button class="rb" data-a="roll" data-l="Spell attack" data-b="${p+cm}">${fmt(p+cm)}</button></span><span>Modifier <b>${fmt(cm)}</b></span></div>`;
  const sl=S.slots.map((s,i)=>({s,i})).filter(o=>ed||o.s.m>0);
  h+=`<div class="slots">${sl.length?sl.map(({s,i})=>`<div class="sl"><span class="lv">Lvl ${i+1}</span><div class="pips">${Array.from({length:s.m},(_,j)=>`<button class="pip ${j<s.u?'used':''}" data-a="slot" data-v="${i}.${j}" aria-label="Slot ${j+1}"></button>`).join('')}</div>${ed?inp(`slots.${i}.m`,s.m,'number','min=0 max=9 aria-label="Max slots"'):''}</div>`).join(''):'<div class="empty">No spell slots. Switch to Edit to set them.</div>'}</div>`;
@@ -73,6 +74,7 @@ function render(){
  if(lv.length)h+=`<p class="sub prep">Prepared <b>${np}</b> of ${lv.length} leveled spells. Tick the box next to a spell to prepare it.</p>`;
  h+=sp.length?sp.map(({x,i})=>{let g='';if(x.l!==last){last=x.l;g=`<div class="grp">${x.l?'Level '+x.l:'Cantrips'}</div>`}const dim=!ed&&np&&x.l>0&&!x.p;return g+`<div class="spi${dim?' unp':''}"><div class="ln">${x.l>0?`<input type="checkbox" data-k="spells.${i}.p" ${x.p?'checked':''} aria-label="Prepared" title="Prepared">`:'<span class="pk"></span>'}<span class="g">${x.d?`<button class="lk" data-a="spd" data-v="${i}" aria-expanded="${OPEN.has('sp'+i)}">${esc(x.n)}</button>`:esc(x.n)}</span>${ed?`<button class="x" data-a="delsp" data-v="${i}" aria-label="Remove">\u2715</button>`:''}</div>${spRow(x,i,ed,p,cm)}${x.d&&OPEN.has('sp'+i)?`<p class="sd">${md(x.d)}</p>`:''}</div>`}).join(''):'<div class="empty">No spells yet.</div>';
  if(ed)h+=`<div class="add"><input class="n" id="spn" placeholder="Spell name"><select id="spl">${[0,1,2,3,4,5,6,7,8,9].map(n=>`<option value="${n}">${n?'Lvl '+n:'Cantrip'}</option>`).join('')}</select><button class="pri" data-a="addsp">Add</button></div>`;
+ if(S.spc)h=h.slice(0,sp0);
  cut('inv');
  h+=`<h2>Inventory</h2>`;
  h+=S.items.length?S.items.map((x,i)=>`<div class="ln"><span class="g">${esc(x.n)}</span>${ed?inp(`items.${i}.q`,x.q,'number','style="width:64px"'):`<span class="v">&times;${x.q}</span>`}${ed?`<button class="x" data-a="delit" data-v="${i}" aria-label="Remove">\u2715</button>`:''}</div>`).join(''):'<div class="empty">Nothing carried.</div>';
@@ -118,6 +120,7 @@ document.addEventListener('click',e=>{
  else if(a==='delsp'){S.spells.splice(+v,1);[...OPEN].filter(k=>k.startsWith('sp')).forEach(k=>OPEN.delete(k));Object.keys(UP).forEach(k=>delete UP[k]);CRIT=null}
  else if(a==='satk'){const x=S.spells[+v],cm=S.cast?mod(S.ab[S.cast]):0;doRoll(x.n+' attack',prof()+cm);CRIT=LAST.crit==='Natural 20'?+v:null;COP=copyText(cmdFor())}
  else if(a==='sdmg'){const x=S.spells[+v],{d}=spDice(x,UP[v]??x.l);if(!rollExpr(x.n+(x.r.h?' healing':' damage'),d,CRIT===+v)){alert('Use dice like 1d10 or 2d6+3. Fix them in Edit.');return}CRIT=null;COP=copyText(cmdFor())}
+ else if(a==='spc')S.spc=!S.spc;
  else if(a==='spd'){const k='sp'+v;OPEN.has(k)?OPEN.delete(k):OPEN.add(k)}
  else if(a==='lib'){openLibrary(()=>S,()=>{save();render()});return}
  else if(a==='addit'){const nm=g('itn').value.trim();if(!nm)return;S.items.push({n:nm,q:parseInt(g('itq').value)||1})}
