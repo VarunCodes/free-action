@@ -1,7 +1,10 @@
 import { KINDS, loadLibrary, search, importPack, clearPacks } from './library.js';
-import { esc, md, rarityTag } from './text.js';
+import { esc, md, rarityTag, RARITY } from './text.js';
 
 let dlg, data = null, status = 'idle', errors = [], kind = 'spell', query = '', open = new Set(), msg = '', packOpen = false;
+// Items tab filter: all, mundane, magic, or a rarity rank ('1'-'6').
+let rf = 'all';
+const rfOk = it => rf === 'all' || (rf === 'mundane' ? !it.rr : rf === 'magic' ? it.rr > 0 : it.rr === Number(rf));
 let getS, onChange;
 
 const has = (S, it) => {
@@ -34,7 +37,9 @@ function add(it) {
 
 function draw() {
   const S = getS();
-  const { shown, total } = data ? search(data.items, kind, query) : { shown: [], total: 0 };
+  const pool = data ? (kind === 'item' ? data.items.filter(it => it.kind !== 'item' || rfOk(it)) : data.items) : [];
+  const { shown, total } = data ? search(pool, kind, query) : { shown: [], total: 0 };
+  const chips = kind === 'item' ? `<div class="chips" role="group" aria-label="Filter by rarity">${[['all', 'All'], ['mundane', 'Mundane'], ['magic', 'Magic'], ...RARITY.slice(1).map((r, i) => [String(i + 1), r])].map(([v, t]) => `<button class="chip${rf === v ? ' on' : ''}${/^\d$/.test(v) ? ' r' + v : ''}" data-lrf="${v}" aria-pressed="${rf === v}">${t}</button>`).join('')}</div>` : '';
   const rows = shown.map((it, idx) => {
     const id = kind + ':' + it.name + ':' + idx;
     const done = has(S, it);
@@ -46,6 +51,7 @@ function draw() {
   dlg.innerHTML = `<div class="dh"><h2>Library</h2><button data-lc>Close</button></div>
   <div class="seg" role="tablist">${KINDS.map(k => `<button role="tab" data-lk="${k.id}" class="${k.id === kind ? 'on' : ''}">${k.label}</button>`).join('')}</div>
   <input id="lq" type="search" placeholder="Search ${KINDS.find(k => k.id === kind).label.toLowerCase()} (${kind === 'item' ? 'try weapon, armor or rare' : 'try a class name or level'})" value="${esc(query)}" aria-label="Search">
+  ${chips}
   <div class="lbody">
   ${status === 'loading' ? '<p class="empty">Loading the 2024 SRD&hellip;</p>' : ''}
   ${errors.length ? `<p class="err">Could not load: ${esc(errors.join('; '))}. Check your connection, then <button data-lr>Retry</button></p>` : ''}
@@ -106,6 +112,7 @@ export function openLibrary(stateGetter, changed) {
       const b = e.target.closest('button'); if (!b) return;
       if (b.dataset.lc !== undefined) dlg.close();
       else if (b.dataset.lk) { kind = b.dataset.lk; draw(); }
+      else if (b.dataset.lrf) { rf = b.dataset.lrf; draw(); }
       else if (b.dataset.lo) { open.has(b.dataset.lo) ? open.delete(b.dataset.lo) : open.add(b.dataset.lo); draw(); }
       else if (b.dataset.la) add(dlg._shown[+b.dataset.la]);
       else if (b.dataset.lr !== undefined) load(false);
