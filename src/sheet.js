@@ -4,7 +4,7 @@
 export const AB = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 export const ABN = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
 export const SK = [['Acrobatics', 'dex'], ['Animal Handling', 'wis'], ['Arcana', 'int'], ['Athletics', 'str'], ['Deception', 'cha'], ['History', 'int'], ['Insight', 'wis'], ['Intimidation', 'cha'], ['Investigation', 'int'], ['Medicine', 'wis'], ['Nature', 'int'], ['Perception', 'wis'], ['Performance', 'cha'], ['Persuasion', 'cha'], ['Religion', 'int'], ['Sleight of Hand', 'dex'], ['Stealth', 'dex'], ['Survival', 'wis']];
-export const DEF = () => ({ name: 'New Hero', cls: '', sub: '', species: '', bg: '', level: 1, mode: 'play', ab: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }, sv: {}, sk: {}, hp: { cur: 10, max: 10, temp: 0 }, ac: 10, speed: 30, init: 0, cast: '', slots: Array.from({ length: 9 }, () => ({ m: 0, u: 0 })), spells: [], items: [], notes: '', insp: false, feats: [], race: [], vtt: 'foundry', spc: false });
+export const DEF = () => ({ name: 'New Hero', cls: '', sub: '', species: '', bg: '', level: 1, mode: 'play', ab: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }, sv: {}, sk: {}, hp: { cur: 10, max: 10, temp: 0 }, ac: 10, speed: 30, init: 0, cast: '', slots: Array.from({ length: 9 }, () => ({ m: 0, u: 0 })), spells: [], items: [], notes: '', insp: false, feats: [], race: [], vtt: 'foundry', spc: false, acAuto: true, acb: 0 });
 
 const obj = v => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 const arr = (v, max) => (Array.isArray(v) ? v.slice(0, max) : []);
@@ -24,6 +24,10 @@ const cleanRoll = r => {
 const cleanWeapon = w => {
   w = obj(w);
   return { d: str(w.d, 40), t: str(w.t, 40), v: str(w.v, 40), b: int(w.b, -10, 10, 0), ab: pick(w.ab, ['str', 'dex', 'fin'], 'str') };
+};
+const cleanArmor = a => {
+  a = obj(a);
+  return { k: pick(a.k, ['light', 'medium', 'heavy', 'shield', 'bonus', 'unarm'], ''), ac: int(a.ac, -10, 30, 0), str: int(a.str, 0, 30, 0), nu: bool(a.nu) };
 };
 const cleanFeat = f => { f = obj(f); return { n: str(f.n), t: str(f.t, 60), d: str(f.d, 20000) }; };
 
@@ -46,9 +50,12 @@ export function cleanSheet(o) {
       n: str(x.n), q: int(x.q, 0, 99999, 1), d: str(x.d, 20000),
       ...(x.eq === undefined ? {} : { eq: bool(x.eq) }), on: bool(x.on),
       ...(x.w ? { w: cleanWeapon(x.w) } : {}),
+      ...(x.ar ? { ar: cleanArmor(x.ar) } : {}),
     })),
     notes: str(o.notes, 100000), insp: bool(o.insp),
     feats: arr(o.feats, 500).map(cleanFeat).filter(f => f.n), race: arr(o.race, 200).map(cleanFeat).filter(f => f.n),
     vtt: pick(o.vtt, ['foundry', 'roll20', 'roll20t'], 'foundry'), spc: bool(o.spc),
+    // Sheets from before AC was calculated keep a hand-typed AC unless it was still the default.
+    acAuto: o.acAuto === undefined ? (o.ac === undefined || Number(o.ac) === 10) : bool(o.acAuto), acb: int(o.acb, -10, 20, 0),
   };
 }
