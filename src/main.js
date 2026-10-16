@@ -1,14 +1,21 @@
 import './style.css';
 import { openLibrary } from './libraryui.js';
 import { md } from './text.js';
-const AB=['str','dex','con','int','wis','cha'];
-const ABN={str:'Strength',dex:'Dexterity',con:'Constitution',int:'Intelligence',wis:'Wisdom',cha:'Charisma'};
-const SK=[['Acrobatics','dex'],['Animal Handling','wis'],['Arcana','int'],['Athletics','str'],['Deception','cha'],['History','int'],['Insight','wis'],['Intimidation','cha'],['Investigation','int'],['Medicine','wis'],['Nature','int'],['Perception','wis'],['Performance','cha'],['Persuasion','cha'],['Religion','int'],['Sleight of Hand','dex'],['Stealth','dex'],['Survival','wis']];
-const DEF=()=>({name:'New Hero',cls:'',sub:'',species:'',bg:'',level:1,mode:'play',ab:{str:10,dex:10,con:10,int:10,wis:10,cha:10},sv:{},sk:{},hp:{cur:10,max:10,temp:0},ac:10,speed:30,init:0,cast:'',slots:Array.from({length:9},()=>({m:0,u:0})),spells:[],items:[],notes:'',insp:false,feats:[],race:[],vtt:'foundry',spc:false});
+import { AB, ABN, SK, DEF, cleanSheet } from './sheet.js';
 let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null;const UP={};
 const SR=()=>({a:false,s:'',d:'',b:'',t:'',h:false,m:false,by:'slot',up:[]});
-try{const r=localStorage.getItem('sheet');if(r)S=Object.assign(DEF(),JSON.parse(r))}catch(e){}
-const save=()=>{try{localStorage.setItem('sheet',JSON.stringify(S))}catch(e){}};
+const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}},lsSet=(k,v)=>{try{localStorage.setItem(k,v);return true}catch(e){return false}};
+try{const r=lsGet('sheet');if(r)S=cleanSheet(JSON.parse(r))}catch(e){}
+// Earlier versions kept in this browser: one when the page opens, one per 30 minutes of editing,
+// and one right before Import, Restore or New character replaces the sheet.
+const snaps=()=>{try{const a=JSON.parse(lsGet('sheet-history')||'[]');return Array.isArray(a)?a.filter(x=>x&&typeof x.s==='string'):[]}catch(e){return[]}};
+function snapshot(why,force){const a=snaps(),now=Date.now(),s=JSON.stringify(S);if(a[0]&&a[0].s===s)return;if(!force&&a[0]&&now-a[0].at<30*60e3)return;a.unshift({at:now,why,name:S.name,s});while(a.length&&!lsSet('sheet-history',JSON.stringify(a.slice(0,6))))a.pop()}
+const save=()=>{lsSet('sheet',JSON.stringify(S));snapshot('autosave')};
+function replaceSheet(o,why){snapshot(why,true);S=cleanSheet(o);io='';OPEN.clear();Object.keys(UP).forEach(k=>delete UP[k]);CRIT=null}
+const ago=t=>{const d=Math.floor((Date.now()-t)/864e5);return d<1?'today':d===1?'yesterday':d+' days ago'};
+function downloadSheet(){const u=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download=(S.name||'character').replace(/[^\w-]+/g,'-')+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);lsSet('sheet-exported',String(Date.now()))}
+function importText(t){let o;try{o=JSON.parse(t);if(!o||typeof o!=='object'||!o.ab)throw 0}catch(x){alert('That is not a valid exported sheet. Use a file from Download backup, or paste the full JSON from Export.');return false}
+ if(!confirm(`Replace "${S.name}" with "${cleanSheet(o).name}"? The current character can be brought back from "Restore an earlier version".`))return false;replaceSheet(o,'before import');return true}
 const esc=v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const mod=n=>Math.floor((n-10)/2), fmt=n=>(n>=0?'+':'')+n;
 const prof=()=>Math.ceil(Math.max(1,S.level)/4)+1;
@@ -88,9 +95,12 @@ function render(){
  if(ed)h+=`<div class="add"><input class="n" id="itn" placeholder="Item name"><input class="q" id="itq" type="number" value="1" min="0"><button class="pri" data-a="addit">Add</button></div>`;
  cut('notes');h+=`<h2>Notes</h2><textarea data-k="notes" placeholder="Features, backstory, session notes">${esc(S.notes)}</textarea>`;
  cut('backup');
- h+=`<h2>Backup</h2><p class="sub" style="margin:0 0 8px">Saves automatically in this browser. Export to copy your sheet, import to restore it.</p>
+ const ex=+lsGet('sheet-exported')||0,hist=snaps();
+ h+=`<h2>Backup</h2><p class="sub" style="margin:0 0 8px">Saves automatically in this browser only. Browsers can clear saved data (Safari after 7 days without a visit), so keep a backup file. <b>${ex?`Last backup ${ago(ex)}.`:'No backup downloaded yet.'}</b></p>
+ <div class="row" style="margin-bottom:8px"><button class="pri" data-a="dl">Download backup</button><label class="btn">Open backup file<input type="file" id="imf" class="vh" accept=".json,application/json"></label></div>
  <textarea id="io" placeholder="Exported JSON appears here. Paste JSON here to import.">${esc(io)}</textarea>
- <div class="row" style="margin-top:8px"><button data-a="exp">Export</button><button data-a="imp">Import</button><button class="bad" data-a="reset">New character</button></div>`;
+ <div class="row" style="margin-top:8px"><button data-a="exp">Export</button><button data-a="imp">Import</button><button class="bad" data-a="reset">New character</button></div>
+ ${hist.length?`<div class="row" style="margin-top:8px"><select id="snp" aria-label="Earlier version" style="flex:1">${hist.map((x,i)=>`<option value="${i}">${esc(new Date(x.at).toLocaleString())}: ${esc(x.name)}${x.why==='autosave'?'':` (${esc(x.why)})`}</option>`).join('')}</select><button data-a="rst">Restore an earlier version</button></div>`:''}`;
  // Sections go into three columns: stats, inventory and spells, everything else. On phones the columns
  // dissolve and the order values put the sections back into one reading order.
  cut('end');const part=k=>{const i=MK.findIndex(m=>m[0]===k);return h.slice(MK[i][1],MK[i+1][1])};
@@ -141,9 +151,17 @@ document.addEventListener('click',e=>{
  else if(a==='rm')RM=v;
  else if(a==='cx'){if(!doCustom(g('cx').value)){alert('Use a format like 2d6+3.');return}CRIT=null;COP=copyText(cmdFor())}
  else if(a==='cp')COP=copyText(cmdFor());
- else if(a==='exp'){io=JSON.stringify(S,null,1);save();render();const ta=g('io');ta.select();try{navigator.clipboard.writeText(io)}catch(x){}return}
- else if(a==='imp'){try{const o=JSON.parse(g('io').value);if(typeof o!=='object'||!o||!o.ab)throw 0;S=Object.assign(DEF(),o);io=''}catch(x){alert('That is not a valid exported sheet. Paste the full JSON from Export.');return}}
- else if(a==='reset'){if(!confirm('Delete this character and start a new one?'))return;S=DEF();io=''}
+ else if(a==='exp'){io=JSON.stringify(S,null,1);lsSet('sheet-exported',String(Date.now()));save();render();const ta=g('io');ta.select();try{navigator.clipboard.writeText(io)}catch(x){}return}
+ else if(a==='dl')downloadSheet();
+ else if(a==='imp'){if(!importText(g('io').value))return}
+ else if(a==='rst'){const x=snaps()[+g('snp').value];if(!x||!confirm(`Restore "${x.name}" from ${new Date(x.at).toLocaleString()}? The current version is kept in the list.`))return;try{replaceSheet(JSON.parse(x.s),'before restore')}catch(e){alert('That version could not be read.');return}}
+ else if(a==='reset'){if(!confirm('Start a new character? The current one can be brought back from "Restore an earlier version".'))return;replaceSheet({},'before new character')}
  save();render();
 });
+document.addEventListener('change',e=>{const f=e.target.id==='imf'&&e.target.files[0];if(!f)return;f.text().then(t=>{if(importText(t)){save();render()}}).catch(()=>alert('Could not read that file.'));e.target.value=''});
+// Another tab saved: take its version, so this tab never writes a stale copy over it.
+window.addEventListener('storage',e=>{if(e.key!=='sheet'||!e.newValue)return;try{S=cleanSheet(JSON.parse(e.newValue));render()}catch(x){}});
+// Ask the browser not to clear this site's data under storage pressure (granted silently or not at all).
+try{navigator.storage?.persisted?.().then(p=>p||navigator.storage.persist()).catch(()=>{})}catch(e){}
+snapshot('opened',true);
 render();
