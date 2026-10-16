@@ -4,7 +4,7 @@
 export const AB = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 export const ABN = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
 export const SK = [['Acrobatics', 'dex'], ['Animal Handling', 'wis'], ['Arcana', 'int'], ['Athletics', 'str'], ['Deception', 'cha'], ['History', 'int'], ['Insight', 'wis'], ['Intimidation', 'cha'], ['Investigation', 'int'], ['Medicine', 'wis'], ['Nature', 'int'], ['Perception', 'wis'], ['Performance', 'cha'], ['Persuasion', 'cha'], ['Religion', 'int'], ['Sleight of Hand', 'dex'], ['Stealth', 'dex'], ['Survival', 'wis']];
-export const DEF = () => ({ name: 'New Hero', cls: '', sub: '', species: '', bg: '', level: 1, mode: 'play', ab: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }, sv: {}, sk: {}, hp: { cur: 10, max: 10, temp: 0 }, ac: 10, speed: 30, init: 0, cast: '', slots: Array.from({ length: 9 }, () => ({ m: 0, u: 0 })), spells: [], items: [], notes: '', insp: false, feats: [], race: [], vtt: 'foundry', spc: false, acAuto: true, acb: 0 });
+export const DEF = () => ({ name: 'New Hero', cls: '', sub: '', species: '', bg: '', level: 1, mode: 'play', ab: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }, sv: {}, sk: {}, hp: { cur: 10, max: 10, temp: 0 }, ac: 10, speed: 30, init: 0, cast: '', slots: Array.from({ length: 9 }, () => ({ m: 0, u: 0 })), spells: [], items: [], notes: '', insp: false, feats: [], race: [], vtt: 'foundry', spc: false, inc: false, acAuto: true, acb: 0 });
 
 const obj = v => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 const arr = (v, max) => (Array.isArray(v) ? v.slice(0, max) : []);
@@ -29,6 +29,13 @@ const cleanArmor = a => {
   a = obj(a);
   return { k: pick(a.k, ['light', 'medium', 'heavy', 'shield', 'bonus', 'unarm'], ''), ac: int(a.ac, -10, 30, 0), str: int(a.str, 0, 30, 0), nu: bool(a.nu), sb: int(a.sb, -5, 10, 0), stl: bool(a.stl) };
 };
+// Item effects: [type, target, value]. See effectsOf() in library.js.
+const FX = ["set", "chk", "sv", "sa", "dc", "adv"];
+const cleanFx = l => arr(l, 12).filter(Array.isArray).map(([t, a, v]) => {
+  t = pick(t, FX, "");
+  a = t === "set" ? pick(a, AB, "") : t === "adv" ? pick(a, ["init", ...SK.map(([n]) => n)], "") : "";
+  return [t, a, int(v, t === "set" ? 1 : -10, 30, 0)];
+}).filter(([t, a]) => t && (a || !["set", "adv"].includes(t)));
 const cleanFeat = f => { f = obj(f); return { n: str(f.n), t: str(f.t, 60), d: str(f.d, 20000) }; };
 
 export function cleanSheet(o) {
@@ -52,10 +59,12 @@ export function cleanSheet(o) {
       ...(x.w ? { w: cleanWeapon(x.w) } : {}),
       ...(x.ar ? { ar: cleanArmor(x.ar) } : {}),
       ...(x.v ? { v: int(x.v, 0, 99, 0) } : {}),
+      ...(x.rr ? { rr: int(x.rr, 0, 6, 0) } : {}),
+      ...(x.at ? { at: true, ...(x.att === undefined ? {} : { att: bool(x.att) }) } : {}), ...(x.fx ? { fx: cleanFx(x.fx) } : {}),
     })),
     notes: str(o.notes, 100000), insp: bool(o.insp),
     feats: arr(o.feats, 500).map(cleanFeat).filter(f => f.n), race: arr(o.race, 200).map(cleanFeat).filter(f => f.n),
-    vtt: pick(o.vtt, ['foundry', 'roll20', 'roll20t'], 'foundry'), spc: bool(o.spc),
+    vtt: pick(o.vtt, ['foundry', 'roll20', 'roll20t'], 'foundry'), spc: bool(o.spc), inc: bool(o.inc),
     // Sheets from before AC was calculated keep a hand-typed AC unless it was still the default.
     acAuto: o.acAuto === undefined ? (o.ac === undefined || Number(o.ac) === 10) : bool(o.acAuto), acb: int(o.acb, -10, 20, 0),
   };

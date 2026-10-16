@@ -2,7 +2,7 @@
 // and merges in any custom content packs the user has imported.
 const BASE = 'https://api.open5e.com/v2';
 const SOURCE = 'srd-2024';
-const CACHE_VER = 6;
+const CACHE_VER = 10;
 
 export const KINDS = [
   { id: 'spell', label: 'Spells' },
@@ -155,27 +155,70 @@ function normClass(c) {
 // Gear you wear or wield. Everything else (rope, potions, tools, ammunition...) just sits in inventory.
 const EQUIP = /^(weapon|armor|shield|ring|wondrous item|staff|rod|wand|spellcasting focus)$/i;
 const num = v => { const n = Number(v); return n ? String(+n.toFixed(2)) : ''; };
-function normItem(x) {
-  const w = x.weapon, a = x.armor, cat = txt(x.category);
+function normItem(x, weap = new Map()) {
+  // Staves and rods "wielded as a magic Quarterstaff" (or Mace...) borrow that weapon's stats.
+  const as = !x.weapon && /wielded as a magic ([A-Z][a-z]+(?: [A-Z][a-z]+)?)/.exec(x.desc || '');
+  const w = x.weapon || (as && weap.get(as[1].toLowerCase())), a = x.armor, cat = txt(x.category);
   const props = list(w?.properties).map(p => txt(p.property) + (p.detail ? ` (${p.detail})` : ''));
   const has = n => list(w?.properties).some(p => txt(p.property) === n);
   const vers = list(w?.properties).find(p => txt(p.property) === 'Versatile')?.detail || '';
   const bonus = Number(/\(\+(\d)\)/.exec(x.name)?.[1] || 0);
+  // Magic staves and rods state their weapon bonus in the text instead of the name.
+  const wb = bonus || Number(/\+(\d) bonus to attack rolls and damage rolls made with (?:it|this)/i.exec(x.desc || '')?.[1] || 0);
+  // Mithral armor drops the Strength requirement and the Stealth penalty of the armor it's made from.
+  const mith = /^Mithral Armor/i.test(x.name);
   const cost = num(x.cost), lb = num(x.weight);
   const sub = [cat, x.rarity && txt(x.rarity), x.requires_attunement && 'attunement', cost && cost + ' gp', lb && lb + ' lb'].filter(Boolean).join(', ');
   const head = [
-    w && `Damage: ${w.damage_dice} ${txt(w.damage_type).toLowerCase()}${bonus ? ` +${bonus}` : ''}`,
+    x.requires_attunement && (x.attunement_detail || 'Requires attunement'),
+    w && `Damage: ${w.damage_dice} ${txt(w.damage_type).toLowerCase()}${wb ? ` +${wb}` : ''}`,
     props.length && `Properties: ${props.join(', ')}`,
     a && `Armor class: ${a.ac_display}${a.category ? ` (${a.category} armor)` : ''}`,
-    a?.strength_score_required && `Strength ${a.strength_score_required} required`,
-    a?.grants_stealth_disadvantage && 'Disadvantage on Stealth checks',
+    !mith && a?.strength_score_required && `Strength ${a.strength_score_required} required`,
+    !mith && a?.grants_stealth_disadvantage && 'Disadvantage on Stealth checks',
   ].filter(Boolean).join('\n');
+  const fx = effectsOf(x);
   return {
     kind: 'item', name: x.name, level: 0, sub, desc: [head, x.desc].filter(Boolean).join('\n\n'), src: 'SRD', eq: EQUIP.test(cat),
+    ...(x.requires_attunement ? { at: true } : {}), ...(fx.length ? { fx } : {}),
+    // Rarity rank: 0 mundane, 1 Common, 2 Uncommon, 3 Rare, 4 Very Rare, 5 Legendary, 6 Artifact.
+    rr: Math.min(6, Math.max(0, Number(x.rarity?.rank) || 0)),
     // Ranged weapons use Dex, Finesse weapons the better of Str and Dex, everything else Str.
-    ...(w && w.damage_dice ? { w: { d: String(w.damage_dice).replace(/\s+/g, ''), t: txt(w.damage_type).toLowerCase(), v: vers, b: bonus, ab: has('Ammunition') ? 'dex' : has('Finesse') ? 'fin' : 'str' } } : {}),
-    ...armorOf(x, cat, bonus),
+    ...(w && w.damage_dice ? { w: { d: String(w.damage_dice).replace(/\s+/g, ''), t: txt(w.damage_type).toLowerCase(), v: vers, b: wb, ab: has('Ammunition') ? 'dex' : has('Finesse') ? 'fin' : 'str' } } : {}),
+    ...armorOf(x, cat, bonus, mith),
   };
+}
+
+// What a magic item does to the numbers on the sheet while it's equipped (and attuned), as a list of
+// [type, target, value]: set (ability score becomes value, if higher), chk (bonus to ability checks),
+// sv (saving throws), sa (spell attack rolls), dc (spell save DC), adv (Advantage on a skill or 'init').
+// Situational wording (against..., made to interact..., in Bright Light) is skipped.
+const ABL = { strength: 'str', dexterity: 'dex', constitution: 'con', intelligence: 'int', wisdom: 'wis', charisma: 'cha' };
+const BELT = { hill: 21, 'frost or stone': 23, fire: 25, cloud: 27, storm: 29 };
+function effectsOf(x) {
+  const d = String(x.desc || '').replace(/\s+/g, ' '), fx = [], add = (t, a, v) => { if (!fx.some(f => f[0] === t && f[1] === a)) fx.push([t, a, v]); };
+  let m = /Your (Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) (?:score )?is (\d+) while/i.exec(d);
+  if (m) add('set', ABL[m[1].toLowerCase()], Number(m[2]));
+  m = /^Belt of Giant Strength \((.+)\)$/i.exec(x.name);
+  if (m && BELT[m[1].toLowerCase()]) add('set', 'str', BELT[m[1].toLowerCase()]);
+  for (const s of d.split(/(?<=\.)\s+/)) {
+    if (/against|made to interact|Bright Light|transfer/i.test(s)) continue;
+    const b = /\+(\d+) bonus to ([^.]*)/i.exec(s);
+    if (b) {
+      const n = Number(b[1]), what = b[2];
+      if (!/Armor Class/i.test(what)) {
+        if (/ability checks/i.test(what)) add('chk', '', n);
+        if (/saving throws/i.test(what)) add('sv', '', n);
+      }
+      if (/spell attack/i.test(what)) add('sa', '', n);
+    }
+    m = /spell save DC (and spell attack bonus )?(?:each )?increases? by (\d+)/i.exec(s);
+    if (m) { add('dc', '', Number(m[2])); if (m[1]) add('sa', '', Number(m[2])); }
+    if (/bonus to spell attack rolls determined by the wand's rarity/i.test(s)) add('sa', '', Number(/\+(\d)/.exec(x.name)?.[1] || 1));
+    for (const a of s.matchAll(/\bAdvantage on (?:Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) \(([A-Za-z ]+)\) checks/gi)) add('adv', a[1].trim(), 0);
+    if (/\bAdvantage on [^.]*Initiative rolls/i.test(s)) add('adv', 'init', 0);
+  }
+  return fx;
 }
 
 // How an item affects Armor Class, as { ar: { k, ac, str, nu, sb, stl } }:
@@ -186,7 +229,7 @@ function normItem(x) {
 //   k unarm: a better unarmored base (Robe of the Archmagi: 15 + Dex).
 //   sb: bonus to saving throws; stl: Disadvantage on Stealth checks while worn.
 // Situational bonuses (only against ranged attacks, moved from a weapon, from a lit rod) are skipped.
-function armorOf(x, cat, bonus) {
+function armorOf(x, cat, bonus, mith) {
   const a = x.armor, desc = String(x.desc || '');
   const sentences = desc.split(/(?<=\.)\s+/);
   const found = sentences.map(s => [s, /\+(\d+) bonus to Armor Class/i.exec(s)]).filter(([s, m]) => m && !/against|transfer|allies|Bright Light/i.test(s));
@@ -196,7 +239,7 @@ function armorOf(x, cat, bonus) {
   if (/\bShield\b/.test(x.name) && /^armor$/i.test(cat) && (!a || a.ac_base <= 2)) return { ar: { k: 'shield', ac: 2 + bonus, str: 0, sb } };
   if (a && a.ac_base) {
     const k = ['light', 'medium', 'heavy'].includes(a.category) ? a.category : 'heavy';
-    return { ar: { k, ac: a.ac_base + bonus + textBonus, str: a.strength_score_required || 0, sb, stl: !!a.grants_stealth_disadvantage } };
+    return { ar: { k, ac: a.ac_base + bonus + textBonus, str: mith ? 0 : a.strength_score_required || 0, sb, stl: !mith && !!a.grants_stealth_disadvantage } };
   }
   const un = /base Armor Class is (\d+) plus your Dexterity/i.exec(desc);
   if (un) return { ar: { k: 'unarm', ac: Number(un[1]), str: 0, sb } };
@@ -207,7 +250,10 @@ function armorOf(x, cat, bonus) {
 function normalise(kind, rows) {
   if (kind === 'spell') return rows.map(normSpell);
   if (kind === 'feat') return rows.map(normFeat);
-  if (kind === 'item') return rows.map(normItem);
+  if (kind === 'item') {
+    const weap = new Map(rows.filter(r => r.weapon && !r.rarity).map(r => [r.name.toLowerCase(), r.weapon]));
+    return rows.map(r => normItem(r, weap));
+  }
   if (kind === 'race') return rows.map(normRace);
   return rows.flatMap(normClass);
 }
