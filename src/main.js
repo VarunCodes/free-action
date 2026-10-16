@@ -3,7 +3,7 @@ import { openLibrary } from './libraryui.js';
 import { cachedItems } from './library.js';
 import { md, rarityTag, magicMark } from './text.js';
 import { AB, ABN, SK, DEF, cleanSheet } from './sheet.js';
-let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null;const UP={};
+let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null,RERR='',IOMSG=null;const UP={};
 const SR=()=>({a:false,s:'',d:'',b:'',t:'',h:false,m:false,by:'slot',up:[]});
 const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}},lsSet=(k,v)=>{try{localStorage.setItem(k,v);return true}catch(e){return false}};
 try{const r=lsGet('sheet');if(r)S=cleanSheet(JSON.parse(r))}catch(e){}
@@ -11,12 +11,16 @@ try{const r=lsGet('sheet');if(r)S=cleanSheet(JSON.parse(r))}catch(e){}
 // and one right before Import, Restore or New character replaces the sheet.
 const snaps=()=>{try{const a=JSON.parse(lsGet('sheet-history')||'[]');return Array.isArray(a)?a.filter(x=>x&&typeof x.s==='string'):[]}catch(e){return[]}};
 function snapshot(why,force){const a=snaps(),now=Date.now(),s=JSON.stringify(S);if(a[0]&&a[0].s===s)return;if(!force&&a[0]&&now-a[0].at<30*60e3)return;a.unshift({at:now,why,name:S.name,s});while(a.length&&!lsSet('sheet-history',JSON.stringify(a.slice(0,6))))a.pop()}
-const save=()=>{lsSet('sheet',JSON.stringify(S));snapshot('autosave')};
-function replaceSheet(o,why){snapshot(why,true);S=cleanSheet(o);io='';OPEN.clear();Object.keys(UP).forEach(k=>delete UP[k]);CRIT=null}
+// Every save goes through the same limits as loading (scores 1-30, current HP no more than max, and so on).
+const save=()=>{S=cleanSheet(S);lsSet('sheet',JSON.stringify(S));snapshot('autosave')};
+function replaceSheet(o,why){snapshot(why,true);S=cleanSheet(o);io='';IOMSG=null;OPEN.clear();Object.keys(UP).forEach(k=>delete UP[k]);CRIT=null}
 const ago=t=>{const d=Math.floor((Date.now()-t)/864e5);return d<1?'today':d===1?'yesterday':d+' days ago'};
 function downloadSheet(){const u=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download=(S.name||'character').replace(/[^\w-]+/g,'-')+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);lsSet('sheet-exported',String(Date.now()))}
-function importText(t){let o;try{o=JSON.parse(t);if(!o||typeof o!=='object'||!o.ab)throw 0}catch(x){alert('That is not a valid exported sheet. Use a file from Download backup, or paste the full JSON from Export.');return false}
- if(!confirm(`Replace "${S.name}" with "${cleanSheet(o).name}"? The current character can be brought back from "Restore an earlier version".`))return false;replaceSheet(o,'before import');return true}
+// Problems and results from Import, Open backup file and Restore show under the Backup buttons.
+function importText(t){let o;try{o=JSON.parse(t);if(!o||typeof o!=='object'||!o.ab)throw 0}catch(x){IOMSG={bad:true,t:'That is not a valid exported sheet. Use a file from Download backup, or paste the full JSON from Export.'};return false}
+ const nm=cleanSheet(o).name;if(!confirm(`Replace "${S.name}" with "${nm}"? The current character can be brought back from "Restore an earlier version".`))return false;replaceSheet(o,'before import');IOMSG={t:`Imported "${nm}".`};return true}
+// Dates spell out the month, so 03/04 can't be read two ways; the order still follows the browser's language.
+const when=t=>new Date(t).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'});
 const esc=v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const mod=n=>Math.floor((n-10)/2), fmt=n=>(n>=0?'+':'')+n;
 const prof=()=>Math.ceil(Math.max(1,S.level)/4)+1;
@@ -38,10 +42,10 @@ const fxAdv=k=>fxOf('adv').filter(([,f])=>f[1]===k).map(([x])=>x);
 // Ability score after items: a "your Strength is 19" item raises it, never lowers it.
 const scBy=a=>fxOf('set').filter(([,f])=>f[1]===a&&f[2]>S.ab[a]).sort((p,q)=>q[1][2]-p[1][2])[0];
 const sc=a=>scBy(a)?.[1][2]??S.ab[a];
-// Equipped gear whose Strength requirement isn't met. While any is equipped, every d20 roll is
-// made with Disadvantage and the Normal/Adv choices are locked.
+// Equipped gear whose Strength requirement isn't met. As in the 2024 rules this costs 10 ft of Speed
+// (once, however many such items are worn) and doesn't change any rolls.
 const unmet=()=>S.items.filter(x=>x.eq&&x.on&&x.ar&&x.ar.str>sc('str'));
-const rollMode=()=>unmet().length?'dis':RM;
+const speedNow=()=>Math.max(0,S.speed-(unmet().length?10:0));
 // Armor class from equipped gear: the best body armor (or 10 + Dex, or a better unarmored base),
 // plus the best shield, plus every equipped AC bonus item, plus the sheet's own bonus.
 function acCalc(){const dx=mod(sc('dex')),on=gear().live.filter(x=>x.ar&&x.ar.k),best=(l,f)=>l.map(x=>({x,v:f(x)})).sort((a,b)=>b.v-a.v)[0];
@@ -59,10 +63,17 @@ const saveSrc=()=>[...worn(a=>a.sb).map(x=>[x.n,x.ar.sb]),...fxOf('sv').map(([x,
 const saveBonus=()=>saveSrc().reduce((n,[,v])=>n+v,0);
 const srcText=l=>l.map(([n,v])=>`${n} ${fmt(v)}`).join(', ');
 // dis/adv: this roll's own Disadvantage (Stealth in noisy armor) or Advantage (Cloak of Elvenkind).
-// Any Advantage and any Disadvantage cancel out. An unmet Strength requirement still forces Disadvantage.
-function doRoll(label,b,dis,adv){let RM=rollMode();if(!unmet().length){const A=RM==='adv'||adv,D=RM==='dis'||dis;RM=A&&D?'':A?'adv':D?'dis':''}const r=[rd(20)];if(RM)r.push(rd(20));const pk=RM==='adv'?Math.max(...r):RM==='dis'?Math.min(...r):r[0];LAST={label,expr:(RM?'2d20'+(RM==='adv'?'kh1':'kl1'):'1d20')+(b?fmt(b):''),detail:(RM?'['+r.join(', ')+'] take '+pk:'['+pk+']')+(b?' '+(b>0?'+':'-')+' '+Math.abs(b):''),total:pk+b,crit:pk===20?'Natural 20':pk===1?'Natural 1':''}}
-function doCustom(s){const m=s.replace(/\s/g,'').match(/^(\d*)d(\d+)([+-]\d+)?$/i);if(!m||+m[2]<1)return false;const n=Math.min(50,+m[1]||1),f=+m[2],b=+(m[3]||0),r=Array.from({length:n},()=>rd(f));LAST={label:'Roll',expr:n+'d'+f+(b?fmt(b):''),detail:'['+r.join(', ')+']'+(b?' '+(b>0?'+':'-')+' '+Math.abs(b):''),total:r.reduce((a,c)=>a+c,0)+b,crit:''};return true}
-function rollExpr(label,e,crit){const ts=String(e).replace(/\s/g,'').match(/[+-]?[^+-]+/g)||[];let tot=0;const det=[],ex=[];for(const t of ts){const neg=t[0]==='-',q=t.replace(/^[+-]/,''),m=q.match(/^(\d*)d(\d+)$/i);if(m&&+m[2]>0){const n=Math.min(50,(+m[1]||1)*(crit?2:1)),f=+m[2],r=Array.from({length:n},()=>rd(f)),s=r.reduce((a,c)=>a+c,0);tot+=neg?-s:s;det.push((neg?'- ':det.length?'+ ':'')+'['+r.join(', ')+']');ex.push((neg?'-':'+')+n+'d'+f)}else if(/^\d+$/.test(q)){tot+=neg?-q:+q;det.push((neg?'- ':'+ ')+q);ex.push((neg?'-':'+')+q)}else return false}if(!ex.length)return false;LAST={label,expr:ex.join('').replace(/^\+/,''),detail:det.join(' '),total:Math.max(0,tot),crit:crit?'Critical hit, dice doubled':''};return true}
+// Any Advantage and any Disadvantage cancel out.
+function doRoll(label,b,dis,adv){const A=RM==='adv'||adv,D=RM==='dis'||dis,M=A&&D?'':A?'adv':D?'dis':'';const r=[rd(20)];if(M)r.push(rd(20));const pk=M==='adv'?Math.max(...r):M==='dis'?Math.min(...r):r[0];RERR='';LAST={label,expr:(M?'2d20'+(M==='adv'?'kh1':'kl1'):'1d20')+(b?fmt(b):''),detail:(M?'['+r.join(', ')+'] take '+pk:'['+pk+']')+(b?' '+(b>0?'+':'-')+' '+Math.abs(b):''),total:pk+b,crit:pk===20?'Natural 20':pk===1?'Natural 1':''}}
+// A roll that can't be made clears the last one, so its chat command can't be pasted by mistake.
+const rollErr=t=>{LAST=null;RERR=t;COP=false};
+// Custom rolls: dice and numbers joined by + and -, like 2d6+3 or 1d20+1d4-1. Too many dice is refused, not trimmed.
+function doCustom(s){const e=s.replace(/\s/g,''),dice=[...e.matchAll(/(\d*)d(\d+)/gi)];
+ if(!e)return rollErr('Type a roll first, like 2d6+3.');
+ if(!/^[+-]?(\d*d\d+|\d+)([+-](\d*d\d+|\d+))*$/i.test(e)||!dice.length||dice.some(m=>(m[1]!==''&&+m[1]<1)||+m[2]<1))return rollErr(`"${s.trim().slice(0,40)}" is not a roll. Use dice like 2d6+3 or 1d20+1d4.`);
+ if(dice.reduce((n,m)=>n+(+m[1]||1),0)>100||dice.some(m=>+m[2]>1000))return rollErr('That roll is too big. Use up to 100 dice, each with up to 1000 sides.');
+ rollExpr('Roll',e,false,true)}
+function rollExpr(label,e,crit,raw){const ts=String(e).replace(/\s/g,'').match(/[+-]?[^+-]+/g)||[];let tot=0;const det=[],ex=[];for(const t of ts){const neg=t[0]==='-',q=t.replace(/^[+-]/,''),m=q.match(/^(\d*)d(\d+)$/i);if(m&&+m[2]>0){const n=Math.min(200,(+m[1]||1)*(crit?2:1)),f=+m[2],r=Array.from({length:n},()=>rd(f)),s=r.reduce((a,c)=>a+c,0);tot+=neg?-s:s;det.push((neg?'- ':det.length?'+ ':'')+'['+r.join(', ')+']');ex.push((neg?'-':'+')+n+'d'+f)}else if(/^\d+$/.test(q)){tot+=neg?-q:+q;det.push((neg?'- ':'+ ')+q);ex.push((neg?'-':'+')+q)}else return false}if(!ex.length)return false;RERR='';LAST={label,expr:ex.join('').replace(/^\+/,''),detail:det.join(' '),total:raw?tot:Math.max(0,tot),crit:crit?'Critical hit, dice doubled':''};return true}
 // Damage dice for a spell: cantrips scale with character level, other spells with the slot used.
 // Scaling only applies while the dice still match what the Library gave, so hand edits win.
 function spDice(x,slot){const r=x.r;let d=String(r.d).replace(/\s+/g,''),n=0;if(d&&d===r.b){const lv=r.by==='char'?S.level:slot;for(const[at,dd,nn]of r.up)if(at<=lv){if(dd)d=dd;if(nn)n=nn}}const cm=S.cast?mod(sc(S.cast)):0;if(d&&r.m&&cm)d+=fmt(cm);return{d,n}}
@@ -70,8 +81,8 @@ function spDice(x,slot){const r=x.r;let d=String(r.d).replace(/\s+/g,''),n=0;if(
 // x is the inventory item; a magic weapon that needs attunement only gets its +N once attuned.
 const wMod=x=>{const w=x.w,s=mod(sc('str')),d=mod(sc('dex'));return (w.ab==='dex'?d:w.ab==='fin'?Math.max(s,d):s)+(x.at&&!x.att?0:(+w.b||0))};
 const withMod=(d,m)=>m?d+fmt(m):d;
-function renderRoll(){const L=LAST,bad=unmet(),rm=rollMode(),sg=(v,t)=>`<button data-a="rm" data-v="${v}" class="${rm===v?'on':''}" ${bad.length&&v!=='dis'?'disabled':''}>${t}</button>`,op=(v,t)=>`<option value="${v}" ${S.vtt===v?'selected':''}>${t}</option>`;
-document.getElementById('roll').innerHTML=`<div class="rp"><div class="rpi"><div class="rr">${L?`<b class="tot">${L.total}</b><span>${esc(L.label)} ${esc(L.detail)}</span>${L.crit?`<span class="crit">${L.crit}</span>`:''}`:'<span class="sub">Tap any modifier to roll</span>'}</div>${bad.length?`<p class="reqn">Disadvantage on every d20 roll: ${esc(bad.map(x=>`${x.n} needs Str ${x.ar.str}`).join(', '))}. Unequip it or raise Strength.</p>`:''}<div class="rc"><div class="seg">${sg('','Normal')}${sg('adv','Adv')}${sg('dis','Dis')}</div><input id="cmd" readonly value="${esc(cmdFor())}" placeholder="Chat command" aria-label="Chat command"><button class="pri" data-a="cp">${COP?'Copied':'Copy'}</button></div><details data-id="more" ${OPEN.has('more')?'open':''}><summary>VTT format and custom roll</summary><div class="rc"><select data-k="vtt" aria-label="Chat format">${op('foundry','Foundry (/r)')}${op('roll20','Roll20 (/roll)')}${op('roll20t','Roll20 template')}</select><input id="cx" placeholder="2d6+3" value="${esc(CX)}" aria-label="Custom dice"><button data-a="cx">Roll</button></div></details></div></div>`}
+function renderRoll(){const L=LAST,sg=(v,t)=>`<button data-a="rm" data-v="${v}" class="${RM===v?'on':''}">${t}</button>`,op=(v,t)=>`<option value="${v}" ${S.vtt===v?'selected':''}>${t}</option>`;
+document.getElementById('roll').innerHTML=`<div class="rp"><div class="rpi"><div class="rr">${L?`<b class="tot">${L.total}</b><span>${esc(L.label)} ${esc(L.detail)}</span>${L.crit?`<span class="crit">${L.crit}</span>`:''}`:RERR?`<span class="reqn" role="alert">${esc(RERR)}</span>`:'<span class="sub">Tap any modifier to roll</span>'}</div><div class="rc"><div class="seg">${sg('','Normal')}${sg('adv','Adv')}${sg('dis','Dis')}</div><input id="cmd" readonly value="${esc(cmdFor())}" placeholder="Chat command" aria-label="Chat command"><button class="pri" data-a="cp" ${L?'':'disabled'}>${COP?'Copied':'Copy'}</button></div><details data-id="more" ${OPEN.has('more')?'open':''}><summary>VTT format and custom roll</summary><div class="rc"><select data-k="vtt" aria-label="Chat format">${op('foundry','Foundry (/r)')}${op('roll20','Roll20 (/roll)')}${op('roll20t','Roll20 template')}</select><input id="cx" placeholder="2d6+3" value="${esc(CX)}" aria-label="Custom dice"><button data-a="cx">Roll</button></div></details></div></div>`}
 const featSec=(t,k,typed,ed)=>{const L=S[k];let h=`<h2>${t}</h2>`;h+=L.length?L.map((x,i)=>{const id=k+'.'+i;return `<details class="ft" data-id="${id}" ${ed||OPEN.has(id)?'open':''}><summary><span class="g">${esc(x.n)}</span>${x.t?`<span class="pill">${esc(x.t)}</span>`:''}${ed?`<button class="x" data-a="delft" data-v="${id}" aria-label="Remove">\u2715</button>`:''}</summary>${ed?`<textarea data-k="${id}.d" placeholder="Description">${esc(x.d)}</textarea>`:`<p>${md(x.d)||'No description.'}</p>`}</details>`}).join(''):'<div class="empty">None yet.</div>';if(ed)h+=`<div class="add"><input class="n" id="ftn-${k}" placeholder="Name">${typed?`<select id="ftt-${k}"><option>Class feature</option><option>Feat</option></select>`:''}<button class="pri" data-a="addft" data-v="${k}">Add</button></div>`;return h};
 function spRow(x,i,ed,p,cm){const r=x.r,k=`spells.${i}.r.`;
  if(ed)return `<div class="srl"><label class="row"><input type="checkbox" data-k="${k}a" ${r.a?'checked':''}> Attack</label><select data-k="${k}s" aria-label="Saving throw"><option value="">No save</option>${AB.map(a=>`<option value="${a}" ${r.s===a?'selected':''}>${ABN[a].slice(0,3)} save</option>`).join('')}</select>${inp(k+'d',r.d,'text','class="dmg" placeholder="Dice, e.g. 1d10" aria-label="Damage dice"')}${inp(k+'t',r.t,'text','class="dmt" placeholder="Type" aria-label="Damage type"')}<label class="row"><input type="checkbox" data-k="${k}m" ${r.m?'checked':''}> + modifier</label></div>`;
@@ -90,13 +101,13 @@ function render(){
  cut('vit');
  h+=`<h2>Vitals</h2><div class="vitals">
  <div class="vit" title="${esc(S.acAuto?acCalc().parts.map(([n,v])=>n+' '+(v<0?v:'+'+v)).join('\n'):'Typed in by hand')}">${ed&&!S.acAuto?fld('AC','ac',S.ac,'number'):`<b>${acNow()}</b><span class="lab">Armor class</span>`}</div>
- <div class="vit">${ed?fld('Init bonus','init',S.init,'number'):`<button class="bigb" data-a="roll" data-l="Initiative" data-b="${mod(sc('dex'))+S.init+CK}" ${advT('init')?`data-adv="1"`:''} title="${esc([ckT,advT('init')].filter(Boolean).join('. '))}">${fmt(mod(sc('dex'))+S.init+CK)}</button><span class="lab">Initiative${advT('init')?' <span class="pill adv">Adv</span>':''}</span>`}</div>
- <div class="vit">${ed?fld('Speed','speed',S.speed,'number'):`<b>${S.speed}</b><span class="lab">Speed</span>`}</div>
+ <div class="vit">${ed?fld('Init bonus','init',S.init,'number','min=-20 max=20'):`<button class="bigb" data-a="roll" data-l="Initiative" data-b="${mod(sc('dex'))+S.init+CK}" ${advT('init')?`data-adv="1"`:''} title="${esc([ckT,advT('init')].filter(Boolean).join('. '))}">${fmt(mod(sc('dex'))+S.init+CK)}</button><span class="lab">Initiative${advT('init')?' <span class="pill adv">Adv</span>':''}</span>`}</div>
+ <div class="vit">${ed?fld('Speed','speed',S.speed,'number','min=0 max=999'):`<b class="${speedNow()<S.speed?'slow':''}" ${speedNow()<S.speed?`title="${esc(`${S.speed} ft, minus 10 ft: ${unmet().map(x=>`${x.n} needs Str ${x.ar.str}`).join(', ')}`)}"`:''}>${speedNow()}</b><span class="lab">Speed${speedNow()<S.speed?' <span class="pill dis">&minus;10 ft</span>':''}</span>`}</div>
  <div class="vit"><b>${fmt(p)}</b><span class="lab">Proficiency</span></div></div>
  <div class="hp"><div class="hpn"><b>${S.hp.cur}</b><span>/ ${S.hp.max} HP</span>${S.hp.temp?`<span class="pill">+${S.hp.temp} temp</span>`:''}</div>
  <div class="bar ${pct<25?'low':''}"><i style="width:${pct}%"></i></div>
  <div class="row"><input id="amt" type="number" min="0" value="${amt}" aria-label="Amount"><button class="bad" data-a="dmg">Damage</button><button class="pri" data-a="heal">Heal</button><button data-a="temp">Set temp</button></div>
- ${ed?`<div class="row" style="margin-top:8px">${fld('Max HP','hp.max',S.hp.max,'number')}${fld('Current HP','hp.cur',S.hp.cur,'number')}</div>`:''}
+ ${ed?`<div class="row" style="margin-top:8px">${fld('Max HP','hp.max',S.hp.max,'number','min=1 max=9999')}${fld('Current HP','hp.cur',S.hp.cur,'number',`min=0 max=${S.hp.max}`)}</div>`:''}
  <div class="row" style="margin-top:8px"><button data-a="long">Long rest</button>
  <label class="row" style="margin-left:auto"><input type="checkbox" data-k="insp" ${S.insp?'checked':''}> Heroic Inspiration</label></div></div>`;
  if(ed)h+=`<div class="row acset"><label class="row"><input type="checkbox" data-k="acAuto" ${S.acAuto?'checked':''}> Calculate AC from equipped gear</label>${S.acAuto?`<label class="row">Other AC bonus ${inp('acb',S.acb,'number','min=-10 max=20 style="width:72px" aria-label="Other AC bonus"')}</label>`:''}</div>`;
@@ -136,7 +147,7 @@ function render(){
  if(S.acAuto&&eqs.length&&!S.inc)h+=`<p class="sub prep">Armor class <b>${AC.ac}</b>: ${esc(AC.parts.map(([n,v])=>`${n} ${v<0?v:'+'+v}`).join(', ').replace(/^(.*?) \+(\d+)/,'$1 $2'))}.</p>`;
  const AK=[['','No AC effect'],['light','Light armor (+ Dex)'],['medium','Medium armor (+ Dex, max 2)'],['heavy','Heavy armor'],['shield','Shield (adds AC)'],['bonus','AC bonus (adds AC)'],['unarm','Unarmored base (+ Dex)']];
  const shownIt=S.items.map((x,i)=>[x,i]).filter(([x])=>!S.inc||(x.eq&&x.on));
- h+=shownIt.length?shownIt.map(([x,i])=>{const w=x.w,m=w?wMod(x):0,dim=!ed&&ne&&x.eq&&!x.on,bad=x.eq&&x.on&&x.ar&&x.ar.str>sc('str'),spare=x.on&&x.ar&&['light','medium','heavy','shield'].includes(x.ar.k)&&!AC.used.has(x),over=G.over.includes(x);return `<div class="spi${dim?' unp':''}${bad||over?' req':x.rr?` rs r${x.rr}`:''}"><div class="ln">${x.eq?`<input type="checkbox" data-k="items.${i}.on" ${x.on?'checked':''} aria-label="Equipped" title="Equipped">`:'<span class="pk"></span>'}<span class="g">${magicMark(x.rr)}${x.d?`<button class="lk" data-a="itd" data-v="${i}" aria-expanded="${OPEN.has('it'+i)}">${esc(x.n)}</button>`:esc(x.n)}${rarityTag(x.rr)}${bad?` <span class="reqm">Needs Str ${x.ar.str} (you have ${sc('str')})</span>`:''}${x.at?` <button class="pill att${x.att?' on':''}" data-a="att" data-v="${i}" aria-pressed="${!!x.att}" title="${x.att?'Attuned. Click to end attunement':'Needs attunement. Click to attune'}">${x.att?'Attuned':'Attune'}</button>`:''}${over?' <span class="reqm">Over the 3-item attunement limit</span>':''}${x.at&&x.on&&!x.att?' <span class="a">not attuned, no effect</span>':''}${spare&&S.acAuto?' <span class="a">not counted, a better one is equipped</span>':''}</span>${ed?inp(`items.${i}.q`,x.q,'number','style="width:64px"'):`<span class="v">&times;${x.q}</span>`}${ed?`<button class="x" data-a="delit" data-v="${i}" aria-label="Remove">\u2715</button>`:''}</div>${!ed&&x.fx&&x.fx.length?`<div class="srl fxl">${esc(x.fx.map(fxLabel).join(' \u00b7 '))}</div>`:''}${ed&&x.eq?`<div class="srl"><label class="row"><input type="checkbox" data-k="items.${i}.at" ${x.at?'checked':''}> Needs attunement</label>${(x.fx||[]).map((f,j)=>`<span class="pill">${esc(fxLabel(f))} <button class="x" data-a="delfx" data-v="${i}.${j}" aria-label="Remove effect">\u2715</button></span>`).join('')}<select id="fxt-${i}" aria-label="Effect">${FXO}</select><input id="fxv-${i}" type="number" value="1" style="width:64px" aria-label="Effect value"><button data-a="addfx" data-v="${i}">Add effect</button></div>`:''}${ed?`<div class="srl"><label class="row"><input type="checkbox" data-k="items.${i}.eq" ${x.eq?'checked':''}> Equippable</label>${x.eq?`<select data-k="items.${i}.ar.k" aria-label="Armor class effect">${AK.map(([v,t])=>`<option value="${v}" ${x.ar.k===v?'selected':''}>${t}</option>`).join('')}</select>${x.ar.k?`<label class="row">AC ${inp(`items.${i}.ar.ac`,x.ar.ac,'number','min=-10 max=30 style="width:64px" aria-label="AC value"')}</label><label class="row">Str needed ${inp(`items.${i}.ar.str`,x.ar.str,'number','min=0 max=30 style="width:64px" aria-label="Strength needed"')}</label><label class="row">Save bonus ${inp(`items.${i}.ar.sb`,x.ar.sb||0,'number','min=-5 max=10 style="width:64px" aria-label="Saving throw bonus"')}</label><label class="row"><input type="checkbox" data-k="items.${i}.ar.stl" ${x.ar.stl?'checked':''}> Stealth Disadvantage</label>`:''}`:''}</div>`:''}${w&&!ed?`<div class="srl"><button class="rb" data-a="iatk" data-v="${i}">Hit ${fmt(p+m)}</button><button class="rb" data-a="idmg" data-v="${i}">${esc(withMod(w.d,m))} ${esc(w.t)}</button>${w.v?`<button class="rb" data-a="idmg" data-v="${i}" data-t="v">${esc(withMod(w.v,m))} two-handed</button>`:''}</div>`:''}${x.d&&OPEN.has('it'+i)?`<p class="sd">${md(x.d)}</p>`:''}</div>`}).join(''):(S.inc&&S.items.length?'<div class="empty">Nothing equipped.</div>':'<div class="empty">Nothing carried.</div>');
+ h+=shownIt.length?shownIt.map(([x,i])=>{const w=x.w,m=w?wMod(x):0,dim=!ed&&ne&&x.eq&&!x.on,bad=x.eq&&x.on&&x.ar&&x.ar.str>sc('str'),spare=x.on&&x.ar&&['light','medium','heavy','shield'].includes(x.ar.k)&&!AC.used.has(x),over=G.over.includes(x);return `<div class="spi${dim?' unp':''}${bad||over?' req':x.rr?` rs r${x.rr}`:''}"><div class="ln">${x.eq?`<input type="checkbox" data-k="items.${i}.on" ${x.on?'checked':''} aria-label="Equipped" title="Equipped">`:'<span class="pk"></span>'}<span class="g">${magicMark(x.rr)}${x.d?`<button class="lk" data-a="itd" data-v="${i}" aria-expanded="${OPEN.has('it'+i)}">${esc(x.n)}</button>`:esc(x.n)}${rarityTag(x.rr)}${bad?` <span class="reqm">Needs Str ${x.ar.str} (you have ${sc('str')}): Speed &minus;10 ft</span>`:''}${x.at?` <button class="pill att${x.att?' on':''}" data-a="att" data-v="${i}" aria-pressed="${!!x.att}" title="${x.att?'Attuned. Click to end attunement':'Needs attunement. Click to attune'}">${x.att?'Attuned':'Attune'}</button>`:''}${over?' <span class="reqm">Over the 3-item attunement limit</span>':''}${x.at&&x.on&&!x.att?' <span class="a">not attuned, no effect</span>':''}${spare&&S.acAuto?' <span class="a">not counted, a better one is equipped</span>':''}</span>${ed?inp(`items.${i}.q`,x.q,'number','min=0 style="width:64px" aria-label="Quantity"'):`<span class="v">&times;${x.q}</span>`}${ed?`<button class="x" data-a="delit" data-v="${i}" aria-label="Remove">\u2715</button>`:''}</div>${!ed&&x.fx&&x.fx.length?`<div class="srl fxl">${esc(x.fx.map(fxLabel).join(' \u00b7 '))}</div>`:''}${ed&&x.eq?`<div class="srl"><label class="row"><input type="checkbox" data-k="items.${i}.at" ${x.at?'checked':''}> Needs attunement</label>${(x.fx||[]).map((f,j)=>`<span class="pill">${esc(fxLabel(f))} <button class="x" data-a="delfx" data-v="${i}.${j}" aria-label="Remove effect">\u2715</button></span>`).join('')}<select id="fxt-${i}" aria-label="Effect">${FXO}</select><input id="fxv-${i}" type="number" value="1" style="width:64px" aria-label="Effect value"><button data-a="addfx" data-v="${i}">Add effect</button></div>`:''}${ed?`<div class="srl"><label class="row"><input type="checkbox" data-k="items.${i}.eq" ${x.eq?'checked':''}> Equippable</label>${x.eq?`<select data-k="items.${i}.ar.k" aria-label="Armor class effect">${AK.map(([v,t])=>`<option value="${v}" ${x.ar.k===v?'selected':''}>${t}</option>`).join('')}</select>${x.ar.k?`<label class="row">AC ${inp(`items.${i}.ar.ac`,x.ar.ac,'number','min=-10 max=30 style="width:64px" aria-label="AC value"')}</label><label class="row">Str needed ${inp(`items.${i}.ar.str`,x.ar.str,'number','min=0 max=30 style="width:64px" aria-label="Strength needed"')}</label><label class="row">Save bonus ${inp(`items.${i}.ar.sb`,x.ar.sb||0,'number','min=-5 max=10 style="width:64px" aria-label="Saving throw bonus"')}</label><label class="row"><input type="checkbox" data-k="items.${i}.ar.stl" ${x.ar.stl?'checked':''}> Stealth Disadvantage</label>`:''}`:''}</div>`:''}${w&&!ed?`<div class="srl"><button class="rb" data-a="iatk" data-v="${i}">Hit ${fmt(p+m)}</button><button class="rb" data-a="idmg" data-v="${i}">${esc(withMod(w.d,m))} ${esc(w.t)}</button>${w.v?`<button class="rb" data-a="idmg" data-v="${i}" data-t="v">${esc(withMod(w.v,m))} two-handed</button>`:''}</div>`:''}${x.d&&OPEN.has('it'+i)?`<p class="sd">${md(x.d)}</p>`:''}</div>`}).join(''):(S.inc&&S.items.length?'<div class="empty">Nothing equipped.</div>':'<div class="empty">Nothing carried.</div>');
  if(ed&&!S.inc)h+=`<div class="add"><input class="n" id="itn" placeholder="Item name"><input class="q" id="itq" type="number" value="1" min="0"><button class="pri" data-a="addit">Add</button></div>`;
  cut('notes');h+=`<h2>Notes</h2><textarea data-k="notes" placeholder="Features, backstory, session notes">${esc(S.notes)}</textarea>`;
  cut('backup');
@@ -145,13 +156,14 @@ function render(){
  <div class="row" style="margin-bottom:8px"><button class="pri" data-a="dl">Download backup</button><label class="btn">Open backup file<input type="file" id="imf" class="vh" accept=".json,application/json"></label></div>
  <textarea id="io" placeholder="Exported JSON appears here. Paste JSON here to import.">${esc(io)}</textarea>
  <div class="row" style="margin-top:8px"><button data-a="exp">Export</button><button data-a="imp">Import</button><button class="bad" data-a="reset">New character</button></div>
- ${hist.length?`<div class="row" style="margin-top:8px"><select id="snp" aria-label="Earlier version" style="flex:1">${hist.map((x,i)=>`<option value="${i}">${esc(new Date(x.at).toLocaleString())}: ${esc(x.name)}${x.why==='autosave'?'':` (${esc(x.why)})`}</option>`).join('')}</select><button data-a="rst">Restore an earlier version</button></div>`:''}`;
+ ${IOMSG?`<p class="${IOMSG.bad?'reqn':'sub'}" role="${IOMSG.bad?'alert':'status'}" style="margin:8px 0 0">${esc(IOMSG.t)}</p>`:''}
+ ${hist.length?`<div class="row" style="margin-top:8px"><select id="snp" aria-label="Earlier version" style="flex:1">${hist.map((x,i)=>`<option value="${i}">${esc(when(x.at))}: ${esc(x.name)}${x.why==='autosave'?'':` (${esc(x.why)})`}</option>`).join('')}</select><button data-a="rst">Restore an earlier version</button></div>`:''}`;
  // Sections go into three columns: stats, inventory and spells, everything else. On phones the columns
  // dissolve and the order values put the sections back into one reading order.
  cut('end');const part=k=>{const i=MK.findIndex(m=>m[0]===k);return h.slice(MK[i][1],MK[i+1][1])};
  const secOf=(k,o)=>`<section class="c" style="order:${o}">${part(k)}</section>`;
  h=h.slice(0,MK[0][1])+`<div class="grid"><div class="col">${secOf('vit',1)}${secOf('abil',2)}${secOf('save',3)}${secOf('skill',4)}</div><div class="col">${secOf('inv',7)}${secOf('spell',8)}</div><div class="col">${secOf('feat',5)}${secOf('race',6)}${secOf('notes',9)}${secOf('backup',10)}</div></div>`;
- document.getElementById('app').innerHTML=h;renderRoll();
+ document.getElementById('app').innerHTML=h;renderRoll();document.title=`${S.name.trim()||'Unnamed'} · Character Sheet`;
 }
 
 document.addEventListener('change',e=>{
@@ -160,8 +172,9 @@ document.addEventListener('change',e=>{
  if(t.id==='cx'){CX=t.value;return}
  if(t.dataset.up!==undefined){UP[t.dataset.up]=+t.value;render();return}
  if(!t.dataset.k)return;
- setPath(t.dataset.k,t.type==='number'?(parseInt(t.value)||0):t.type==='checkbox'?t.checked:t.value);
- if(t.dataset.k==='level')S.level=Math.min(20,Math.max(1,S.level));
+ // A blank or non-numeric number box puts the old value back instead of becoming 0.
+ const n=parseInt(t.value);if(t.type==='number'&&!Number.isFinite(n)){render();return}
+ setPath(t.dataset.k,t.type==='number'?n:t.type==='checkbox'?t.checked:t.value);
  save();render();
 });
 document.addEventListener('toggle',e=>{const d=e.target;if(d.dataset&&d.dataset.id&&(S.mode!=='edit'||d.dataset.id==='more')){d.open?OPEN.add(d.dataset.id):OPEN.delete(d.dataset.id)}},true);
@@ -181,9 +194,9 @@ document.addEventListener('click',e=>{
  else if(a==='addsp'){const nm=g('spn').value.trim();if(!nm)return;S.spells.push({n:nm,l:+g('spl').value,p:false})}
  else if(a==='delsp'){S.spells.splice(+v,1);[...OPEN].filter(k=>k.startsWith('sp')).forEach(k=>OPEN.delete(k));Object.keys(UP).forEach(k=>delete UP[k]);CRIT=null}
  else if(a==='satk'){const x=S.spells[+v],cm=S.cast?mod(sc(S.cast)):0;doRoll(x.n+' attack',prof()+cm+fxSum('sa'));CRIT=LAST.crit==='Natural 20'?'s'+v:null;COP=copyText(cmdFor())}
- else if(a==='sdmg'){const x=S.spells[+v],{d}=spDice(x,UP[v]??x.l);if(!rollExpr(x.n+(x.r.h?' healing':' damage'),d,CRIT==='s'+v)){alert('Use dice like 1d10 or 2d6+3. Fix them in Edit.');return}CRIT=null;COP=copyText(cmdFor())}
+ else if(a==='sdmg'){const x=S.spells[+v],{d}=spDice(x,UP[v]??x.l);if(!rollExpr(x.n+(x.r.h?' healing':' damage'),d,CRIT==='s'+v))rollErr(`${x.n} has no valid dice. Use dice like 1d10 or 2d6+3; fix them in Edit.`);else COP=copyText(cmdFor());CRIT=null}
  else if(a==='iatk'){const x=S.items[+v];doRoll(x.n+' attack',prof()+wMod(x));CRIT=LAST.crit==='Natural 20'?'i'+v:null;COP=copyText(cmdFor())}
- else if(a==='idmg'){const x=S.items[+v],tw=b.dataset.t==='v';if(!rollExpr(x.n+' damage'+(tw?' (two-handed)':''),withMod(tw?x.w.v:x.w.d,wMod(x)),CRIT==='i'+v)){alert('This weapon has no valid damage dice.');return}CRIT=null;COP=copyText(cmdFor())}
+ else if(a==='idmg'){const x=S.items[+v],tw=b.dataset.t==='v';if(!rollExpr(x.n+' damage'+(tw?' (two-handed)':''),withMod(tw?x.w.v:x.w.d,wMod(x)),CRIT==='i'+v))rollErr(`${x.n} has no valid damage dice.`);else COP=copyText(cmdFor());CRIT=null}
  else if(a==='addfx'){const x=S.items[+v],[t,k]=g('fxt-'+v).value.split('|');let n=parseInt(g('fxv-'+v).value)||0;if(t==='set')n=Math.min(30,Math.max(1,n||19));if(t==='adv')n=0;x.fx=[...(x.fx||[]).filter(f=>!(f[0]===t&&f[1]===k)),[t,k,n]]}
  else if(a==='delfx'){const[i,j]=v.split('.').map(Number);S.items[i].fx.splice(j,1)}
  else if(a==='itd'){const k='it'+v;OPEN.has(k)?OPEN.delete(k):OPEN.add(k)}
@@ -198,16 +211,16 @@ document.addEventListener('click',e=>{
  else if(a==='delft'){const[k,i]=v.split('.');S[k].splice(+i,1);OPEN.clear()}
  else if(a==='roll'){doRoll(b.dataset.l,+b.dataset.b,b.dataset.dis==='1',b.dataset.adv==='1');CRIT=null;COP=copyText(cmdFor())}
  else if(a==='rm')RM=v;
- else if(a==='cx'){if(!doCustom(g('cx').value)){alert('Use a format like 2d6+3.');return}CRIT=null;COP=copyText(cmdFor())}
- else if(a==='cp')COP=copyText(cmdFor());
- else if(a==='exp'){io=JSON.stringify(S,null,1);lsSet('sheet-exported',String(Date.now()));save();render();const ta=g('io');ta.select();try{navigator.clipboard.writeText(io)}catch(x){}return}
- else if(a==='dl')downloadSheet();
- else if(a==='imp'){if(!importText(g('io').value))return}
- else if(a==='rst'){const x=snaps()[+g('snp').value];if(!x||!confirm(`Restore "${x.name}" from ${new Date(x.at).toLocaleString()}? The current version is kept in the list.`))return;try{replaceSheet(JSON.parse(x.s),'before restore')}catch(e){alert('That version could not be read.');return}}
+ else if(a==='cx'){CX=g('cx').value;doCustom(CX);CRIT=null;if(LAST)COP=copyText(cmdFor())}
+ else if(a==='cp'){if(LAST)COP=copyText(cmdFor())}
+ else if(a==='exp'){IOMSG=null;io=JSON.stringify(S,null,1);lsSet('sheet-exported',String(Date.now()));save();render();const ta=g('io');ta.select();try{navigator.clipboard.writeText(io)}catch(x){}return}
+ else if(a==='dl'){IOMSG=null;downloadSheet()}
+ else if(a==='imp'){io=g('io').value;IOMSG=null;if(!importText(io)){render();return}}
+ else if(a==='rst'){const x=snaps()[+g('snp').value];if(!x||!confirm(`Restore "${x.name}" from ${when(x.at)}? The current version is kept in the list.`))return;try{replaceSheet(JSON.parse(x.s),'before restore');IOMSG={t:`Restored "${x.name}" from ${when(x.at)}.`}}catch(e){IOMSG={bad:true,t:'That version could not be read.'};render();return}}
  else if(a==='reset'){if(!confirm('Start a new character? The current one can be brought back from "Restore an earlier version".'))return;replaceSheet({},'before new character')}
  save();render();
 });
-document.addEventListener('change',e=>{const f=e.target.id==='imf'&&e.target.files[0];if(!f)return;f.text().then(t=>{if(importText(t)){save();render()}}).catch(()=>alert('Could not read that file.'));e.target.value=''});
+document.addEventListener('change',e=>{const f=e.target.id==='imf'&&e.target.files[0];if(!f)return;IOMSG=null;f.text().then(t=>{if(importText(t))save();render()}).catch(()=>{IOMSG={bad:true,t:'Could not read that file.'};render()});e.target.value=''});
 // Another tab saved: take its version, so this tab never writes a stale copy over it.
 window.addEventListener('storage',e=>{if(e.key!=='sheet'||!e.newValue)return;try{S=cleanSheet(JSON.parse(e.newValue));render()}catch(x){}});
 // Ask the browser not to clear this site's data under storage pressure (granted silently or not at all).

@@ -1,5 +1,6 @@
 // The character sheet's shape, and cleanSheet(), which every sheet passes through on its way in
-// (page load, Import, restoring a snapshot, another tab saving). Anything unexpected is dropped
+// (page load, Import, restoring a snapshot, another tab saving) and on every save, so what you see
+// while editing is what you get after a reload. Anything unexpected is dropped
 // or coerced, so the page can trust that numbers are numbers and lists hold the right things.
 export const AB = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 export const ABN = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
@@ -41,14 +42,14 @@ const cleanFeat = f => { f = obj(f); return { n: str(f.n), t: str(f.t, 60), d: s
 export function cleanSheet(o) {
   o = obj(o);
   const d = DEF(), ab = obj(o.ab), sv = obj(o.sv), sk = obj(o.sk), hp = obj(o.hp), slots = arr(o.slots, 9);
-  const hpMax = int(hp.max, 0, 9999, d.hp.max);
+  const hpMax = int(hp.max, 1, 9999, d.hp.max);
   return {
     name: str(o.name, 120, d.name), cls: str(o.cls, 120), sub: str(o.sub, 120), species: str(o.species, 120), bg: str(o.bg, 120),
     level: int(o.level, 1, 20, 1), mode: pick(o.mode, ['play', 'edit'], 'play'),
     ab: Object.fromEntries(AB.map(a => [a, int(ab[a], 1, 30, 10)])),
     sv: Object.fromEntries(AB.filter(a => bool(sv[a])).map(a => [a, true])),
     sk: Object.fromEntries(SK.map(([n]) => [n, int(sk[n], 0, 2, 0)]).filter(([, v]) => v)),
-    hp: { cur: int(hp.cur, 0, 9999, hpMax), max: hpMax, temp: int(hp.temp, 0, 9999, 0) },
+    hp: { cur: int(hp.cur, 0, hpMax, hpMax), max: hpMax, temp: int(hp.temp, 0, 9999, 0) },
     ac: int(o.ac, 0, 50, d.ac), speed: int(o.speed, 0, 999, d.speed), init: int(o.init, -20, 20, 0),
     cast: pick(o.cast, AB, ''),
     slots: d.slots.map((_, i) => { const s = obj(slots[i]), m = int(s.m, 0, 9, 0); return { m, u: int(s.u, 0, m, 0) }; }),

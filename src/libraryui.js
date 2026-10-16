@@ -47,7 +47,7 @@ function draw() {
       <button class="${done ? '' : 'pri'}" data-la="${idx}" ${done ? 'disabled' : ''}>${done ? 'Added' : kind === 'race' ? 'Add species' : owned(S, it) ? `Add (have ${owned(S, it)})` : 'Add'}</button></div>
       ${open.has(id) ? `<p class="sd">${md(it.desc) || 'No description.'}</p>` : ''}</div>`;
   }).join('');
-  const stamp = data && data.at ? `SRD data saved ${new Date(data.at).toLocaleDateString()}` : '';
+  const stamp = data && data.at ? `SRD data saved ${new Date(data.at).toLocaleDateString(undefined, { dateStyle: 'medium' })}` : '';
   dlg.innerHTML = `<div class="dh"><h2>Library</h2><button data-lc>Close</button></div>
   <div class="seg" role="tablist">${KINDS.map(k => `<button role="tab" data-lk="${k.id}" class="${k.id === kind ? 'on' : ''}">${k.label}</button>`).join('')}</div>
   <input id="lq" type="search" placeholder="Search ${KINDS.find(k => k.id === kind).label.toLowerCase()} (${kind === 'item' ? 'try weapon, armor or rare' : 'try a class name or level'})" value="${esc(query)}" aria-label="Search">
