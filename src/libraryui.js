@@ -77,7 +77,24 @@ export function openLibrary(stateGetter, changed) {
     document.body.appendChild(dlg);
     dlg.addEventListener('toggle', e => { if (e.target.classList.contains('pack')) packOpen = e.target.open; }, true);
     dlg.addEventListener('input', e => { if (e.target.id === 'lq') { query = e.target.value; dlg._focusQ = true; draw(); } });
+    // Clicking the backdrop closes the Library. Only when the press also started there,
+    // so dragging a text selection out of the search box doesn't close it, and never
+    // while unimported custom content is sitting in the textarea.
+    const outside = e => {
+      const r = dlg.getBoundingClientRect();
+      return e.target === dlg && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom);
+    };
+    dlg.addEventListener('pointerdown', e => { dlg._downOut = outside(e); });
     dlg.addEventListener('click', async e => {
+      if (outside(e) && dlg._downOut) {
+        const pending = dlg.querySelector('#lp')?.value || '';
+        if (pending.trim()) {
+          msg = 'Import or clear the custom content before closing.'; packOpen = true; draw();
+          dlg.querySelector('#lp').value = pending;
+        }
+        else dlg.close();
+        return;
+      }
       const b = e.target.closest('button'); if (!b) return;
       if (b.dataset.lc !== undefined) dlg.close();
       else if (b.dataset.lk) { kind = b.dataset.lk; draw(); }
