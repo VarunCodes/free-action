@@ -29,6 +29,13 @@ const cleanArmor = a => {
   a = obj(a);
   return { k: pick(a.k, ['light', 'medium', 'heavy', 'shield', 'bonus', 'unarm'], ''), ac: int(a.ac, -10, 30, 0), str: int(a.str, 0, 30, 0), nu: bool(a.nu), sb: int(a.sb, -5, 10, 0), stl: bool(a.stl) };
 };
+// Item effects: [type, target, value]. See effectsOf() in library.js.
+const FX = ["set", "chk", "sv", "sa", "dc", "adv"];
+const cleanFx = l => arr(l, 12).filter(Array.isArray).map(([t, a, v]) => {
+  t = pick(t, FX, "");
+  a = t === "set" ? pick(a, AB, "") : t === "adv" ? pick(a, ["init", ...SK.map(([n]) => n)], "") : "";
+  return [t, a, int(v, t === "set" ? 1 : -10, 30, 0)];
+}).filter(([t, a]) => t && (a || !["set", "adv"].includes(t)));
 const cleanFeat = f => { f = obj(f); return { n: str(f.n), t: str(f.t, 60), d: str(f.d, 20000) }; };
 
 export function cleanSheet(o) {
@@ -52,6 +59,7 @@ export function cleanSheet(o) {
       ...(x.w ? { w: cleanWeapon(x.w) } : {}),
       ...(x.ar ? { ar: cleanArmor(x.ar) } : {}),
       ...(x.v ? { v: int(x.v, 0, 99, 0) } : {}),
+      ...(x.at ? { at: true } : {}), ...(x.fx ? { fx: cleanFx(x.fx) } : {}),
     })),
     notes: str(o.notes, 100000), insp: bool(o.insp),
     feats: arr(o.feats, 500).map(cleanFeat).filter(f => f.n), race: arr(o.race, 200).map(cleanFeat).filter(f => f.n),
