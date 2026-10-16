@@ -15,3 +15,7 @@ export function md(src) {
     .replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,;:]|$)/g, '$1<i>$2</i>')
     .replace(/_([^_\n]+)_/g, '<i>$1</i>');
 }
+
+// Magic item rarity, by rank (0 = mundane gear, which gets no tag).
+export const RARITY = ['', 'Common', 'Uncommon', 'Rare', 'Very Rare', 'Legendary', 'Artifact'];
+export const rarityTag = r => (r > 0 && r < 7 ? ` <span class="rar r${r}">${RARITY[r]}</span>` : '');

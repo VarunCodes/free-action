@@ -1,5 +1,5 @@
 import { KINDS, loadLibrary, search, importPack, clearPacks } from './library.js';
-import { esc, md } from './text.js';
+import { esc, md, rarityTag } from './text.js';
 
 let dlg, data = null, status = 'idle', errors = [], kind = 'spell', query = '', open = new Set(), msg = '', packOpen = false;
 let getS, onChange;
@@ -22,7 +22,7 @@ function add(it) {
   else if (it.kind === 'item') {
     const x = S.items.find(o => o.n.toLowerCase() === it.name.toLowerCase());
     if (x) x.q = (Number(x.q) || 0) + 1;
-    else S.items.push({ n: it.name, q: 1, d: it.desc, eq: !!it.eq, on: false, ...(it.w ? { w: { ...it.w } } : {}), ...(it.ar ? { ar: { ...it.ar } } : {}), ...(it.at ? { at: true } : {}), ...(it.fx ? { fx: it.fx.map(f => [...f]) } : {}), v: 2 });
+    else S.items.push({ n: it.name, q: 1, d: it.desc, eq: !!it.eq, on: false, ...(it.w ? { w: { ...it.w } } : {}), ...(it.ar ? { ar: { ...it.ar } } : {}), ...(it.at ? { at: true } : {}), ...(it.fx ? { fx: it.fx.map(f => [...f]) } : {}), rr: it.rr || 0, v: 3 });
   }
   else {
     if (!S.species) S.species = it.name;
@@ -38,7 +38,7 @@ function draw() {
   const rows = shown.map((it, idx) => {
     const id = kind + ':' + it.name + ':' + idx;
     const done = has(S, it);
-    return `<div class="lrow"><div class="lhd"><button class="lk" data-lo="${esc(id)}" aria-expanded="${open.has(id)}"><span>${esc(it.name)}</span><small>${esc(it.sub)}${it.src === 'Custom' ? ' (custom)' : ''}</small></button>
+    return `<div class="lrow"><div class="lhd"><button class="lk" data-lo="${esc(id)}" aria-expanded="${open.has(id)}"><span>${esc(it.name)}${rarityTag(it.rr)}</span><small>${esc(it.sub)}${it.src === 'Custom' ? ' (custom)' : ''}</small></button>
       <button class="${done ? '' : 'pri'}" data-la="${idx}" ${done ? 'disabled' : ''}>${done ? 'Added' : kind === 'race' ? 'Add species' : owned(S, it) ? `Add (have ${owned(S, it)})` : 'Add'}</button></div>
       ${open.has(id) ? `<p class="sd">${md(it.desc) || 'No description.'}</p>` : ''}</div>`;
   }).join('');

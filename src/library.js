@@ -2,7 +2,7 @@
 // and merges in any custom content packs the user has imported.
 const BASE = 'https://api.open5e.com/v2';
 const SOURCE = 'srd-2024';
-const CACHE_VER = 9;
+const CACHE_VER = 10;
 
 export const KINDS = [
   { id: 'spell', label: 'Spells' },
@@ -181,6 +181,8 @@ function normItem(x, weap = new Map()) {
   return {
     kind: 'item', name: x.name, level: 0, sub, desc: [head, x.desc].filter(Boolean).join('\n\n'), src: 'SRD', eq: EQUIP.test(cat),
     ...(x.requires_attunement ? { at: true } : {}), ...(fx.length ? { fx } : {}),
+    // Rarity rank: 0 mundane, 1 Common, 2 Uncommon, 3 Rare, 4 Very Rare, 5 Legendary, 6 Artifact.
+    rr: Math.min(6, Math.max(0, Number(x.rarity?.rank) || 0)),
     // Ranged weapons use Dex, Finesse weapons the better of Str and Dex, everything else Str.
     ...(w && w.damage_dice ? { w: { d: String(w.damage_dice).replace(/\s+/g, ''), t: txt(w.damage_type).toLowerCase(), v: vers, b: wb, ab: has('Ammunition') ? 'dex' : has('Finesse') ? 'fin' : 'str' } } : {}),
     ...armorOf(x, cat, bonus, mith),

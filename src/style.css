@@ -1,6 +1,6 @@
-:root{--bg:#EEF0EA;--sf:#F8F9F5;--ink:#1B2A30;--mute:#5B6B70;--line:#CBD2C8;--ac:#1F6F78;--acink:#fff;--bad:#B24A2E;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111A1E;--sf:#18242A;--ink:#E4EAE6;--mute:#8FA0A4;--line:#2C3C43;--ac:#5BB8C2;--acink:#0E1619;--bad:#E0846A;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#111A1E;--sf:#18242A;--ink:#E4EAE6;--mute:#8FA0A4;--line:#2C3C43;--ac:#5BB8C2;--acink:#0E1619;--bad:#E0846A;color-scheme:dark}
+:root{--r1:#5F686C;--r2:#2E7D32;--r3:#1F5FBF;--r4:#7B3FB8;--r5:#A36200;--r6:#B0123E;--bg:#EEF0EA;--sf:#F8F9F5;--ink:#1B2A30;--mute:#5B6B70;--line:#CBD2C8;--ac:#1F6F78;--acink:#fff;--bad:#B24A2E;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--r1:#A9B4B8;--r2:#6CCB73;--r3:#73A9F5;--r4:#BC8FEE;--r5:#F0B44C;--r6:#F2708F;--bg:#111A1E;--sf:#18242A;--ink:#E4EAE6;--mute:#8FA0A4;--line:#2C3C43;--ac:#5BB8C2;--acink:#0E1619;--bad:#E0846A;color-scheme:dark}}
+:root[data-theme="dark"]{--r1:#A9B4B8;--r2:#6CCB73;--r3:#73A9F5;--r4:#BC8FEE;--r5:#F0B44C;--r6:#F2708F;--bg:#111A1E;--sf:#18242A;--ink:#E4EAE6;--mute:#8FA0A4;--line:#2C3C43;--ac:#5BB8C2;--acink:#0E1619;--bad:#E0846A;color-scheme:dark}
 *,*::before,*::after{box-sizing:inherit}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 "Hanken Grotesk",system-ui,sans-serif}
@@ -102,3 +102,4 @@ label.btn{display:inline-flex;align-items:center;position:relative;background:va
 .pill.dis{border-color:var(--bad);color:var(--bad)}
 .pill.adv{border-color:var(--ac);color:var(--ac)}.ab.boost{border-color:var(--ac)}.ab .s .up{display:block;font-size:.7rem;color:var(--ac);line-height:1.2}.fxl{color:var(--ac);font-size:.85rem}.pill .x{min-height:0;padding:0 2px;border:0;background:none;font-size:.7rem}
 .pill.att{min-height:0;padding:0 8px;cursor:pointer;background:none;font:inherit;font-size:.72rem}.pill.att.on{background:var(--ac);color:var(--acink)}
+.rar{display:inline-block;font-size:.68rem;font-weight:700;line-height:1.4;border:1px solid currentColor;border-radius:10px;padding:0 6px;margin-left:4px;white-space:nowrap;vertical-align:1px}.rar.r1{color:var(--r1)}.rar.r2{color:var(--r2)}.rar.r3{color:var(--r3)}.rar.r4{color:var(--r4)}.rar.r5{color:var(--r5)}.rar.r6{color:var(--r6)}
