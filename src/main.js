@@ -82,11 +82,11 @@ function render(){
  h+=`<h2>Backup</h2><p class="sub" style="margin:0 0 8px">Saves automatically in this browser. Export to copy your sheet, import to restore it.</p>
  <textarea id="io" placeholder="Exported JSON appears here. Paste JSON here to import.">${esc(io)}</textarea>
  <div class="row" style="margin-top:8px"><button data-a="exp">Export</button><button data-a="imp">Import</button><button class="bad" data-a="reset">New character</button></div>`;
- // Sections go into three columns: stats, spells, everything else. On phones the columns
+ // Sections go into three columns: stats, inventory and spells, everything else. On phones the columns
  // dissolve and the order values put the sections back into one reading order.
  cut('end');const part=k=>{const i=MK.findIndex(m=>m[0]===k);return h.slice(MK[i][1],MK[i+1][1])};
  const sc=(k,o)=>`<section class="c" style="order:${o}">${part(k)}</section>`;
- h=h.slice(0,MK[0][1])+`<div class="grid"><div class="col">${sc('vit',1)}${sc('abil',2)}${sc('save',3)}${sc('skill',4)}</div><div class="col">${sc('spell',7)}</div><div class="col">${sc('feat',5)}${sc('race',6)}${sc('inv',8)}${sc('notes',9)}${sc('backup',10)}</div></div>`;
+ h=h.slice(0,MK[0][1])+`<div class="grid"><div class="col">${sc('vit',1)}${sc('abil',2)}${sc('save',3)}${sc('skill',4)}</div><div class="col">${sc('inv',7)}${sc('spell',8)}</div><div class="col">${sc('feat',5)}${sc('race',6)}${sc('notes',9)}${sc('backup',10)}</div></div>`;
  document.getElementById('app').innerHTML=h;renderRoll();
 }
 
