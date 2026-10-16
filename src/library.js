@@ -2,15 +2,25 @@
 // and merges in any custom content packs the user has imported.
 const BASE = 'https://api.open5e.com/v2';
 const SOURCE = 'srd-2024';
-const CACHE_VER = 2;
+const CACHE_VER = 3;
 
 export const KINDS = [
   { id: 'spell', label: 'Spells' },
   { id: 'feat', label: 'Feats' },
   { id: 'race', label: 'Species' },
   { id: 'class', label: 'Class features' },
+  { id: 'item', label: 'Items' },
 ];
-const RESOURCES = { spell: 'spells', feat: 'feats', race: 'species', class: 'classes' };
+const RESOURCES = { spell: 'spells', feat: 'feats', race: 'species', class: 'classes', item: 'items' };
+// Items come from two endpoints. magicitems ignores the document filter and also returns
+// the 2014 SRD and non-SRD books, so it is filtered here.
+const FETCH = {
+  ...Object.fromEntries(Object.entries(RESOURCES).map(([k, r]) => [k, () => fetchAll(r)])),
+  item: async () => {
+    const [gear, magic] = await Promise.all([fetchAll('items', 500), fetchAll('magicitems', 500)]);
+    return [...gear, ...magic.filter(x => x.document?.key === SOURCE)];
+  },
+};
 
 // ---------- tiny IndexedDB key/value store ----------
 const open = () => new Promise((res, rej) => {
@@ -43,8 +53,8 @@ async function kvSet(k, v) {
 }
 
 // ---------- fetching ----------
-async function fetchAll(resource) {
-  let url = `${BASE}/${resource}/?document__key=${SOURCE}&limit=100`;
+async function fetchAll(resource, limit = 100) {
+  let url = `${BASE}/${resource}/?document__key=${SOURCE}&limit=${limit}`;
   const out = [];
   for (let page = 0; url && page < 30; page++) {
     const ctl = new AbortController();
@@ -141,9 +151,35 @@ function normClass(c) {
   return out;
 }
 
+// Gear you wear or wield. Everything else (rope, potions, tools, ammunition...) just sits in inventory.
+const EQUIP = /^(weapon|armor|shield|ring|wondrous item|staff|rod|wand|spellcasting focus)$/i;
+const num = v => { const n = Number(v); return n ? String(+n.toFixed(2)) : ''; };
+function normItem(x) {
+  const w = x.weapon, a = x.armor, cat = txt(x.category);
+  const props = list(w?.properties).map(p => txt(p.property) + (p.detail ? ` (${p.detail})` : ''));
+  const has = n => list(w?.properties).some(p => txt(p.property) === n);
+  const vers = list(w?.properties).find(p => txt(p.property) === 'Versatile')?.detail || '';
+  const bonus = Number(/\(\+(\d)\)/.exec(x.name)?.[1] || 0);
+  const cost = num(x.cost), lb = num(x.weight);
+  const sub = [cat, x.rarity && txt(x.rarity), x.requires_attunement && 'attunement', cost && cost + ' gp', lb && lb + ' lb'].filter(Boolean).join(', ');
+  const head = [
+    w && `Damage: ${w.damage_dice} ${txt(w.damage_type).toLowerCase()}${bonus ? ` +${bonus}` : ''}`,
+    props.length && `Properties: ${props.join(', ')}`,
+    a && `Armor class: ${a.ac_display}${a.category ? ` (${a.category} armor)` : ''}`,
+    a?.strength_score_required && `Strength ${a.strength_score_required} required`,
+    a?.grants_stealth_disadvantage && 'Disadvantage on Stealth checks',
+  ].filter(Boolean).join('\n');
+  return {
+    kind: 'item', name: x.name, level: 0, sub, desc: [head, x.desc].filter(Boolean).join('\n\n'), src: 'SRD', eq: EQUIP.test(cat),
+    // Ranged weapons use Dex, Finesse weapons the better of Str and Dex, everything else Str.
+    ...(w && w.damage_dice ? { w: { d: String(w.damage_dice).replace(/\s+/g, ''), t: txt(w.damage_type).toLowerCase(), v: vers, b: bonus, ab: has('Ammunition') ? 'dex' : has('Finesse') ? 'fin' : 'str' } } : {}),
+  };
+}
+
 function normalise(kind, rows) {
   if (kind === 'spell') return rows.map(normSpell);
   if (kind === 'feat') return rows.map(normFeat);
+  if (kind === 'item') return rows.map(normItem);
   if (kind === 'race') return rows.map(normRace);
   return rows.flatMap(normClass);
 }
@@ -155,7 +191,7 @@ export async function loadLibrary({ force = false } = {}) {
   const missing = KINDS.map(k => k.id).filter(k => !(cache.kinds[k] && cache.kinds[k].length));
   const errors = [];
   if (missing.length) {
-    const res = await Promise.allSettled(missing.map(k => fetchAll(RESOURCES[k])));
+    const res = await Promise.allSettled(missing.map(k => FETCH[k]()));
     res.forEach((r, i) => {
       const k = missing[i];
       if (r.status === 'fulfilled' && r.value.length) cache.kinds[k] = normalise(k, r.value);
