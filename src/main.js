@@ -4,7 +4,7 @@ import { md } from './text.js';
 const AB=['str','dex','con','int','wis','cha'];
 const ABN={str:'Strength',dex:'Dexterity',con:'Constitution',int:'Intelligence',wis:'Wisdom',cha:'Charisma'};
 const SK=[['Acrobatics','dex'],['Animal Handling','wis'],['Arcana','int'],['Athletics','str'],['Deception','cha'],['History','int'],['Insight','wis'],['Intimidation','cha'],['Investigation','int'],['Medicine','wis'],['Nature','int'],['Perception','wis'],['Performance','cha'],['Persuasion','cha'],['Religion','int'],['Sleight of Hand','dex'],['Stealth','dex'],['Survival','wis']];
-const DEF=()=>({name:'New Hero',cls:'',sub:'',species:'',bg:'',level:1,mode:'play',ab:{str:10,dex:10,con:10,int:10,wis:10,cha:10},sv:{},sk:{},hp:{cur:10,max:10,temp:0},ac:10,speed:30,init:0,cast:'',slots:Array.from({length:9},()=>({m:0,u:0})),spells:[],items:[],notes:'',insp:false,feats:[],race:[],vtt:'foundry'});
+const DEF=()=>({name:'New Hero',cls:'',sub:'',species:'',bg:'',level:1,mode:'play',ab:{str:10,dex:10,con:10,int:10,wis:10,cha:10},sv:{},sk:{},hp:{cur:10,max:10,temp:0},ac:10,speed:30,init:0,cast:'',slots:Array.from({length:9},()=>({m:0,u:0})),spells:[],items:[],notes:'',insp:false,feats:[],race:[],vtt:'foundry',spc:false});
 let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null;const UP={};
 const SR=()=>({a:false,s:'',d:'',b:'',t:'',h:false,m:false,by:'slot',up:[]});
 try{const r=localStorage.getItem('sheet');if(r)S=Object.assign(DEF(),JSON.parse(r))}catch(e){}
@@ -36,11 +36,12 @@ function spRow(x,i,ed,p,cm){const r=x.r,k=`spells.${i}.r.`;
 function render(){
  const ed=S.mode==='edit',p=prof(),ca=S.cast,cm=ca?mod(S.ab[ca]):0;
  S.spells.forEach(x=>{x.r=Object.assign(SR(),x.r)});
+ const MK=[],cut=k=>MK.push([k,h.length]);
  const pct=Math.max(0,Math.min(100,S.hp.max?S.hp.cur/S.hp.max*100:0));
  let h=`<div class="top"><div><h1>${esc(S.name)||'Unnamed'}</h1><p class="sub">${esc([S.species,S.cls&&(S.cls+(S.sub?' ('+S.sub+')':'')),'Level '+S.level].filter(Boolean).join(', '))}</p></div>
  <div class="seg"><button data-a="mode" data-v="play" class="${ed?'':'on'}">Play</button><button data-a="mode" data-v="edit" class="${ed?'on':''}">Edit</button></div><button data-a="lib">Library</button></div>`;
  if(ed)h+=`<div class="id">${fld('Name','name',S.name)}${fld('Level','level',S.level,'number','min=1 max=20')}${fld('Class','cls',S.cls)}${fld('Subclass','sub',S.sub)}${fld('Species','species',S.species)}${fld('Background','bg',S.bg)}</div>`;
- // vitals
+ cut('vit');
  h+=`<h2>Vitals</h2><div class="vitals">
  <div class="vit">${ed?fld('AC','ac',S.ac,'number'):`<b>${S.ac}</b><span class="lab">Armor class</span>`}</div>
  <div class="vit">${ed?fld('Init bonus','init',S.init,'number'):`<button class="bigb" data-a="roll" data-l="Initiative" data-b="${mod(S.ab.dex)+S.init}">${fmt(mod(S.ab.dex)+S.init)}</button><span class="lab">Initiative</span>`}</div>
@@ -52,15 +53,16 @@ function render(){
  ${ed?`<div class="row" style="margin-top:8px">${fld('Max HP','hp.max',S.hp.max,'number')}${fld('Current HP','hp.cur',S.hp.cur,'number')}</div>`:''}
  <div class="row" style="margin-top:8px"><button data-a="long">Long rest</button>
  <label class="row" style="margin-left:auto"><input type="checkbox" data-k="insp" ${S.insp?'checked':''}> Heroic Inspiration</label></div></div>`;
- // abilities
+ cut('abil');
  h+=`<h2>Abilities</h2><div class="abs">${AB.map(a=>`<div class="ab"><div class="n">${ABN[a].slice(0,3)}</div><button class="rb m" data-a="roll" data-l="${ABN[a]} check" data-b="${mod(S.ab[a])}">${fmt(mod(S.ab[a]))}</button>${ed?inp('ab.'+a,S.ab[a],'number','min=1 max=30'):`<div class="s">${S.ab[a]}</div>`}</div>`).join('')}</div>`;
- // saves + skills
+ cut('save');
  h+=`<h2>Saving throws ${ed?'<small>tap circles to set proficiency</small>':''}</h2><div class="list two">${AB.map(a=>{const pr=S.sv[a]?1:0;return `<div class="ln"><button class="pr" data-a="sv" data-v="${a}" ${ed?'':'disabled'}>${PM[pr]}</button><span class="g">${ABN[a]}</span><button class="rb" data-a="roll" data-l="${ABN[a]} save" data-b="${mod(S.ab[a])+pr*p}">${fmt(mod(S.ab[a])+pr*p)}</button></div>`}).join('')}</div>`;
- h+=`<h2>Skills ${ed?'<small>tap to cycle: none, proficient, expertise</small>':''}</h2><div class="list two">${SK.map(([n,a])=>{const pr=S.sk[n]||0;return `<div class="ln"><button class="pr" data-a="sk" data-v="${n}" ${ed?'':'disabled'}>${PM[pr]}</button><span class="g">${n} <span class="a">${a}</span></span><button class="rb" data-a="roll" data-l="${n}" data-b="${mod(S.ab[a])+pr*p}">${fmt(mod(S.ab[a])+pr*p)}</button></div>`}).join('')}</div>
+ cut('skill');h+=`<h2>Skills ${ed?'<small>tap to cycle: none, proficient, expertise</small>':''}</h2><div class="list two">${SK.map(([n,a])=>{const pr=S.sk[n]||0;return `<div class="ln"><button class="pr" data-a="sk" data-v="${n}" ${ed?'':'disabled'}>${PM[pr]}</button><span class="g">${n} <span class="a">${a}</span></span><button class="rb" data-a="roll" data-l="${n}" data-b="${mod(S.ab[a])+pr*p}">${fmt(mod(S.ab[a])+pr*p)}</button></div>`}).join('')}</div>
  <div class="ln"><span class="g">Passive Perception</span><span class="v">${10+mod(S.ab.wis)+(S.sk.Perception||0)*p}</span></div>`;
- h+=featSec('Features and feats','feats',true,ed);h+=featSec('Racial features','race',false,ed);
- // spells
- h+=`<h2>Spellcasting</h2><div class="row" style="margin-bottom:8px"><div style="flex:1"><label class="lab">Spellcasting ability</label><select data-k="cast"><option value="">None</option>${AB.map(a=>`<option value="${a}" ${ca===a?'selected':''}>${ABN[a]}</option>`).join('')}</select></div></div>`;
+ cut('feat');h+=featSec('Features and feats','feats',true,ed);cut('race');h+=featSec('Racial features','race',false,ed);
+ cut('spell');
+ h+=`<h2><button class="hd" data-a="spc" aria-expanded="${!S.spc}">Spellcasting</button>${S.spc?`<small>${S.spells.length} spell${S.spells.length===1?'':'s'}${ca?`, save DC ${8+p+cm}`:''}</small>`:''}</h2>`;const sp0=h.length;
+ h+=`<div class="row" style="margin-bottom:8px"><div style="flex:1"><label class="lab">Spellcasting ability</label><select data-k="cast"><option value="">None</option>${AB.map(a=>`<option value="${a}" ${ca===a?'selected':''}>${ABN[a]}</option>`).join('')}</select></div></div>`;
  if(ca)h+=`<div class="cast"><span>Save DC <b>${8+p+cm}</b></span><span>Attack <button class="rb" data-a="roll" data-l="Spell attack" data-b="${p+cm}">${fmt(p+cm)}</button></span><span>Modifier <b>${fmt(cm)}</b></span></div>`;
  const sl=S.slots.map((s,i)=>({s,i})).filter(o=>ed||o.s.m>0);
  h+=`<div class="slots">${sl.length?sl.map(({s,i})=>`<div class="sl"><span class="lv">Lvl ${i+1}</span><div class="pips">${Array.from({length:s.m},(_,j)=>`<button class="pip ${j<s.u?'used':''}" data-a="slot" data-v="${i}.${j}" aria-label="Slot ${j+1}"></button>`).join('')}</div>${ed?inp(`slots.${i}.m`,s.m,'number','min=0 max=9 aria-label="Max slots"'):''}</div>`).join(''):'<div class="empty">No spell slots. Switch to Edit to set them.</div>'}</div>`;
@@ -72,15 +74,21 @@ function render(){
  if(lv.length)h+=`<p class="sub prep">Prepared <b>${np}</b> of ${lv.length} leveled spells. Tick the box next to a spell to prepare it.</p>`;
  h+=sp.length?sp.map(({x,i})=>{let g='';if(x.l!==last){last=x.l;g=`<div class="grp">${x.l?'Level '+x.l:'Cantrips'}</div>`}const dim=!ed&&np&&x.l>0&&!x.p;return g+`<div class="spi${dim?' unp':''}"><div class="ln">${x.l>0?`<input type="checkbox" data-k="spells.${i}.p" ${x.p?'checked':''} aria-label="Prepared" title="Prepared">`:'<span class="pk"></span>'}<span class="g">${x.d?`<button class="lk" data-a="spd" data-v="${i}" aria-expanded="${OPEN.has('sp'+i)}">${esc(x.n)}</button>`:esc(x.n)}</span>${ed?`<button class="x" data-a="delsp" data-v="${i}" aria-label="Remove">\u2715</button>`:''}</div>${spRow(x,i,ed,p,cm)}${x.d&&OPEN.has('sp'+i)?`<p class="sd">${md(x.d)}</p>`:''}</div>`}).join(''):'<div class="empty">No spells yet.</div>';
  if(ed)h+=`<div class="add"><input class="n" id="spn" placeholder="Spell name"><select id="spl">${[0,1,2,3,4,5,6,7,8,9].map(n=>`<option value="${n}">${n?'Lvl '+n:'Cantrip'}</option>`).join('')}</select><button class="pri" data-a="addsp">Add</button></div>`;
- // inventory
+ if(S.spc)h=h.slice(0,sp0);
+ cut('inv');
  h+=`<h2>Inventory</h2>`;
  h+=S.items.length?S.items.map((x,i)=>`<div class="ln"><span class="g">${esc(x.n)}</span>${ed?inp(`items.${i}.q`,x.q,'number','style="width:64px"'):`<span class="v">&times;${x.q}</span>`}${ed?`<button class="x" data-a="delit" data-v="${i}" aria-label="Remove">\u2715</button>`:''}</div>`).join(''):'<div class="empty">Nothing carried.</div>';
  if(ed)h+=`<div class="add"><input class="n" id="itn" placeholder="Item name"><input class="q" id="itq" type="number" value="1" min="0"><button class="pri" data-a="addit">Add</button></div>`;
- h+=`<h2>Notes</h2><textarea data-k="notes" placeholder="Features, backstory, session notes">${esc(S.notes)}</textarea>`;
- // data
+ cut('notes');h+=`<h2>Notes</h2><textarea data-k="notes" placeholder="Features, backstory, session notes">${esc(S.notes)}</textarea>`;
+ cut('backup');
  h+=`<h2>Backup</h2><p class="sub" style="margin:0 0 8px">Saves automatically in this browser. Export to copy your sheet, import to restore it.</p>
  <textarea id="io" placeholder="Exported JSON appears here. Paste JSON here to import.">${esc(io)}</textarea>
  <div class="row" style="margin-top:8px"><button data-a="exp">Export</button><button data-a="imp">Import</button><button class="bad" data-a="reset">New character</button></div>`;
+ // Sections go into three columns: stats, inventory and spells, everything else. On phones the columns
+ // dissolve and the order values put the sections back into one reading order.
+ cut('end');const part=k=>{const i=MK.findIndex(m=>m[0]===k);return h.slice(MK[i][1],MK[i+1][1])};
+ const sc=(k,o)=>`<section class="c" style="order:${o}">${part(k)}</section>`;
+ h=h.slice(0,MK[0][1])+`<div class="grid"><div class="col">${sc('vit',1)}${sc('abil',2)}${sc('save',3)}${sc('skill',4)}</div><div class="col">${sc('inv',7)}${sc('spell',8)}</div><div class="col">${sc('feat',5)}${sc('race',6)}${sc('notes',9)}${sc('backup',10)}</div></div>`;
  document.getElementById('app').innerHTML=h;renderRoll();
 }
 
@@ -112,6 +120,7 @@ document.addEventListener('click',e=>{
  else if(a==='delsp'){S.spells.splice(+v,1);[...OPEN].filter(k=>k.startsWith('sp')).forEach(k=>OPEN.delete(k));Object.keys(UP).forEach(k=>delete UP[k]);CRIT=null}
  else if(a==='satk'){const x=S.spells[+v],cm=S.cast?mod(S.ab[S.cast]):0;doRoll(x.n+' attack',prof()+cm);CRIT=LAST.crit==='Natural 20'?+v:null;COP=copyText(cmdFor())}
  else if(a==='sdmg'){const x=S.spells[+v],{d}=spDice(x,UP[v]??x.l);if(!rollExpr(x.n+(x.r.h?' healing':' damage'),d,CRIT===+v)){alert('Use dice like 1d10 or 2d6+3. Fix them in Edit.');return}CRIT=null;COP=copyText(cmdFor())}
+ else if(a==='spc')S.spc=!S.spc;
  else if(a==='spd'){const k='sp'+v;OPEN.has(k)?OPEN.delete(k):OPEN.add(k)}
  else if(a==='lib'){openLibrary(()=>S,()=>{save();render()});return}
  else if(a==='addit'){const nm=g('itn').value.trim();if(!nm)return;S.items.push({n:nm,q:parseInt(g('itq').value)||1})}
