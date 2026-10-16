@@ -9,14 +9,21 @@ const has = (S, it) => {
   const inList = l => l.some(x => x.n.toLowerCase() === n);
   if (it.kind === 'spell') return inList(S.spells);
   if (it.kind === 'race') return S.species && S.species.toLowerCase() === n;
+  if (it.kind === 'item') return false;
   return inList(S.feats);
 };
+const owned = (S, it) => it.kind === 'item' ? (S.items.find(x => x.n.toLowerCase() === it.name.toLowerCase())?.q || 0) : 0;
 
 function add(it) {
   const S = getS();
   if (it.kind === 'spell') S.spells.push({ n: it.name, l: it.level, p: false, d: it.desc, ...(it.roll ? { r: { ...it.roll } } : {}) });
   else if (it.kind === 'feat') S.feats.push({ n: it.name, t: 'Feat', d: it.desc });
   else if (it.kind === 'class') S.feats.push({ n: it.name, t: 'Class feature', d: it.desc });
+  else if (it.kind === 'item') {
+    const x = S.items.find(o => o.n.toLowerCase() === it.name.toLowerCase());
+    if (x) x.q = (Number(x.q) || 0) + 1;
+    else S.items.push({ n: it.name, q: 1, d: it.desc, ...(it.w ? { w: { ...it.w } } : {}) });
+  }
   else {
     if (!S.species) S.species = it.name;
     const traits = it.traits && it.traits.length ? it.traits : [{ n: it.name, d: it.desc }];
@@ -32,13 +39,13 @@ function draw() {
     const id = kind + ':' + it.name + ':' + idx;
     const done = has(S, it);
     return `<div class="lrow"><div class="lhd"><button class="lk" data-lo="${esc(id)}" aria-expanded="${open.has(id)}"><span>${esc(it.name)}</span><small>${esc(it.sub)}${it.src === 'Custom' ? ' (custom)' : ''}</small></button>
-      <button class="${done ? '' : 'pri'}" data-la="${idx}" ${done ? 'disabled' : ''}>${done ? 'Added' : kind === 'race' ? 'Add species' : 'Add'}</button></div>
+      <button class="${done ? '' : 'pri'}" data-la="${idx}" ${done ? 'disabled' : ''}>${done ? 'Added' : kind === 'race' ? 'Add species' : owned(S, it) ? `Add (have ${owned(S, it)})` : 'Add'}</button></div>
       ${open.has(id) ? `<p class="sd">${md(it.desc) || 'No description.'}</p>` : ''}</div>`;
   }).join('');
   const stamp = data && data.at ? `SRD data saved ${new Date(data.at).toLocaleDateString()}` : '';
   dlg.innerHTML = `<div class="dh"><h2>Library</h2><button data-lc>Close</button></div>
   <div class="seg" role="tablist">${KINDS.map(k => `<button role="tab" data-lk="${k.id}" class="${k.id === kind ? 'on' : ''}">${k.label}</button>`).join('')}</div>
-  <input id="lq" type="search" placeholder="Search ${KINDS.find(k => k.id === kind).label.toLowerCase()} (try a class name or level)" value="${esc(query)}" aria-label="Search">
+  <input id="lq" type="search" placeholder="Search ${KINDS.find(k => k.id === kind).label.toLowerCase()} (${kind === 'item' ? 'try weapon, armor or rare' : 'try a class name or level'})" value="${esc(query)}" aria-label="Search">
   <div class="lbody">
   ${status === 'loading' ? '<p class="empty">Loading the 2024 SRD&hellip;</p>' : ''}
   ${errors.length ? `<p class="err">Could not load: ${esc(errors.join('; '))}. Check your connection, then <button data-lr>Retry</button></p>` : ''}

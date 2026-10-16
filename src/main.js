@@ -26,6 +26,9 @@ function rollExpr(label,e,crit){const ts=String(e).replace(/\s/g,'').match(/[+-]
 // Damage dice for a spell: cantrips scale with character level, other spells with the slot used.
 // Scaling only applies while the dice still match what the Library gave, so hand edits win.
 function spDice(x,slot){const r=x.r;let d=String(r.d).replace(/\s+/g,''),n=0;if(d&&d===r.b){const lv=r.by==='char'?S.level:slot;for(const[at,dd,nn]of r.up)if(at<=lv){if(dd)d=dd;if(nn)n=nn}}const cm=S.cast?mod(S.ab[S.cast]):0;if(d&&r.m&&cm)d+=fmt(cm);return{d,n}}
+// Weapons: ranged use Dex, Finesse the better of Str and Dex, others Str; magic +N adds to both rolls.
+const wMod=w=>{const s=mod(S.ab.str),d=mod(S.ab.dex);return (w.ab==='dex'?d:w.ab==='fin'?Math.max(s,d):s)+(+w.b||0)};
+const withMod=(d,m)=>m?d+fmt(m):d;
 function renderRoll(){const L=LAST,sg=(v,t)=>`<button data-a="rm" data-v="${v}" class="${RM===v?'on':''}">${t}</button>`,op=(v,t)=>`<option value="${v}" ${S.vtt===v?'selected':''}>${t}</option>`;
 document.getElementById('roll').innerHTML=`<div class="rp"><div class="rpi"><div class="rr">${L?`<b class="tot">${L.total}</b><span>${esc(L.label)} ${esc(L.detail)}</span>${L.crit?`<span class="crit">${L.crit}</span>`:''}`:'<span class="sub">Tap any modifier to roll</span>'}</div><div class="rc"><div class="seg">${sg('','Normal')}${sg('adv','Adv')}${sg('dis','Dis')}</div><input id="cmd" readonly value="${esc(cmdFor())}" placeholder="Chat command" aria-label="Chat command"><button class="pri" data-a="cp">${COP?'Copied':'Copy'}</button></div><details data-id="more" ${OPEN.has('more')?'open':''}><summary>VTT format and custom roll</summary><div class="rc"><select data-k="vtt" aria-label="Chat format">${op('foundry','Foundry (/r)')}${op('roll20','Roll20 (/roll)')}${op('roll20t','Roll20 template')}</select><input id="cx" placeholder="2d6+3" value="${esc(CX)}" aria-label="Custom dice"><button data-a="cx">Roll</button></div></details></div></div>`}
 const featSec=(t,k,typed,ed)=>{const L=S[k];let h=`<h2>${t}</h2>`;h+=L.length?L.map((x,i)=>{const id=k+'.'+i;return `<details class="ft" data-id="${id}" ${ed||OPEN.has(id)?'open':''}><summary><span class="g">${esc(x.n)}</span>${x.t?`<span class="pill">${esc(x.t)}</span>`:''}${ed?`<button class="x" data-a="delft" data-v="${id}" aria-label="Remove">\u2715</button>`:''}</summary>${ed?`<textarea data-k="${id}.d" placeholder="Description">${esc(x.d)}</textarea>`:`<p>${md(x.d)||'No description.'}</p>`}</details>`}).join(''):'<div class="empty">None yet.</div>';if(ed)h+=`<div class="add"><input class="n" id="ftn-${k}" placeholder="Name">${typed?`<select id="ftt-${k}"><option>Class feature</option><option>Feat</option></select>`:''}<button class="pri" data-a="addft" data-v="${k}">Add</button></div>`;return h};
@@ -77,7 +80,7 @@ function render(){
  if(S.spc)h=h.slice(0,sp0);
  cut('inv');
  h+=`<h2>Inventory</h2>`;
- h+=S.items.length?S.items.map((x,i)=>`<div class="ln"><span class="g">${esc(x.n)}</span>${ed?inp(`items.${i}.q`,x.q,'number','style="width:64px"'):`<span class="v">&times;${x.q}</span>`}${ed?`<button class="x" data-a="delit" data-v="${i}" aria-label="Remove">\u2715</button>`:''}</div>`).join(''):'<div class="empty">Nothing carried.</div>';
+ h+=S.items.length?S.items.map((x,i)=>{const w=x.w,m=w?wMod(w):0;return `<div class="ln"><span class="g">${x.d?`<button class="lk" data-a="itd" data-v="${i}" aria-expanded="${OPEN.has('it'+i)}">${esc(x.n)}</button>`:esc(x.n)}</span>${ed?inp(`items.${i}.q`,x.q,'number','style="width:64px"'):`<span class="v">&times;${x.q}</span>`}${ed?`<button class="x" data-a="delit" data-v="${i}" aria-label="Remove">\u2715</button>`:''}</div>${w&&!ed?`<div class="srl"><button class="rb" data-a="iatk" data-v="${i}">Hit ${fmt(p+m)}</button><button class="rb" data-a="idmg" data-v="${i}">${esc(withMod(w.d,m))} ${esc(w.t)}</button>${w.v?`<button class="rb" data-a="idmg" data-v="${i}" data-t="v">${esc(withMod(w.v,m))} two-handed</button>`:''}</div>`:''}${x.d&&OPEN.has('it'+i)?`<p class="sd">${md(x.d)}</p>`:''}`}).join(''):'<div class="empty">Nothing carried.</div>';
  if(ed)h+=`<div class="add"><input class="n" id="itn" placeholder="Item name"><input class="q" id="itq" type="number" value="1" min="0"><button class="pri" data-a="addit">Add</button></div>`;
  cut('notes');h+=`<h2>Notes</h2><textarea data-k="notes" placeholder="Features, backstory, session notes">${esc(S.notes)}</textarea>`;
  cut('backup');
@@ -118,13 +121,16 @@ document.addEventListener('click',e=>{
  else if(a==='slot'){const[i,j]=v.split('.').map(Number),s=S.slots[i];s.u=(j<s.u)?j:j+1}
  else if(a==='addsp'){const nm=g('spn').value.trim();if(!nm)return;S.spells.push({n:nm,l:+g('spl').value,p:false})}
  else if(a==='delsp'){S.spells.splice(+v,1);[...OPEN].filter(k=>k.startsWith('sp')).forEach(k=>OPEN.delete(k));Object.keys(UP).forEach(k=>delete UP[k]);CRIT=null}
- else if(a==='satk'){const x=S.spells[+v],cm=S.cast?mod(S.ab[S.cast]):0;doRoll(x.n+' attack',prof()+cm);CRIT=LAST.crit==='Natural 20'?+v:null;COP=copyText(cmdFor())}
- else if(a==='sdmg'){const x=S.spells[+v],{d}=spDice(x,UP[v]??x.l);if(!rollExpr(x.n+(x.r.h?' healing':' damage'),d,CRIT===+v)){alert('Use dice like 1d10 or 2d6+3. Fix them in Edit.');return}CRIT=null;COP=copyText(cmdFor())}
+ else if(a==='satk'){const x=S.spells[+v],cm=S.cast?mod(S.ab[S.cast]):0;doRoll(x.n+' attack',prof()+cm);CRIT=LAST.crit==='Natural 20'?'s'+v:null;COP=copyText(cmdFor())}
+ else if(a==='sdmg'){const x=S.spells[+v],{d}=spDice(x,UP[v]??x.l);if(!rollExpr(x.n+(x.r.h?' healing':' damage'),d,CRIT==='s'+v)){alert('Use dice like 1d10 or 2d6+3. Fix them in Edit.');return}CRIT=null;COP=copyText(cmdFor())}
+ else if(a==='iatk'){const x=S.items[+v];doRoll(x.n+' attack',prof()+wMod(x.w));CRIT=LAST.crit==='Natural 20'?'i'+v:null;COP=copyText(cmdFor())}
+ else if(a==='idmg'){const x=S.items[+v],tw=b.dataset.t==='v';if(!rollExpr(x.n+' damage'+(tw?' (two-handed)':''),withMod(tw?x.w.v:x.w.d,wMod(x.w)),CRIT==='i'+v)){alert('This weapon has no valid damage dice.');return}CRIT=null;COP=copyText(cmdFor())}
+ else if(a==='itd'){const k='it'+v;OPEN.has(k)?OPEN.delete(k):OPEN.add(k)}
  else if(a==='spc')S.spc=!S.spc;
  else if(a==='spd'){const k='sp'+v;OPEN.has(k)?OPEN.delete(k):OPEN.add(k)}
  else if(a==='lib'){openLibrary(()=>S,()=>{save();render()});return}
  else if(a==='addit'){const nm=g('itn').value.trim();if(!nm)return;S.items.push({n:nm,q:parseInt(g('itq').value)||1})}
- else if(a==='delit')S.items.splice(+v,1);
+ else if(a==='delit'){S.items.splice(+v,1);[...OPEN].filter(k=>k.startsWith('it')).forEach(k=>OPEN.delete(k));CRIT=null}
  else if(a==='addft'){const nm=g('ftn-'+v).value.trim();if(!nm)return;const t=g('ftt-'+v);S[v].push({n:nm,t:t?t.value:'',d:''})}
  else if(a==='delft'){const[k,i]=v.split('.');S[k].splice(+i,1);OPEN.clear()}
  else if(a==='roll'){doRoll(b.dataset.l,+b.dataset.b);CRIT=null;COP=copyText(cmdFor())}
