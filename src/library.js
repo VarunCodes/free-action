@@ -2,7 +2,7 @@
 // and merges in any custom content packs the user has imported.
 const BASE = 'https://api.open5e.com/v2';
 const SOURCE = 'srd-2024';
-const CACHE_VER = 2;
+const CACHE_VER = 3;
 
 export const KINDS = [
   { id: 'spell', label: 'Spells' },
@@ -151,6 +151,8 @@ function normClass(c) {
   return out;
 }
 
+// Gear you wear or wield. Everything else (rope, potions, tools, ammunition...) just sits in inventory.
+const EQUIP = /^(weapon|armor|shield|ring|wondrous item|staff|rod|wand|spellcasting focus)$/i;
 const num = v => { const n = Number(v); return n ? String(+n.toFixed(2)) : ''; };
 function normItem(x) {
   const w = x.weapon, a = x.armor, cat = txt(x.category);
@@ -168,7 +170,7 @@ function normItem(x) {
     a?.grants_stealth_disadvantage && 'Disadvantage on Stealth checks',
   ].filter(Boolean).join('\n');
   return {
-    kind: 'item', name: x.name, level: 0, sub, desc: [head, x.desc].filter(Boolean).join('\n\n'), src: 'SRD',
+    kind: 'item', name: x.name, level: 0, sub, desc: [head, x.desc].filter(Boolean).join('\n\n'), src: 'SRD', eq: EQUIP.test(cat),
     // Ranged weapons use Dex, Finesse weapons the better of Str and Dex, everything else Str.
     ...(w && w.damage_dice ? { w: { d: String(w.damage_dice).replace(/\s+/g, ''), t: txt(w.damage_type).toLowerCase(), v: vers, b: bonus, ab: has('Ammunition') ? 'dex' : has('Finesse') ? 'fin' : 'str' } } : {}),
   };
