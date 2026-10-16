@@ -2,7 +2,7 @@
 // and merges in any custom content packs the user has imported.
 const BASE = 'https://api.open5e.com/v2';
 const SOURCE = 'srd-2024';
-const CACHE_VER = 3;
+const CACHE_VER = 4;
 
 export const KINDS = [
   { id: 'spell', label: 'Spells' },
@@ -12,13 +12,12 @@ export const KINDS = [
   { id: 'item', label: 'Items' },
 ];
 const RESOURCES = { spell: 'spells', feat: 'feats', race: 'species', class: 'classes', item: 'items' };
-// Items come from two endpoints. magicitems ignores the document filter and also returns
-// the 2014 SRD and non-SRD books, so it is filtered here.
+// Items come from two endpoints (gear and magic items).
 const FETCH = {
   ...Object.fromEntries(Object.entries(RESOURCES).map(([k, r]) => [k, () => fetchAll(r)])),
   item: async () => {
     const [gear, magic] = await Promise.all([fetchAll('items', 500), fetchAll('magicitems', 500)]);
-    return [...gear, ...magic.filter(x => x.document?.key === SOURCE)];
+    return [...gear, ...magic];
   },
 };
 
@@ -63,7 +62,9 @@ async function fetchAll(resource, limit = 100) {
     try { r = await fetch(url, { signal: ctl.signal }); } finally { clearTimeout(timer); }
     if (!r.ok) throw new Error(`${resource}: HTTP ${r.status}`);
     const j = await r.json();
-    out.push(...(j.results || []));
+    // Some endpoints (items, magicitems) ignore document__key and mix in the 2014 SRD or
+    // other books, which shows up as duplicates like two Plate Armors. Keep 2024 SRD only.
+    out.push(...(j.results || []).filter(x => !x.document || x.document.key === SOURCE));
     url = j.next ? String(j.next).replace(/^http:/, 'https:') : null;
   }
   return out;
