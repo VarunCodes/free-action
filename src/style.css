@@ -101,3 +101,4 @@ label.btn{display:inline-flex;align-items:center;position:relative;background:va
 .spi.req{box-shadow:inset 3px 0 0 var(--bad);background:color-mix(in srgb,var(--bad) 10%,transparent);border-radius:4px;padding-left:4px}.reqm{color:var(--bad);font-size:.8rem;font-weight:700;white-space:nowrap}.reqn{margin:0 0 6px;color:var(--bad);font-size:.85rem;font-weight:700}.seg button:disabled{opacity:.35;cursor:not-allowed}.acset{margin-top:8px;gap:16px}
 .pill.dis{border-color:var(--bad);color:var(--bad)}
 .pill.adv{border-color:var(--ac);color:var(--ac)}.ab.boost{border-color:var(--ac)}.ab .s .up{display:block;font-size:.7rem;color:var(--ac);line-height:1.2}.fxl{color:var(--ac);font-size:.85rem}.pill .x{min-height:0;padding:0 2px;border:0;background:none;font-size:.7rem}
+.pill.att{min-height:0;padding:0 8px;cursor:pointer;background:none;font:inherit;font-size:.72rem}.pill.att.on{background:var(--ac);color:var(--acink)}

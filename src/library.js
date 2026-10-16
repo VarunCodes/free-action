@@ -2,7 +2,7 @@
 // and merges in any custom content packs the user has imported.
 const BASE = 'https://api.open5e.com/v2';
 const SOURCE = 'srd-2024';
-const CACHE_VER = 8;
+const CACHE_VER = 9;
 
 export const KINDS = [
   { id: 'spell', label: 'Spells' },
@@ -155,8 +155,10 @@ function normClass(c) {
 // Gear you wear or wield. Everything else (rope, potions, tools, ammunition...) just sits in inventory.
 const EQUIP = /^(weapon|armor|shield|ring|wondrous item|staff|rod|wand|spellcasting focus)$/i;
 const num = v => { const n = Number(v); return n ? String(+n.toFixed(2)) : ''; };
-function normItem(x) {
-  const w = x.weapon, a = x.armor, cat = txt(x.category);
+function normItem(x, weap = new Map()) {
+  // Staves and rods "wielded as a magic Quarterstaff" (or Mace...) borrow that weapon's stats.
+  const as = !x.weapon && /wielded as a magic ([A-Z][a-z]+(?: [A-Z][a-z]+)?)/.exec(x.desc || '');
+  const w = x.weapon || (as && weap.get(as[1].toLowerCase())), a = x.armor, cat = txt(x.category);
   const props = list(w?.properties).map(p => txt(p.property) + (p.detail ? ` (${p.detail})` : ''));
   const has = n => list(w?.properties).some(p => txt(p.property) === n);
   const vers = list(w?.properties).find(p => txt(p.property) === 'Versatile')?.detail || '';
@@ -246,7 +248,10 @@ function armorOf(x, cat, bonus, mith) {
 function normalise(kind, rows) {
   if (kind === 'spell') return rows.map(normSpell);
   if (kind === 'feat') return rows.map(normFeat);
-  if (kind === 'item') return rows.map(normItem);
+  if (kind === 'item') {
+    const weap = new Map(rows.filter(r => r.weapon && !r.rarity).map(r => [r.name.toLowerCase(), r.weapon]));
+    return rows.map(r => normItem(r, weap));
+  }
   if (kind === 'race') return rows.map(normRace);
   return rows.flatMap(normClass);
 }

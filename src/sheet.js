@@ -59,7 +59,7 @@ export function cleanSheet(o) {
       ...(x.w ? { w: cleanWeapon(x.w) } : {}),
       ...(x.ar ? { ar: cleanArmor(x.ar) } : {}),
       ...(x.v ? { v: int(x.v, 0, 99, 0) } : {}),
-      ...(x.at ? { at: true } : {}), ...(x.fx ? { fx: cleanFx(x.fx) } : {}),
+      ...(x.at ? { at: true, ...(x.att === undefined ? {} : { att: bool(x.att) }) } : {}), ...(x.fx ? { fx: cleanFx(x.fx) } : {}),
     })),
     notes: str(o.notes, 100000), insp: bool(o.insp),
     feats: arr(o.feats, 500).map(cleanFeat).filter(f => f.n), race: arr(o.race, 200).map(cleanFeat).filter(f => f.n),
