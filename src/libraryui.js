@@ -70,6 +70,7 @@ async function load(force) {
   try {
     data = await loadLibrary({ force });
     errors = data.errors;
+    window.dispatchEvent(new Event('library-loaded'));
   } catch (e) { errors = [e.message || 'unknown error']; }
   status = 'ready';
   draw();

@@ -1,5 +1,6 @@
 import './style.css';
 import { openLibrary } from './libraryui.js';
+import { cachedItems } from './library.js';
 import { md } from './text.js';
 import { AB, ABN, SK, DEF, cleanSheet } from './sheet.js';
 let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null;const UP={};
@@ -40,7 +41,10 @@ function acCalc(){const dx=mod(S.ab.dex),on=S.items.filter(x=>x.eq&&x.on&&x.ar&&
  for(const x of on.filter(x=>x.ar.k==='bonus'&&(!x.ar.nu||(!arm&&!sh))))parts.push([x.n,x.ar.ac]);if(S.acb)parts.push(['Other bonus',S.acb]);
  return{ac:parts.reduce((n,[,v])=>n+v,0),parts,used:new Set([arm?.x,sh?.x])}}
 const acNow=()=>S.acAuto?acCalc().ac:S.ac;
-function doRoll(label,b){const RM=rollMode(),r=[rd(20)];if(RM)r.push(rd(20));const pk=RM==='adv'?Math.max(...r):RM==='dis'?Math.min(...r):r[0];LAST={label,expr:(RM?'2d20'+(RM==='adv'?'kh1':'kl1'):'1d20')+(b?fmt(b):''),detail:(RM?'['+r.join(', ')+'] take '+pk:'['+pk+']')+(b?' '+(b>0?'+':'-')+' '+Math.abs(b):''),total:pk+b,crit:pk===20?'Natural 20':pk===1?'Natural 1':''}}
+const worn=f=>S.items.filter(x=>x.eq&&x.on&&x.ar&&f(x.ar));
+const saveBonus=()=>worn(a=>a.sb).reduce((n,x)=>n+x.ar.sb,0);
+// dis: this roll has its own Disadvantage (Stealth in noisy armor). With Adv picked they cancel out.
+function doRoll(label,b,dis){let RM=rollMode();if(dis)RM=RM==='adv'?'':'dis';const r=[rd(20)];if(RM)r.push(rd(20));const pk=RM==='adv'?Math.max(...r):RM==='dis'?Math.min(...r):r[0];LAST={label,expr:(RM?'2d20'+(RM==='adv'?'kh1':'kl1'):'1d20')+(b?fmt(b):''),detail:(RM?'['+r.join(', ')+'] take '+pk:'['+pk+']')+(b?' '+(b>0?'+':'-')+' '+Math.abs(b):''),total:pk+b,crit:pk===20?'Natural 20':pk===1?'Natural 1':''}}
 function doCustom(s){const m=s.replace(/\s/g,'').match(/^(\d*)d(\d+)([+-]\d+)?$/i);if(!m||+m[2]<1)return false;const n=Math.min(50,+m[1]||1),f=+m[2],b=+(m[3]||0),r=Array.from({length:n},()=>rd(f));LAST={label:'Roll',expr:n+'d'+f+(b?fmt(b):''),detail:'['+r.join(', ')+']'+(b?' '+(b>0?'+':'-')+' '+Math.abs(b):''),total:r.reduce((a,c)=>a+c,0)+b,crit:''};return true}
 function rollExpr(label,e,crit){const ts=String(e).replace(/\s/g,'').match(/[+-]?[^+-]+/g)||[];let tot=0;const det=[],ex=[];for(const t of ts){const neg=t[0]==='-',q=t.replace(/^[+-]/,''),m=q.match(/^(\d*)d(\d+)$/i);if(m&&+m[2]>0){const n=Math.min(50,(+m[1]||1)*(crit?2:1)),f=+m[2],r=Array.from({length:n},()=>rd(f)),s=r.reduce((a,c)=>a+c,0);tot+=neg?-s:s;det.push((neg?'- ':det.length?'+ ':'')+'['+r.join(', ')+']');ex.push((neg?'-':'+')+n+'d'+f)}else if(/^\d+$/.test(q)){tot+=neg?-q:+q;det.push((neg?'- ':'+ ')+q);ex.push((neg?'-':'+')+q)}else return false}if(!ex.length)return false;LAST={label,expr:ex.join('').replace(/^\+/,''),detail:det.join(' '),total:Math.max(0,tot),crit:crit?'Critical hit, dice doubled':''};return true}
 // Damage dice for a spell: cantrips scale with character level, other spells with the slot used.
@@ -80,8 +84,10 @@ function render(){
  cut('abil');
  h+=`<h2>Abilities</h2><div class="abs">${AB.map(a=>`<div class="ab"><div class="n">${ABN[a].slice(0,3)}</div><button class="rb m" data-a="roll" data-l="${ABN[a]} check" data-b="${mod(S.ab[a])}">${fmt(mod(S.ab[a]))}</button>${ed?inp('ab.'+a,S.ab[a],'number','min=1 max=30'):`<div class="s">${S.ab[a]}</div>`}</div>`).join('')}</div>`;
  cut('save');
- h+=`<h2>Saving throws ${ed?'<small>tap circles to set proficiency</small>':''}</h2><div class="list two">${AB.map(a=>{const pr=S.sv[a]?1:0;return `<div class="ln"><button class="pr" data-a="sv" data-v="${a}" ${ed?'':'disabled'}>${PM[pr]}</button><span class="g">${ABN[a]}</span><button class="rb" data-a="roll" data-l="${ABN[a]} save" data-b="${mod(S.ab[a])+pr*p}">${fmt(mod(S.ab[a])+pr*p)}</button></div>`}).join('')}</div>`;
- cut('skill');h+=`<h2>Skills ${ed?'<small>tap to cycle: none, proficient, expertise</small>':''}</h2><div class="list two">${SK.map(([n,a])=>{const pr=S.sk[n]||0;return `<div class="ln"><button class="pr" data-a="sk" data-v="${n}" ${ed?'':'disabled'}>${PM[pr]}</button><span class="g">${n} <span class="a">${a}</span></span><button class="rb" data-a="roll" data-l="${n}" data-b="${mod(S.ab[a])+pr*p}">${fmt(mod(S.ab[a])+pr*p)}</button></div>`}).join('')}</div>
+ const sb=saveBonus(),sbT=sb?`Includes ${worn(a=>a.sb).map(x=>`${x.n} +${x.ar.sb}`).join(', ')}`:'';
+ h+=`<h2>Saving throws ${ed?'<small>tap circles to set proficiency</small>':sb?`<small>${esc(sbT)}</small>`:''}</h2><div class="list two">${AB.map(a=>{const pr=S.sv[a]?1:0,v=mod(S.ab[a])+pr*p+sb;return `<div class="ln"><button class="pr" data-a="sv" data-v="${a}" ${ed?'':'disabled'}>${PM[pr]}</button><span class="g">${ABN[a]}</span><button class="rb" data-a="roll" data-l="${ABN[a]} save" data-b="${v}" title="${esc(sbT)}">${fmt(v)}</button></div>`}).join('')}</div>`;
+ const sd=worn(a=>a.stl),sdT=sd.length?`Disadvantage from ${sd.map(x=>x.n).join(', ')}`:'';
+ cut('skill');h+=`<h2>Skills ${ed?'<small>tap to cycle: none, proficient, expertise</small>':''}</h2><div class="list two">${SK.map(([n,a])=>{const pr=S.sk[n]||0;return `<div class="ln"><button class="pr" data-a="sk" data-v="${n}" ${ed?'':'disabled'}>${PM[pr]}</button><span class="g">${n} <span class="a">${a}</span>${n==='Stealth'&&sd.length?` <span class="pill dis" title="${esc(sdT)}">Dis</span>`:''}</span><button class="rb" data-a="roll" data-l="${n}" data-b="${mod(S.ab[a])+pr*p}" ${n==='Stealth'&&sd.length?`data-dis="1" title="${esc(sdT)}"`:''}>${fmt(mod(S.ab[a])+pr*p)}</button></div>`}).join('')}</div>
  <div class="ln"><span class="g">Passive Perception</span><span class="v">${10+mod(S.ab.wis)+(S.sk.Perception||0)*p}</span></div>`;
  cut('feat');h+=featSec('Features and feats','feats',true,ed);cut('race');h+=featSec('Racial features','race',false,ed);
  cut('spell');
@@ -107,7 +113,7 @@ function render(){
  if(eqs.length)h+=`<p class="sub prep">Equipped <b>${ne}</b> of ${eqs.length} equippable item${eqs.length===1?'':'s'}. Tick the box next to gear you are wearing or wielding.</p>`;
  if(S.acAuto&&eqs.length)h+=`<p class="sub prep">Armor class <b>${AC.ac}</b>: ${esc(AC.parts.map(([n,v])=>`${n} ${v<0?v:'+'+v}`).join(', ').replace(/^(.*?) \+(\d+)/,'$1 $2'))}.</p>`;
  const AK=[['','No AC effect'],['light','Light armor (+ Dex)'],['medium','Medium armor (+ Dex, max 2)'],['heavy','Heavy armor'],['shield','Shield (adds AC)'],['bonus','AC bonus (adds AC)'],['unarm','Unarmored base (+ Dex)']];
- h+=S.items.length?S.items.map((x,i)=>{const w=x.w,m=w?wMod(w):0,dim=!ed&&ne&&x.eq&&!x.on,bad=x.eq&&x.on&&x.ar&&x.ar.str>S.ab.str,spare=x.on&&x.ar&&['light','medium','heavy','shield'].includes(x.ar.k)&&!AC.used.has(x);return `<div class="spi${dim?' unp':''}${bad?' req':''}"><div class="ln">${x.eq?`<input type="checkbox" data-k="items.${i}.on" ${x.on?'checked':''} aria-label="Equipped" title="Equipped">`:'<span class="pk"></span>'}<span class="g">${x.d?`<button class="lk" data-a="itd" data-v="${i}" aria-expanded="${OPEN.has('it'+i)}">${esc(x.n)}</button>`:esc(x.n)}${bad?` <span class="reqm">Needs Str ${x.ar.str} (you have ${S.ab.str})</span>`:''}${spare&&S.acAuto?' <span class="a">not counted, a better one is equipped</span>':''}</span>${ed?inp(`items.${i}.q`,x.q,'number','style="width:64px"'):`<span class="v">&times;${x.q}</span>`}${ed?`<button class="x" data-a="delit" data-v="${i}" aria-label="Remove">\u2715</button>`:''}</div>${ed?`<div class="srl"><label class="row"><input type="checkbox" data-k="items.${i}.eq" ${x.eq?'checked':''}> Equippable</label>${x.eq?`<select data-k="items.${i}.ar.k" aria-label="Armor class effect">${AK.map(([v,t])=>`<option value="${v}" ${x.ar.k===v?'selected':''}>${t}</option>`).join('')}</select>${x.ar.k?`<label class="row">AC ${inp(`items.${i}.ar.ac`,x.ar.ac,'number','min=-10 max=30 style="width:64px" aria-label="AC value"')}</label><label class="row">Str needed ${inp(`items.${i}.ar.str`,x.ar.str,'number','min=0 max=30 style="width:64px" aria-label="Strength needed"')}</label>`:''}`:''}</div>`:''}${w&&!ed?`<div class="srl"><button class="rb" data-a="iatk" data-v="${i}">Hit ${fmt(p+m)}</button><button class="rb" data-a="idmg" data-v="${i}">${esc(withMod(w.d,m))} ${esc(w.t)}</button>${w.v?`<button class="rb" data-a="idmg" data-v="${i}" data-t="v">${esc(withMod(w.v,m))} two-handed</button>`:''}</div>`:''}${x.d&&OPEN.has('it'+i)?`<p class="sd">${md(x.d)}</p>`:''}</div>`}).join(''):'<div class="empty">Nothing carried.</div>';
+ h+=S.items.length?S.items.map((x,i)=>{const w=x.w,m=w?wMod(w):0,dim=!ed&&ne&&x.eq&&!x.on,bad=x.eq&&x.on&&x.ar&&x.ar.str>S.ab.str,spare=x.on&&x.ar&&['light','medium','heavy','shield'].includes(x.ar.k)&&!AC.used.has(x);return `<div class="spi${dim?' unp':''}${bad?' req':''}"><div class="ln">${x.eq?`<input type="checkbox" data-k="items.${i}.on" ${x.on?'checked':''} aria-label="Equipped" title="Equipped">`:'<span class="pk"></span>'}<span class="g">${x.d?`<button class="lk" data-a="itd" data-v="${i}" aria-expanded="${OPEN.has('it'+i)}">${esc(x.n)}</button>`:esc(x.n)}${bad?` <span class="reqm">Needs Str ${x.ar.str} (you have ${S.ab.str})</span>`:''}${spare&&S.acAuto?' <span class="a">not counted, a better one is equipped</span>':''}</span>${ed?inp(`items.${i}.q`,x.q,'number','style="width:64px"'):`<span class="v">&times;${x.q}</span>`}${ed?`<button class="x" data-a="delit" data-v="${i}" aria-label="Remove">\u2715</button>`:''}</div>${ed?`<div class="srl"><label class="row"><input type="checkbox" data-k="items.${i}.eq" ${x.eq?'checked':''}> Equippable</label>${x.eq?`<select data-k="items.${i}.ar.k" aria-label="Armor class effect">${AK.map(([v,t])=>`<option value="${v}" ${x.ar.k===v?'selected':''}>${t}</option>`).join('')}</select>${x.ar.k?`<label class="row">AC ${inp(`items.${i}.ar.ac`,x.ar.ac,'number','min=-10 max=30 style="width:64px" aria-label="AC value"')}</label><label class="row">Str needed ${inp(`items.${i}.ar.str`,x.ar.str,'number','min=0 max=30 style="width:64px" aria-label="Strength needed"')}</label><label class="row">Save bonus ${inp(`items.${i}.ar.sb`,x.ar.sb||0,'number','min=-5 max=10 style="width:64px" aria-label="Saving throw bonus"')}</label><label class="row"><input type="checkbox" data-k="items.${i}.ar.stl" ${x.ar.stl?'checked':''}> Stealth Disadvantage</label>`:''}`:''}</div>`:''}${w&&!ed?`<div class="srl"><button class="rb" data-a="iatk" data-v="${i}">Hit ${fmt(p+m)}</button><button class="rb" data-a="idmg" data-v="${i}">${esc(withMod(w.d,m))} ${esc(w.t)}</button>${w.v?`<button class="rb" data-a="idmg" data-v="${i}" data-t="v">${esc(withMod(w.v,m))} two-handed</button>`:''}</div>`:''}${x.d&&OPEN.has('it'+i)?`<p class="sd">${md(x.d)}</p>`:''}</div>`}).join(''):'<div class="empty">Nothing carried.</div>';
  if(ed)h+=`<div class="add"><input class="n" id="itn" placeholder="Item name"><input class="q" id="itq" type="number" value="1" min="0"><button class="pri" data-a="addit">Add</button></div>`;
  cut('notes');h+=`<h2>Notes</h2><textarea data-k="notes" placeholder="Features, backstory, session notes">${esc(S.notes)}</textarea>`;
  cut('backup');
@@ -163,7 +169,7 @@ document.addEventListener('click',e=>{
  else if(a==='delit'){S.items.splice(+v,1);[...OPEN].filter(k=>k.startsWith('it')).forEach(k=>OPEN.delete(k));CRIT=null}
  else if(a==='addft'){const nm=g('ftn-'+v).value.trim();if(!nm)return;const t=g('ftt-'+v);S[v].push({n:nm,t:t?t.value:'',d:''})}
  else if(a==='delft'){const[k,i]=v.split('.');S[k].splice(+i,1);OPEN.clear()}
- else if(a==='roll'){doRoll(b.dataset.l,+b.dataset.b);CRIT=null;COP=copyText(cmdFor())}
+ else if(a==='roll'){doRoll(b.dataset.l,+b.dataset.b,b.dataset.dis==='1');CRIT=null;COP=copyText(cmdFor())}
  else if(a==='rm')RM=v;
  else if(a==='cx'){if(!doCustom(g('cx').value)){alert('Use a format like 2d6+3.');return}CRIT=null;COP=copyText(cmdFor())}
  else if(a==='cp')COP=copyText(cmdFor());
@@ -180,4 +186,15 @@ window.addEventListener('storage',e=>{if(e.key!=='sheet'||!e.newValue)return;try
 // Ask the browser not to clear this site's data under storage pressure (granted silently or not at all).
 try{navigator.storage?.persisted?.().then(p=>p||navigator.storage.persist()).catch(()=>{})}catch(e){}
 snapshot('opened',true);
+// Gear added before the Library knew about AC, save bonuses or Stealth gets that data filled in
+// from the saved Library copy, matched by name. Each item is filled once (v), so later hand edits stick.
+async function backfill(){let lib;try{lib=await cachedItems()}catch(e){return}if(!lib.length)return;
+ const by=new Map(lib.map(x=>[x.name.toLowerCase(),x]));let ch=false;
+ for(const x of S.items){const l=by.get(x.n.toLowerCase());if(!l||(x.v||0)>=1)continue;
+  if(l.eq&&!x.eq)x.eq=true;if(l.w&&!x.w)x.w={...l.w};
+  if(l.ar){if(!x.ar||!x.ar.k)x.ar={...l.ar};else{if(!x.ar.sb&&l.ar.sb)x.ar.sb=l.ar.sb;if(!x.ar.stl&&l.ar.stl)x.ar.stl=true}}
+  x.v=1;ch=true}
+ if(ch){save();render()}}
+window.addEventListener('library-loaded',backfill);
+backfill();
 render();
