@@ -2,7 +2,7 @@
 // and merges in any custom content packs the user has imported.
 const BASE = 'https://api.open5e.com/v2';
 const SOURCE = 'srd-2024';
-const CACHE_VER = 1;
+const CACHE_VER = 2;
 
 export const KINDS = [
   { id: 'spell', label: 'Spells' },
@@ -80,7 +80,30 @@ function normSpell(s) {
   return {
     kind: 'spell', name: s.name, level,
     sub: `${level ? 'Level ' + level : 'Cantrip'}${school ? ' ' + school : ''}${classes ? ' (' + classes + ')' : ''}`,
-    desc, src: 'SRD',
+    desc, src: 'SRD', roll: spellRoll(s),
+  };
+}
+
+// Roll data for the sheet. Open5e's attack_roll flag also marks buffs like Bless, so an
+// attack is only assumed when the text asks for a spell attack and there is damage to roll.
+const ATTACK_RE = /\b(melee|ranged) spell attack|make (a|one) spell attack|make (a|one) (melee|ranged) attack roll|spell attack (roll )?against/i;
+function spellRoll(s) {
+  const dmg = String(s.damage_roll || '').replace(/\s+/g, '');
+  const types = list(s.damage_types).map(t => String(t).toLowerCase());
+  const save = String(s.saving_throw_ability || '').slice(0, 3).toLowerCase();
+  const up = list(s.casting_options)
+    .map(o => ({ m: /^(player|slot)_level_(\d+)$/.exec(o.type || ''), d: String(o.damage_roll || '').replace(/\s+/g, ''), n: o.target_count }))
+    .filter(o => o.m && (o.d || o.n))
+    .map(o => [Number(o.m[2]), o.d, o.n || 0]);
+  const by = list(s.casting_options).some(o => /^player_level/.test(o.type || '')) ? 'char' : 'slot';
+  return {
+    a: ATTACK_RE.test(s.desc || '') && !!dmg,
+    s: save,
+    d: dmg, b: dmg,
+    t: types.join('/'),
+    h: !!dmg && !types.length && /regain/i.test(s.desc || ''),
+    m: /(plus|\+) your spellcasting ability modifier/i.test(s.desc || ''),
+    by, up,
   };
 }
 
