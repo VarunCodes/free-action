@@ -19,3 +19,5 @@ export function md(src) {
 // Magic item rarity, by rank (0 = mundane gear, which gets no tag).
 export const RARITY = ['', 'Common', 'Uncommon', 'Rare', 'Very Rare', 'Legendary', 'Artifact'];
 export const rarityTag = r => (r > 0 && r < 7 ? ` <span class="rar r${r}">${RARITY[r]}</span>` : '');
+// A ✦ before magic item names, in the rarity's color. Hidden from screen readers: the tag says it.
+export const magicMark = r => (r > 0 && r < 7 ? `<span class="mm r${r}" aria-hidden="true">✦</span>` : '');

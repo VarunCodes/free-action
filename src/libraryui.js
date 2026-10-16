@@ -1,5 +1,5 @@
 import { KINDS, loadLibrary, search, importPack, clearPacks } from './library.js';
-import { esc, md, rarityTag, RARITY } from './text.js';
+import { esc, md, rarityTag, RARITY, magicMark } from './text.js';
 
 let dlg, data = null, status = 'idle', errors = [], kind = 'spell', query = '', open = new Set(), msg = '', packOpen = false;
 // Items tab filter: all, mundane, magic, or a rarity rank ('1'-'6').
@@ -43,7 +43,7 @@ function draw() {
   const rows = shown.map((it, idx) => {
     const id = kind + ':' + it.name + ':' + idx;
     const done = has(S, it);
-    return `<div class="lrow"><div class="lhd"><button class="lk" data-lo="${esc(id)}" aria-expanded="${open.has(id)}"><span>${esc(it.name)}${rarityTag(it.rr)}</span><small>${esc(it.sub)}${it.src === 'Custom' ? ' (custom)' : ''}</small></button>
+    return `<div class="lrow"><div class="lhd"><button class="lk" data-lo="${esc(id)}" aria-expanded="${open.has(id)}"><span>${magicMark(it.rr)}${esc(it.name)}${rarityTag(it.rr)}</span><small>${esc(it.sub)}${it.src === 'Custom' ? ' (custom)' : ''}</small></button>
       <button class="${done ? '' : 'pri'}" data-la="${idx}" ${done ? 'disabled' : ''}>${done ? 'Added' : kind === 'race' ? 'Add species' : owned(S, it) ? `Add (have ${owned(S, it)})` : 'Add'}</button></div>
       ${open.has(id) ? `<p class="sd">${md(it.desc) || 'No description.'}</p>` : ''}</div>`;
   }).join('');
