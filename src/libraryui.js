@@ -14,7 +14,7 @@ const has = (S, it) => {
 
 function add(it) {
   const S = getS();
-  if (it.kind === 'spell') S.spells.push({ n: it.name, l: it.level, p: false, d: it.desc });
+  if (it.kind === 'spell') S.spells.push({ n: it.name, l: it.level, p: false, d: it.desc, ...(it.roll ? { r: { ...it.roll } } : {}) });
   else if (it.kind === 'feat') S.feats.push({ n: it.name, t: 'Feat', d: it.desc });
   else if (it.kind === 'class') S.feats.push({ n: it.name, t: 'Class feature', d: it.desc });
   else {
