@@ -2,7 +2,7 @@
 // and merges in any custom content packs the user has imported.
 const BASE = 'https://api.open5e.com/v2';
 const SOURCE = 'srd-2024';
-const CACHE_VER = 4;
+const CACHE_VER = 6;
 
 export const KINDS = [
   { id: 'spell', label: 'Spells' },
@@ -174,7 +174,34 @@ function normItem(x) {
     kind: 'item', name: x.name, level: 0, sub, desc: [head, x.desc].filter(Boolean).join('\n\n'), src: 'SRD', eq: EQUIP.test(cat),
     // Ranged weapons use Dex, Finesse weapons the better of Str and Dex, everything else Str.
     ...(w && w.damage_dice ? { w: { d: String(w.damage_dice).replace(/\s+/g, ''), t: txt(w.damage_type).toLowerCase(), v: vers, b: bonus, ab: has('Ammunition') ? 'dex' : has('Finesse') ? 'fin' : 'str' } } : {}),
+    ...armorOf(x, cat, bonus),
   };
+}
+
+// How an item affects Armor Class, as { ar: { k, ac, str, nu, sb, stl } }:
+//   k light|medium|heavy: body armor; ac is its base (magic bonus included). Light adds Dex,
+//     medium adds Dex up to +2, heavy adds none. str is the Strength it needs.
+//   k shield: ac is added on top (2, plus any magic bonus).
+//   k bonus: ac is added on top (Ring/Cloak of Protection...); nu = only with no armor and no shield.
+//   k unarm: a better unarmored base (Robe of the Archmagi: 15 + Dex).
+//   sb: bonus to saving throws; stl: Disadvantage on Stealth checks while worn.
+// Situational bonuses (only against ranged attacks, moved from a weapon, from a lit rod) are skipped.
+function armorOf(x, cat, bonus) {
+  const a = x.armor, desc = String(x.desc || '');
+  const sentences = desc.split(/(?<=\.)\s+/);
+  const found = sentences.map(s => [s, /\+(\d+) bonus to Armor Class/i.exec(s)]).filter(([s, m]) => m && !/against|transfer|allies|Bright Light/i.test(s));
+  const textBonus = found.reduce((n, [, m]) => n + Number(m[1]), 0);
+  // "+1 bonus to Armor Class and saving throws" (Ring/Cloak of Protection, Staff of Power) also raises saves.
+  const sb = found.filter(([s]) => /saving throws/i.test(s)).reduce((n, [, m]) => n + Number(m[1]), 0);
+  if (/\bShield\b/.test(x.name) && /^armor$/i.test(cat) && (!a || a.ac_base <= 2)) return { ar: { k: 'shield', ac: 2 + bonus, str: 0, sb } };
+  if (a && a.ac_base) {
+    const k = ['light', 'medium', 'heavy'].includes(a.category) ? a.category : 'heavy';
+    return { ar: { k, ac: a.ac_base + bonus + textBonus, str: a.strength_score_required || 0, sb, stl: !!a.grants_stealth_disadvantage } };
+  }
+  const un = /base Armor Class is (\d+) plus your Dexterity/i.exec(desc);
+  if (un) return { ar: { k: 'unarm', ac: Number(un[1]), str: 0, sb } };
+  if (textBonus) return { ar: { k: 'bonus', ac: textBonus, str: 0, sb, nu: found.some(([s]) => /no armor/i.test(s)) } };
+  return {};
 }
 
 function normalise(kind, rows) {
@@ -238,4 +265,11 @@ export function search(items, kind, query, limit = 80) {
     return as - bs || (kind === 'spell' || kind === 'class' ? a.level - b.level : 0) || a.name.localeCompare(b.name);
   });
   return { shown: hits.slice(0, limit), total: hits.length };
+}
+
+// Items from the saved Library copy, without downloading. Used to fill in data on gear that was
+// added to a sheet before the Library knew about it (e.g. armor added before AC was calculated).
+export async function cachedItems() {
+  const c = await kvGet('srd-cache');
+  return c && c.ver === CACHE_VER ? (c.kinds.item || []) : [];
 }

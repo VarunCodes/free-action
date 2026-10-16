@@ -22,7 +22,7 @@ function add(it) {
   else if (it.kind === 'item') {
     const x = S.items.find(o => o.n.toLowerCase() === it.name.toLowerCase());
     if (x) x.q = (Number(x.q) || 0) + 1;
-    else S.items.push({ n: it.name, q: 1, d: it.desc, eq: !!it.eq, on: false, ...(it.w ? { w: { ...it.w } } : {}) });
+    else S.items.push({ n: it.name, q: 1, d: it.desc, eq: !!it.eq, on: false, ...(it.w ? { w: { ...it.w } } : {}), ...(it.ar ? { ar: { ...it.ar } } : {}) });
   }
   else {
     if (!S.species) S.species = it.name;
@@ -70,6 +70,7 @@ async function load(force) {
   try {
     data = await loadLibrary({ force });
     errors = data.errors;
+    window.dispatchEvent(new Event('library-loaded'));
   } catch (e) { errors = [e.message || 'unknown error']; }
   status = 'ready';
   draw();
