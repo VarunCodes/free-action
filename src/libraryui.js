@@ -78,11 +78,16 @@ function add(it) {
 
 // Redrawing replaces the dialog's contents, which would jump the list back to the top. A new list
 // (tab, search, filter) starts at the top; anything else (open a description, Add, Remove) keeps the
-// scroll position and puts keyboard focus back on the same button.
+// scroll position. Either way, keyboard focus goes back to the same control (the search box, a tab, a chip,
+// a row button), found again by its id or data-l* attribute, so it never drops to the page behind.
 function draw(top) {
   const S = getS(), body = dlg.querySelector('.lbody'), keep = !top && body ? [body.scrollTop, dlg.scrollTop] : null;
-  const a = document.activeElement, d = a && dlg.contains(a) ? a.dataset : {};
-  const refocus = d.lo ? `[data-lo="${CSS.escape(d.lo)}"]` : d.la || d.lrm ? `[data-la="${d.la || d.lrm}"],[data-lrm="${d.la || d.lrm}"]` : '';
+  const a = document.activeElement, mine = a && a !== dlg && dlg.contains(a), d = mine ? a.dataset : {}, k0 = Object.keys(d)[0];
+  const attr = k => 'data-' + k.replace(/[A-Z]/g, c => '-' + c.toLowerCase());
+  // Add and Remove share a spot: after either, focus the one now in its place.
+  const refocus = !mine ? '' : a.id === 'lq' ? '' : a.id ? '#' + CSS.escape(a.id)
+    : d.la || d.lrm ? `[data-la="${d.la || d.lrm}"],[data-lrm="${d.la || d.lrm}"]` : k0 ? `[${attr(k0)}="${CSS.escape(d[k0])}"]` : '';
+  if (mine && a.id === 'lq') dlg._focusQ = true;
   const pool = data ? data.items.filter(it => it.kind === 'item' ? rfOk(it) : it.kind === 'spell' ? sfOk(it) : it.kind === 'feat' ? ffOk(it) : it.kind === 'class' ? cfOk(it) : true) : [];
   const { shown, total } = data ? search(pool, kind, query) : { shown: [], total: 0 };
   const chips = kind === 'item' ? chipRow('Filter by rarity', 'lrf', rf, [['all', 'All'], ['mundane', 'Mundane'], ['magic', 'Magic'], ...RARITY.slice(1).map((r, i) => [String(i + 1), r, ' r' + (i + 1)])])
@@ -116,10 +121,11 @@ function draw(top) {
   </details>
   <p class="sub foot">${esc(stamp)}${stamp ? ' &middot; ' : ''}Rules content: SRD 5.2 by Wizards of the Coast, CC-BY 4.0, via Open5e. ${data ? '<button data-lf>Re-download</button>' : ''}</p>`;
   const q = dlg.querySelector('#lq');
-  if (dlg._focusQ) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); dlg._focusQ = false; }
+  const toQ = dlg._focusQ;
+  if (toQ) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); dlg._focusQ = false; }
   dlg._shown = shown;
   if (keep) { dlg.querySelector('.lbody').scrollTop = keep[0]; dlg.scrollTop = keep[1]; }
-  if (refocus && !dlg._focusQ) dlg.querySelector(refocus)?.focus({ preventScroll: true });
+  if (refocus && !toQ) dlg.querySelector(refocus)?.focus({ preventScroll: true });
 }
 
 async function load(force) {
