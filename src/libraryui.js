@@ -11,6 +11,10 @@ const SCHOOLS = ['Abjuration', 'Conjuration', 'Divination', 'Enchantment', 'Evoc
 let sf = 'all';
 const schoolOf = it => SCHOOLS.find(s => new RegExp('\\b' + s + '\\b', 'i').test(it.sub || '')) || '';
 const sfOk = it => sf === 'all' || schoolOf(it) === sf;
+// Feats tab filter: feats or Epic Boons, or one feat category, from the subtitle ("Origin feat", "Epic boon feat").
+const FEATS = [['origin', 'Origin'], ['general', 'General'], ['fighting style', 'Fighting Style']];
+let ff = 'all';
+const ffOk = it => { const s = (it.sub || '').toLowerCase(), boon = /\bboon\b/.test(s) || /^boon of\b/i.test(it.name); return ff === 'all' || (ff === 'boon' ? boon : ff === 'feat' ? !boon : s.startsWith(ff)); };
 const chipRow = (label, attr, cur, opts) => `<div class="chips" role="group" aria-label="${label}">${opts.map(([v, t, cls = '']) => `<button class="chip${cur === v ? ' on' : ''}${cls}" data-${attr}="${v}" aria-pressed="${cur === v}">${t}</button>`).join('')}</div>`;
 let getS, onChange;
 
@@ -74,10 +78,11 @@ function draw(top) {
   const S = getS(), body = dlg.querySelector('.lbody'), keep = !top && body ? [body.scrollTop, dlg.scrollTop] : null;
   const a = document.activeElement, d = a && dlg.contains(a) ? a.dataset : {};
   const refocus = d.lo ? `[data-lo="${CSS.escape(d.lo)}"]` : d.la || d.lrm ? `[data-la="${d.la || d.lrm}"],[data-lrm="${d.la || d.lrm}"]` : '';
-  const pool = data ? data.items.filter(it => it.kind === 'item' ? rfOk(it) : it.kind === 'spell' ? sfOk(it) : true) : [];
+  const pool = data ? data.items.filter(it => it.kind === 'item' ? rfOk(it) : it.kind === 'spell' ? sfOk(it) : it.kind === 'feat' ? ffOk(it) : true) : [];
   const { shown, total } = data ? search(pool, kind, query) : { shown: [], total: 0 };
   const chips = kind === 'item' ? chipRow('Filter by rarity', 'lrf', rf, [['all', 'All'], ['mundane', 'Mundane'], ['magic', 'Magic'], ...RARITY.slice(1).map((r, i) => [String(i + 1), r, ' r' + (i + 1)])])
-    : kind === 'spell' ? chipRow('Filter by school of magic', 'lsf', sf, [['all', 'All'], ...SCHOOLS.map(s => [s, s])]) : '';
+    : kind === 'spell' ? chipRow('Filter by school of magic', 'lsf', sf, [['all', 'All'], ...SCHOOLS.map(s => [s, s])])
+    : kind === 'feat' ? chipRow('Filter feats', 'lff', ff, [['all', 'All'], ['feat', 'Feats'], ['boon', 'Boons'], ...FEATS]) : '';
   const rows = shown.map((it, idx) => {
     const id = kind + ':' + it.name + ':' + idx;
     const done = has(S, it);
@@ -154,6 +159,7 @@ export function openLibrary(stateGetter, changed) {
       else if (b.dataset.lk) { kind = b.dataset.lk; draw(true); }
       else if (b.dataset.lrf) { rf = b.dataset.lrf; draw(true); }
       else if (b.dataset.lsf) { sf = b.dataset.lsf; draw(true); }
+      else if (b.dataset.lff) { ff = b.dataset.lff; draw(true); }
       else if (b.dataset.lo) { open.has(b.dataset.lo) ? open.delete(b.dataset.lo) : open.add(b.dataset.lo); draw(); }
       else if (b.dataset.la) add(dlg._shown[+b.dataset.la]);
       // Add and Remove share a spot, so the second click of a double-click doesn't undo the first.
