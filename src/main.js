@@ -41,12 +41,20 @@ const SPN=['Dragonborn','Dwarf','Elf','Gnome','Goliath','Halfling','Human','Orc'
 const spNames=()=>SPC.length?[...new Set(SPC.map(x=>x.name))].sort():SPN;
 const knownSp=v=>spNames().find(c=>c.toLowerCase()===String(v).trim().toLowerCase());
 const spFld=()=>{const k=knownSp(S.species),cu=CS||(!k&&!!S.species.trim());return `<div><label class="lab" for="f-spp">Species</label><select id="f-spp"><option value="">Choose a species</option>${spNames().map(c=>`<option value="${esc(c)}" ${k===c?'selected':''}>${esc(c)}</option>`).join('')}<option value="*" ${cu?'selected':''}>Custom…</option></select>${cu?inp('species',S.species,'text','class="clsx" placeholder="Species name" aria-label="Custom species"'):''}</div>`};
+// A species' walking speed, read from its Speed trait ("Your Speed is 35 feet."); 0 if it has none.
+const spSpeed=it=>{const t=it&&(it.traits||[]).find(x=>/^speed$/i.test(x.n));const m=t&&/(\d+)\s*(feet|ft)/i.exec(t.d);return m?+m[1]:0};
 // Picking a species swaps the old species' racial traits for the new one's ('' or Custom only removes them).
+// The sheet is saved to "Restore an earlier version" first, since the old traits (and any rewording) go; only
+// before the first of several swaps in a row, so trying species one after another can't push out older versions.
+// Speed follows the species unless you typed your own: it changes only from the default or the old species' speed.
 function setSpecies(n){const go=()=>{const it=n?SPC.find(x=>x.kind==='race'&&x.name===n):null;
   if(n&&!it){S.species=n;CMSG=`Couldn't load ${n}'s traits. Open the Library once to download them, then pick ${n} again.`;return}
-  const r=swapSpecies(S,SPC,it),o=r.old&&r.old!==n?r.old:'';
-  const tr=(k,x)=>`${k} ${x} trait${k===1?'':'s'}`;
-  CMSG=it?(o?`Swapped ${tr(r.removed,o)} for ${tr(r.added,n)} in Racial features.`:`Added ${tr(r.added,n)} to Racial features.`):o&&r.removed?`Removed ${tr(r.removed,o)} from Racial features.`:''};
+  const ob=S.species&&SPC.find(x=>x.kind==='race'&&x.name.toLowerCase()===S.species.toLowerCase());
+  if((S.species||S.race.length)&&snaps()[0]?.why!=='before species change')snapshot('before species change',true);
+  const r=swapSpecies(S,SPC,it),o=r.old&&r.old!==n?r.old:'',sp0=S.speed,ns=spSpeed(it)||(it?0:DEF().speed);
+  if(ns&&(sp0===DEF().speed||sp0===spSpeed(ob)))S.speed=ns;
+  const tr=(k,x)=>`${k} ${x} trait${k===1?'':'s'}`,spd=S.speed!==sp0?` Speed set to ${S.speed} ft.`:'';
+  CMSG=(it?(o?`Swapped ${tr(r.removed,o)} for ${tr(r.added,n)} in Racial features.`:`Added ${tr(r.added,n)} to Racial features.`):o&&r.removed?`Removed ${tr(r.removed,o)} from Racial features.`:'')+spd};
  if(!n||SPC.some(x=>x.name===n)){go();return}
  CMSG=`Loading ${n}'s traits…`;loadLibrary().then(d=>{SPC=d.items.filter(x=>x.kind==='race')}).catch(()=>{}).finally(()=>{go();save();render()})}
 // Hit dice: one per level, of the class's size (or the one picked for a custom class). A short rest spends them
