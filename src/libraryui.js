@@ -103,7 +103,7 @@ function draw(top) {
   }).join('');
   const stamp = data && data.at ? `SRD data saved ${new Date(data.at).toLocaleDateString(undefined, { dateStyle: 'medium' })}` : '';
   dlg.innerHTML = `<div class="dh"><h2>Library</h2><button data-lc>Close</button></div>
-  <div class="seg" role="tablist">${KINDS.map(k => `<button role="tab" data-lk="${k.id}" class="${k.id === kind ? 'on' : ''}">${k.label}</button>`).join('')}</div>
+  <div class="seg" role="tablist" aria-label="Library category">${KINDS.map(k => `<button role="tab" data-lk="${k.id}" class="${k.id === kind ? 'on' : ''}" aria-selected="${k.id === kind}">${k.label}</button>`).join('')}</div>
   <input id="lq" type="search" placeholder="Search ${KINDS.find(k => k.id === kind).label.toLowerCase()} (${kind === 'item' ? 'try weapon, armor or rare' : 'try a class name or level'})" value="${esc(query)}" aria-label="Search">
   ${chips}
   <div class="lbody">
@@ -168,7 +168,8 @@ export function openLibrary(stateGetter, changed) {
       }
       const b = e.target.closest('button'); if (!b) return;
       if (b.dataset.lc !== undefined) dlg.close();
-      else if (b.dataset.lk) { kind = b.dataset.lk; draw(true); }
+      // A new category usually means a new search, so land in the search box instead of on the tab.
+      else if (b.dataset.lk) { kind = b.dataset.lk; dlg._focusQ = true; draw(true); }
       else if (b.dataset.lrf) { rf = b.dataset.lrf; draw(true); }
       else if (b.dataset.lsf) { sf = b.dataset.lsf; draw(true); }
       else if (b.dataset.lff) { ff = b.dataset.lff; draw(true); }
