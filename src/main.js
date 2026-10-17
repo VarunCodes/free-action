@@ -2,8 +2,8 @@ import './style.css';
 import { openLibrary } from './libraryui.js';
 import { cachedItems } from './library.js';
 import { md, rarityTag, magicMark } from './text.js';
-import { AB, ABN, SK, DEF, cleanSheet } from './sheet.js';
-let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null,RERR='',IOMSG=null,ATTMSG=-1;const UP={};
+import { AB, ABN, SK, DEF, CLASSES, cleanSheet } from './sheet.js';
+let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null,RERR='',IOMSG=null,ATTMSG=-1,CC=false;const UP={};
 const SR=()=>({a:false,s:'',d:'',b:'',t:'',h:false,m:false,by:'slot',up:[]});
 const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}},lsSet=(k,v)=>{try{localStorage.setItem(k,v);return true}catch(e){return false}};
 try{const r=lsGet('sheet');if(r)S=cleanSheet(JSON.parse(r))}catch(e){}
@@ -13,7 +13,7 @@ const snaps=()=>{try{const a=JSON.parse(lsGet('sheet-history')||'[]');return Arr
 function snapshot(why,force){const a=snaps(),now=Date.now(),s=JSON.stringify(S);if(a[0]&&a[0].s===s)return;if(!force&&a[0]&&now-a[0].at<30*60e3)return;a.unshift({at:now,why,name:S.name,s});while(a.length&&!lsSet('sheet-history',JSON.stringify(a.slice(0,6))))a.pop()}
 // Every save goes through the same limits as loading (scores 1-30, current HP no more than max, and so on).
 const save=()=>{S=cleanSheet(S);lsSet('sheet',JSON.stringify(S));snapshot('autosave')};
-function replaceSheet(o,why){snapshot(why,true);S=cleanSheet(o);io='';IOMSG=null;OPEN.clear();Object.keys(UP).forEach(k=>delete UP[k]);CRIT=null}
+function replaceSheet(o,why){snapshot(why,true);S=cleanSheet(o);io='';IOMSG=null;CC=false;OPEN.clear();Object.keys(UP).forEach(k=>delete UP[k]);CRIT=null}
 const ago=t=>{const d=Math.floor((Date.now()-t)/864e5);return d<1?'today':d===1?'yesterday':d+' days ago'};
 function downloadSheet(){const u=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download=(S.name||'character').replace(/[^\w-]+/g,'-')+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);lsSet('sheet-exported',String(Date.now()))}
 // Problems and results from Import, Open backup file and Restore show under the Backup buttons.
@@ -31,6 +31,10 @@ function setPath(k,v){const p=k.split('.');let o=S;while(p.length>1)o=o[p.shift(
 const fid=k=>'f-'+k.split('.').join('-');
 const inp=(k,v,t='text',x='')=>`<input id="${fid(k)}" data-k="${k}" type="${t}" value="${esc(v)}" ${x}>`;
 const fld=(l,k,v,t,x)=>`<div><label class="lab" for="${fid(k)}">${l}</label>${inp(k,v,t,x)}</div>`;
+// Class is a drop-down of the standard classes, so other parts of the sheet can rely on the name. Custom (or any
+// name that isn't one of them, like a homebrew class or an older sheet's "Bard 3") opens a text box instead.
+const knownCls=v=>CLASSES.find(c=>c.toLowerCase()===String(v).trim().toLowerCase());
+const clsFld=()=>{const k=knownCls(S.cls),cu=CC||(!k&&!!S.cls.trim());return `<div><label class="lab" for="f-clsp">Class</label><select id="f-clsp"><option value="">Choose a class</option>${CLASSES.map(c=>`<option ${k===c?'selected':''}>${c}</option>`).join('')}<option value="*" ${cu?'selected':''}>Custom…</option></select>${cu?inp('cls',S.cls,'text','class="clsx" placeholder="Class name" aria-label="Custom class"'):''}</div>`};
 
 const cmdFor=()=>{if(!LAST)return'';const{label,expr}=LAST,v=S.vtt;return v==='roll20t'?`&{template:default} {{name=${label}}} {{Roll=[[${expr}]]}}`:v==='roll20'?`/roll ${expr}`:`/r ${expr} # ${label}`};
 function copyText(t){try{navigator.clipboard.writeText(t).catch(()=>{});return true}catch(e){}try{const x=document.createElement('textarea');x.value=t;document.body.appendChild(x);x.select();const ok=document.execCommand('copy');x.remove();return ok}catch(e){return false}}
@@ -104,7 +108,7 @@ function render(){
  const pct=Math.max(0,Math.min(100,S.hp.max?S.hp.cur/S.hp.max*100:0));
  let h=`<div class="top"><div><h1>${esc(S.name)||'Unnamed'}</h1><p class="sub">${esc([S.species,S.cls&&(S.cls+(S.sub?' ('+S.sub+')':'')),'Level '+S.level].filter(Boolean).join(', '))}</p></div>
  <div class="seg"><button data-a="mode" data-v="play" class="${ed?'':'on'}">Play</button><button data-a="mode" data-v="edit" class="${ed?'on':''}">Edit</button></div><button data-a="lib">Library</button></div>`;
- if(ed)h+=`<div class="id">${fld('Name','name',S.name)}${fld('Level','level',S.level,'number','min=1 max=20')}${fld('Class','cls',S.cls)}${fld('Subclass','sub',S.sub)}${fld('Species','species',S.species)}${fld('Background','bg',S.bg)}</div>`;
+ if(ed)h+=`<div class="id">${fld('Name','name',S.name)}${fld('Level','level',S.level,'number','min=1 max=20')}${clsFld()}${fld('Subclass','sub',S.sub)}${fld('Species','species',S.species)}${fld('Background','bg',S.bg)}</div>`;
  cut('vit');
  h+=`<h2>Vitals</h2><div class="vitals">
  <div class="vit" title="${esc(S.acAuto?acCalc().parts.map(([n,v])=>n+' '+(v<0?v:'+'+v)).join('\n'):'Typed in by hand')}">${ed&&!S.acAuto?fld('AC','ac',S.ac,'number'):`<b>${acNow()}</b><span class="lab">Armor class</span>`}</div>
@@ -179,6 +183,9 @@ document.addEventListener('change',e=>{
  if(t.id==='amt'){amt=Math.max(0,parseInt(t.value)||0);return}
  if(t.id==='cx'){CX=t.value;return}
  if(t.dataset.up!==undefined){UP[t.dataset.up]=+t.value;render();return}
+ // Picking Custom clears a standard class so the box starts empty; a typed name that is a standard class snaps to it.
+ if(t.id==='f-clsp'){CC=t.value==='*';if(!CC)S.cls=t.value;else if(knownCls(S.cls))S.cls='';save();render();if(CC)document.getElementById('f-cls')?.focus();return}
+ if(t.dataset.k==='cls'&&knownCls(t.value)){S.cls=knownCls(t.value);CC=false;save();render();return}
  if(!t.dataset.k)return;
  // A blank or non-numeric number box puts the old value back instead of becoming 0.
  const n=parseInt(t.value);if(t.type==='number'&&!Number.isFinite(n)){render();return}

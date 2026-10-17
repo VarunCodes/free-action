@@ -5,6 +5,8 @@
 export const AB = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 export const ABN = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
 export const SK = [['Acrobatics', 'dex'], ['Animal Handling', 'wis'], ['Arcana', 'int'], ['Athletics', 'str'], ['Deception', 'cha'], ['History', 'int'], ['Insight', 'wis'], ['Intimidation', 'cha'], ['Investigation', 'int'], ['Medicine', 'wis'], ['Nature', 'int'], ['Perception', 'wis'], ['Performance', 'cha'], ['Persuasion', 'cha'], ['Religion', 'int'], ['Sleight of Hand', 'dex'], ['Stealth', 'dex'], ['Survival', 'wis']];
+// The twelve classes of the 2024 Player's Handbook (SRD 5.2). The sheet still accepts any class name.
+export const CLASSES = ['Barbarian', 'Bard', 'Cleric', 'Druid', 'Fighter', 'Monk', 'Paladin', 'Ranger', 'Rogue', 'Sorcerer', 'Warlock', 'Wizard'];
 export const DEF = () => ({ name: 'New Hero', cls: '', sub: '', species: '', bg: '', level: 1, mode: 'play', ab: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }, sv: {}, sk: {}, hp: { cur: 10, max: 10, temp: 0 }, ac: 10, speed: 30, init: 0, cast: '', slots: Array.from({ length: 9 }, () => ({ m: 0, u: 0 })), spells: [], items: [], notes: '', insp: false, feats: [], race: [], vtt: 'foundry', spc: false, inc: false, acAuto: true, acb: 0 });
 
 const obj = v => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
