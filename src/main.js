@@ -2,8 +2,8 @@ import './style.css';
 import { openLibrary } from './libraryui.js';
 import { cachedItems } from './library.js';
 import { md, rarityTag, magicMark } from './text.js';
-import { AB, ABN, SK, DEF, CLASSES, cleanSheet } from './sheet.js';
-let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null,RERR='',IOMSG=null,ATTMSG=-1,CC=false;const UP={};
+import { AB, ABN, SK, DEF, CLS, CLASSES, cleanSheet } from './sheet.js';
+let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null,RERR='',IOMSG=null,ATTMSG=-1,CC=false,CMSG='';const UP={};
 const SR=()=>({a:false,s:'',d:'',b:'',t:'',h:false,m:false,by:'slot',up:[]});
 const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}},lsSet=(k,v)=>{try{localStorage.setItem(k,v);return true}catch(e){return false}};
 try{const r=lsGet('sheet');if(r)S=cleanSheet(JSON.parse(r))}catch(e){}
@@ -35,6 +35,14 @@ const fld=(l,k,v,t,x)=>`<div><label class="lab" for="${fid(k)}">${l}</label>${in
 // name that isn't one of them, like a homebrew class or an older sheet's "Bard 3") opens a text box instead.
 const knownCls=v=>CLASSES.find(c=>c.toLowerCase()===String(v).trim().toLowerCase());
 const clsFld=()=>{const k=knownCls(S.cls),cu=CC||(!k&&!!S.cls.trim());return `<div><label class="lab" for="f-clsp">Class</label><select id="f-clsp"><option value="">Choose a class</option>${CLASSES.map(c=>`<option ${k===c?'selected':''}>${c}</option>`).join('')}<option value="*" ${cu?'selected':''}>Custom…</option></select>${cu?inp('cls',S.cls,'text','class="clsx" placeholder="Class name" aria-label="Custom class"'):''}</div>`};
+// Picking a standard class swaps the old class's save proficiencies and spellcasting ability for the new one's.
+// Other saves, and an ability you chose by hand, stay; the sheet can't tell a hand-ticked save from one the old
+// class gave, so those go with the old class. The Spellcasting drop-down can always override what was picked.
+function setClass(c){const o=CLS[knownCls(S.cls)],n=CLS[c],n0=ABN[S.cast];S.cls=c;if(!n)return;
+ if(o)o.sv.forEach(a=>{if(!n.sv.includes(a))delete S.sv[a]});n.sv.forEach(a=>S.sv[a]=true);
+ if(!S.cast||(o&&S.cast===o.ca))S.cast=n.ca;
+ const ca=S.cast===n.ca?(n.ca?`${ABN[n.ca]} for spellcasting`:n0?'no spellcasting ability (pick one below if your subclass casts spells)':''):`spellcasting stays ${ABN[S.cast]}${n.ca?` (${c}s usually use ${ABN[n.ca]})`:''}`;
+ CMSG=`${c}: proficient in ${n.sv.map(a=>ABN[a]).join(' and ')} saving throws${ca?', '+ca:''}. You can change these below.`}
 
 const cmdFor=()=>{if(!LAST)return'';const{label,expr}=LAST,v=S.vtt;return v==='roll20t'?`&{template:default} {{name=${label}}} {{Roll=[[${expr}]]}}`:v==='roll20'?`/roll ${expr}`:`/r ${expr} # ${label}`};
 function copyText(t){try{navigator.clipboard.writeText(t).catch(()=>{});return true}catch(e){}try{const x=document.createElement('textarea');x.value=t;document.body.appendChild(x);x.select();const ok=document.execCommand('copy');x.remove();return ok}catch(e){return false}}
@@ -108,7 +116,7 @@ function render(){
  const pct=Math.max(0,Math.min(100,S.hp.max?S.hp.cur/S.hp.max*100:0));
  let h=`<div class="top"><div><h1>${esc(S.name)||'Unnamed'}</h1><p class="sub">${esc([S.species,S.cls&&(S.cls+(S.sub?' ('+S.sub+')':'')),'Level '+S.level].filter(Boolean).join(', '))}</p></div>
  <div class="seg"><button data-a="mode" data-v="play" class="${ed?'':'on'}">Play</button><button data-a="mode" data-v="edit" class="${ed?'on':''}">Edit</button></div><button data-a="lib">Library</button></div>`;
- if(ed)h+=`<div class="id">${fld('Name','name',S.name)}${fld('Level','level',S.level,'number','min=1 max=20')}${clsFld()}${fld('Subclass','sub',S.sub)}${fld('Species','species',S.species)}${fld('Background','bg',S.bg)}</div>`;
+ if(ed)h+=`<div class="id">${fld('Name','name',S.name)}${fld('Level','level',S.level,'number','min=1 max=20')}${clsFld()}${fld('Subclass','sub',S.sub)}${fld('Species','species',S.species)}${fld('Background','bg',S.bg)}${CMSG?`<p class="sub w clsm" role="status">${esc(CMSG)}</p>`:''}</div>`;
  cut('vit');
  h+=`<h2>Vitals</h2><div class="vitals">
  <div class="vit" title="${esc(S.acAuto?acCalc().parts.map(([n,v])=>n+' '+(v<0?v:'+'+v)).join('\n'):'Typed in by hand')}">${ed&&!S.acAuto?fld('AC','ac',S.ac,'number'):`<b>${acNow()}</b><span class="lab">Armor class</span>`}</div>
@@ -184,9 +192,11 @@ document.addEventListener('change',e=>{
  if(t.id==='cx'){CX=t.value;return}
  if(t.dataset.up!==undefined){UP[t.dataset.up]=+t.value;render();return}
  // Picking Custom clears a standard class so the box starts empty; a typed name that is a standard class snaps to it.
- if(t.id==='f-clsp'){CC=t.value==='*';if(!CC)S.cls=t.value;else if(knownCls(S.cls))S.cls='';save();render();if(CC)document.getElementById('f-cls')?.focus();return}
- if(t.dataset.k==='cls'&&knownCls(t.value)){S.cls=knownCls(t.value);CC=false;save();render();return}
+ // The note on what a class set stays until the next change anywhere on the sheet.
+ if(t.id==='f-clsp'){CMSG='';CC=t.value==='*';if(!CC)setClass(t.value);else if(knownCls(S.cls))S.cls='';save();render();if(CC)document.getElementById('f-cls')?.focus();return}
+ if(t.dataset.k==='cls'&&knownCls(t.value)){CMSG='';setClass(knownCls(t.value));CC=false;save();render();return}
  if(!t.dataset.k)return;
+ CMSG='';
  // A blank or non-numeric number box puts the old value back instead of becoming 0.
  const n=parseInt(t.value);if(t.type==='number'&&!Number.isFinite(n)){render();return}
  setPath(t.dataset.k,t.type==='number'?n:t.type==='checkbox'?t.checked:t.value);
@@ -199,7 +209,7 @@ document.addEventListener('click',e=>{
  if(ATTMSG>=0&&!(b&&b.dataset.a==='att')){ATTMSG=-1;if(!b){render();return}}if(!b)return;
  const a=b.dataset.a,v=b.dataset.v,g=id=>document.getElementById(id);
  const n=Math.max(0,parseInt(g('amt')?.value)||0);amt=n||amt;
- if(a==='mode')S.mode=v;
+ if(a==='mode'){S.mode=v;CMSG=''}
  else if(a==='dmg'){let d=n,t=Math.min(S.hp.temp,d);S.hp.temp-=t;d-=t;S.hp.cur=Math.max(0,S.hp.cur-d)}
  else if(a==='heal')S.hp.cur=Math.min(S.hp.max,S.hp.cur+n);
  else if(a==='temp')S.hp.temp=Math.max(S.hp.temp,n);
