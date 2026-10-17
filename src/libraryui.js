@@ -18,13 +18,21 @@ const onSheet = (S, it) => {
   return null;
 };
 const has = (S, it) => it.kind === 'race' ? !!S.species && S.species.toLowerCase() === it.name.toLowerCase() : !!onSheet(S, it);
+const traitsOf = it => (it.traits && it.traits.length ? it.traits : [{ n: it.name, d: it.desc }]);
+// Take a species' own traits off the sheet. Each is matched by name; where several racial features
+// share a name (two Darkvisions), only the one with this species' text goes.
+function dropTraits(S, it) {
+  for (const t of traitsOf(it)) {
+    const same = S.race.filter(x => x.n.toLowerCase() === t.n.toLowerCase());
+    const x = same.length > 1 ? same.find(x => x.d === t.d) : same[0];
+    if (x) S.race.splice(S.race.indexOf(x), 1);
+  }
+}
 // Undo an Add. A species also takes its traits with it.
 function remove(it) {
   const S = getS();
-  if (it.kind === 'race') {
-    const gone = new Set((it.traits && it.traits.length ? it.traits : [{ n: it.name }]).map(t => t.n.toLowerCase()));
-    S.species = ''; S.race = S.race.filter(x => !gone.has(x.n.toLowerCase()));
-  } else { const o = onSheet(S, it); if (!o) return; o[0].splice(o[1], 1); }
+  if (it.kind === 'race') { S.species = ''; dropTraits(S, it); }
+  else { const o = onSheet(S, it); if (!o) return; o[0].splice(o[1], 1); }
   onChange(true);
 }
 // "Paladin, level 1" -> "Paladin"; "Cleric: Life Domain, level 3" -> "Cleric: Life Domain".
@@ -42,9 +50,12 @@ function add(it) {
     else S.items.push({ n: it.name, q: 1, d: it.desc, eq: !!it.eq, on: false, ...(it.w ? { w: { ...it.w } } : {}), ...(it.ar ? { ar: { ...it.ar } } : {}), ...(it.at ? { at: true } : {}), ...(it.fx ? { fx: it.fx.map(f => [...f]) } : {}), rr: it.rr || 0, v: 3 });
   }
   else {
-    if (!S.species) S.species = it.name;
-    const traits = it.traits && it.traits.length ? it.traits : [{ n: it.name, d: it.desc }];
-    for (const t of traits) if (!S.race.some(x => x.n.toLowerCase() === t.n.toLowerCase())) S.race.push({ n: t.n, t: '', d: t.d });
+    // A character has one species: picking another swaps out the old one's traits.
+    const old = S.species && data.items.find(x => x.kind === 'race' && x.name.toLowerCase() === S.species.toLowerCase());
+    if (old) dropTraits(S, old);
+    S.species = it.name;
+    for (const t of traitsOf(it)) if (!S.race.some(x => x.n.toLowerCase() === t.n.toLowerCase() && x.d === t.d)) S.race.push({ n: t.n, t: '', d: t.d });
+    if (old) { onChange(true); return; }
   }
   onChange();
 }
@@ -58,7 +69,7 @@ function draw() {
     const id = kind + ':' + it.name + ':' + idx;
     const done = has(S, it);
     return `<div class="lrow"><div class="lhd"><button class="lk" data-lo="${esc(id)}" aria-expanded="${open.has(id)}"><span>${magicMark(it.rr)}${esc(it.name)}${rarityTag(it.rr)}</span><small>${esc(it.sub)}${it.src === 'Custom' ? ' (custom)' : ''}</small></button>
-      ${done ? `<button class="bad" data-lrm="${idx}" title="On your sheet. Click to remove it.">${kind === 'race' ? 'Remove species' : 'Remove'}</button>` : `<button class="pri" data-la="${idx}">${kind === 'race' ? 'Add species' : owned(S, it) ? `Add (have ${owned(S, it)})` : 'Add'}</button>`}</div>
+      ${done ? `<button class="bad" data-lrm="${idx}" title="On your sheet. Click to remove it.">${kind === 'race' ? 'Remove species' : 'Remove'}</button>` : `<button class="pri" data-la="${idx}">${kind === 'race' ? (S.species ? 'Switch species' : 'Add species') : owned(S, it) ? `Add (have ${owned(S, it)})` : 'Add'}</button>`}</div>
       ${open.has(id) ? `<p class="sd">${md(it.desc) || 'No description.'}</p>` : ''}</div>`;
   }).join('');
   const stamp = data && data.at ? `SRD data saved ${new Date(data.at).toLocaleDateString(undefined, { dateStyle: 'medium' })}` : '';
