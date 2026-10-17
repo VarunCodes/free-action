@@ -7,17 +7,26 @@ let rf = 'all';
 const rfOk = it => rf === 'all' || (rf === 'mundane' ? !it.rr : rf === 'magic' ? it.rr > 0 : it.rr === Number(rf));
 let getS, onChange;
 
-const has = (S, it) => {
-  const n = it.name.toLowerCase();
-  const inList = l => l.some(x => x.n.toLowerCase() === n);
-  if (it.kind === 'spell') return inList(S.spells);
-  if (it.kind === 'race') return S.species && S.species.toLowerCase() === n;
-  if (it.kind === 'item') return false;
-  // Several classes share feature names (Spellcasting, Extra Attack), so a class feature only counts
-  // as added when its class tag or its text matches too.
-  if (it.kind === 'class') return S.feats.some(x => x.n.toLowerCase() === n && (x.t === clsOf(it) || x.d === it.desc));
-  return inList(S.feats);
+// Where a Library entry sits on the sheet: [list, index], or null. Items are never "added" (they stack).
+// Several classes share feature names (Spellcasting, Extra Attack), so a class feature only matches
+// when its class tag or its text matches too.
+const onSheet = (S, it) => {
+  const n = it.name.toLowerCase(), at = (l, f = () => true) => { const i = l.findIndex(x => x.n.toLowerCase() === n && f(x)); return i < 0 ? null : [l, i]; };
+  if (it.kind === 'spell') return at(S.spells);
+  if (it.kind === 'class') return at(S.feats, x => x.t === clsOf(it) || x.d === it.desc);
+  if (it.kind === 'feat') return at(S.feats);
+  return null;
 };
+const has = (S, it) => it.kind === 'race' ? !!S.species && S.species.toLowerCase() === it.name.toLowerCase() : !!onSheet(S, it);
+// Undo an Add. A species also takes its traits with it.
+function remove(it) {
+  const S = getS();
+  if (it.kind === 'race') {
+    const gone = new Set((it.traits && it.traits.length ? it.traits : [{ n: it.name }]).map(t => t.n.toLowerCase()));
+    S.species = ''; S.race = S.race.filter(x => !gone.has(x.n.toLowerCase()));
+  } else { const o = onSheet(S, it); if (!o) return; o[0].splice(o[1], 1); }
+  onChange(true);
+}
 // "Paladin, level 1" -> "Paladin"; "Cleric: Life Domain, level 3" -> "Cleric: Life Domain".
 const clsOf = it => (it.sub || '').replace(/, level \d+$/, '') || 'Class feature';
 const owned = (S, it) => it.kind === 'item' ? (S.items.find(x => x.n.toLowerCase() === it.name.toLowerCase())?.q || 0) : 0;
@@ -49,7 +58,7 @@ function draw() {
     const id = kind + ':' + it.name + ':' + idx;
     const done = has(S, it);
     return `<div class="lrow"><div class="lhd"><button class="lk" data-lo="${esc(id)}" aria-expanded="${open.has(id)}"><span>${magicMark(it.rr)}${esc(it.name)}${rarityTag(it.rr)}</span><small>${esc(it.sub)}${it.src === 'Custom' ? ' (custom)' : ''}</small></button>
-      <button class="${done ? '' : 'pri'}" data-la="${idx}" ${done ? 'disabled' : ''}>${done ? 'Added' : kind === 'race' ? 'Add species' : owned(S, it) ? `Add (have ${owned(S, it)})` : 'Add'}</button></div>
+      ${done ? `<button class="bad" data-lrm="${idx}" title="On your sheet. Click to remove it.">${kind === 'race' ? 'Remove species' : 'Remove'}</button>` : `<button class="pri" data-la="${idx}">${kind === 'race' ? 'Add species' : owned(S, it) ? `Add (have ${owned(S, it)})` : 'Add'}</button>`}</div>
       ${open.has(id) ? `<p class="sd">${md(it.desc) || 'No description.'}</p>` : ''}</div>`;
   }).join('');
   const stamp = data && data.at ? `SRD data saved ${new Date(data.at).toLocaleDateString(undefined, { dateStyle: 'medium' })}` : '';
@@ -88,7 +97,7 @@ async function load(force) {
 }
 
 export function openLibrary(stateGetter, changed) {
-  getS = stateGetter; onChange = () => { changed(); draw(); };
+  getS = stateGetter; onChange = removed => { changed(!!removed); draw(); };
   if (!dlg) {
     dlg = document.createElement('dialog');
     dlg.className = 'lib';
@@ -120,6 +129,8 @@ export function openLibrary(stateGetter, changed) {
       else if (b.dataset.lrf) { rf = b.dataset.lrf; draw(); }
       else if (b.dataset.lo) { open.has(b.dataset.lo) ? open.delete(b.dataset.lo) : open.add(b.dataset.lo); draw(); }
       else if (b.dataset.la) add(dlg._shown[+b.dataset.la]);
+      // Add and Remove share a spot, so the second click of a double-click doesn't undo the first.
+      else if (b.dataset.lrm) { if (e.detail < 2) remove(dlg._shown[+b.dataset.lrm]); }
       else if (b.dataset.lr !== undefined) load(false);
       else if (b.dataset.lf !== undefined) load(true);
       else if (b.dataset.lp !== undefined) {
