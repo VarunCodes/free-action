@@ -34,7 +34,12 @@ const fld=(l,k,v,t,x)=>`<div><label class="lab" for="${fid(k)}">${l}</label>${in
 // Class is a drop-down of the standard classes, so other parts of the sheet can rely on the name. Custom (or any
 // name that isn't one of them, like a homebrew class or an older sheet's "Bard 3") opens a text box instead.
 const knownCls=v=>CLASSES.find(c=>c.toLowerCase()===String(v).trim().toLowerCase());
-const clsFld=()=>{const k=knownCls(S.cls),cu=CC||(!k&&!!S.cls.trim());return `<div><label class="lab" for="f-clsp">Class</label><select id="f-clsp"><option value="">Choose a class</option>${CLASSES.map(c=>`<option ${k===c?'selected':''}>${c}</option>`).join('')}<option value="*" ${cu?'selected':''}>Custom…</option></select>${cu?inp('cls',S.cls,'text','class="clsx" placeholder="Class name" aria-label="Custom class"'):''}</div>`};
+const clsFld=()=>{const k=knownCls(S.cls),cu=CC||(!k&&!!S.cls.trim());return `<div><label class="lab" for="f-clsp">Class</label><select id="f-clsp"><option value="">Choose a class</option>${CLASSES.map(c=>`<option ${k===c?'selected':''}>${c}</option>`).join('')}<option value="*" ${cu?'selected':''}>Custom…</option></select>${cu?inp('cls',S.cls,'text','class="clsx" placeholder="Class name" aria-label="Custom class"')+`<select class="clsx" data-k="hdie" aria-label="Custom class hit die"><option value="0">Hit die: not set</option>${[6,8,10,12].map(d=>`<option value="${d}" ${S.hdie===d?'selected':''}>Hit die: d${d}</option>`).join('')}</select>`:''}</div>`};
+// Hit dice: one per level, of the class's size (or the one picked for a custom class). A short rest spends them
+// one at a time (die + Con modifier, at least 1 HP); a long rest gives them all back (2024 rules).
+const hdOf=()=>CLS[knownCls(S.cls)]?.hd||S.hdie,hdLeft=()=>Math.max(0,S.level-S.hd);
+// Max HP by the fixed-average rule: the full die plus Con at level 1, then half the die + 1 + Con per level, each at least 1.
+const avgHP=()=>{const d=hdOf(),c=mod(sc('con'));return d?Math.max(1,d+c)+(S.level-1)*Math.max(1,d/2+1+c):0};
 // Picking a standard class swaps the old class's save proficiencies and spellcasting ability for the new one's.
 // Other saves, and an ability you chose by hand, stay; the sheet can't tell a hand-ticked save from one the old
 // class gave, so those go with the old class. The Spellcasting drop-down can always override what was picked.
@@ -126,7 +131,8 @@ function render(){
  <div class="hp"><div class="hpn"><b>${S.hp.cur}</b><span>/ ${S.hp.max} HP</span>${S.hp.temp?`<span class="pill">+${S.hp.temp} temp</span>`:''}</div>
  <div class="bar ${pct<25?'low':''}"><i style="width:${pct}%"></i></div>
  <div class="row"><input id="amt" type="number" min="0" value="${amt}" aria-label="Amount"><button class="bad" data-a="dmg">Damage</button><button class="pri" data-a="heal">Heal</button><button data-a="temp">Set temp</button></div>
- ${ed?`<div class="row" style="margin-top:8px">${fld('Max HP','hp.max',S.hp.max,'number','min=1 max=9999')}${fld('Current HP','hp.cur',S.hp.cur,'number',`min=0 max=${S.hp.max}`)}</div>`:''}
+ ${ed?`<div class="row" style="margin-top:8px">${fld('Max HP','hp.max',S.hp.max,'number','min=1 max=9999')}${fld('Current HP','hp.cur',S.hp.cur,'number',`min=0 max=${S.hp.max}`)}</div>${hdOf()?`<p class="sub hds">Average max HP for level ${S.level} (d${hdOf()}, Con ${fmt(mod(sc('con')))}): <b>${avgHP()}</b> <button data-a="avghp" ${avgHP()===S.hp.max?'disabled':''}>Use ${avgHP()}</button></p>`:''}`:''}
+ ${hdOf()?`<div class="row hds" style="margin-top:8px"><span>Hit dice <b>${hdLeft()}</b> of ${S.level} (d${hdOf()})</span><button data-a="hd" ${hdLeft()&&S.hp.cur<S.hp.max?'':'disabled'} title="${!hdLeft()?'No hit dice left. A long rest gives them all back.':S.hp.cur<S.hp.max?`Short rest: roll d${hdOf()} ${fmt(mod(sc('con')))} and heal that much`:'Already at full HP'}">Spend a hit die</button></div>`:''}
  <div class="row" style="margin-top:8px"><button data-a="long">Long rest</button>
  <label class="row" style="margin-left:auto"><input type="checkbox" data-k="insp" ${S.insp?'checked':''}> Heroic Inspiration</label></div></div>`;
  if(ed)h+=`<div class="row acset"><label class="row"><input type="checkbox" data-k="acAuto" ${S.acAuto?'checked':''}> Calculate AC from equipped gear</label>${S.acAuto?`<label class="row">Other AC bonus ${inp('acb',S.acb,'number','min=-10 max=20 style="width:72px" aria-label="Other AC bonus"')}</label>`:''}</div>`;
@@ -213,7 +219,10 @@ document.addEventListener('click',e=>{
  else if(a==='dmg'){let d=n,t=Math.min(S.hp.temp,d);S.hp.temp-=t;d-=t;S.hp.cur=Math.max(0,S.hp.cur-d)}
  else if(a==='heal')S.hp.cur=Math.min(S.hp.max,S.hp.cur+n);
  else if(a==='temp')S.hp.temp=Math.max(S.hp.temp,n);
- else if(a==='long'){S.hp.cur=S.hp.max;S.hp.temp=0;S.slots.forEach(s=>s.u=0)}
+ else if(a==='long'){S.hp.cur=S.hp.max;S.hp.temp=0;S.hd=0;S.slots.forEach(s=>s.u=0)}
+ else if(a==='hd'){const d=hdOf(),c=mod(sc('con'));if(d&&hdLeft()&&rollExpr(`Hit die (d${d})`,`1d${d}${fmt(c)}`,false,true)){const g=Math.max(1,LAST.total);LAST.total=g;LAST.detail+=` · healed ${Math.min(g,S.hp.max-S.hp.cur)}`;S.hp.cur=Math.min(S.hp.max,S.hp.cur+g);S.hd++;CRIT=null;COP=copyText(cmdFor())}}
+ // Leveling up: the new max comes with the HP gained, so current HP rises by the same amount.
+ else if(a==='avghp'){const m=avgHP();if(m>S.hp.max)S.hp.cur+=m-S.hp.max;S.hp.max=m}
  else if(a==='short'){}
  else if(a==='sv')S.sv[v]=!S.sv[v];
  else if(a==='sk')S.sk[v]=((S.sk[v]||0)+1)%3;
