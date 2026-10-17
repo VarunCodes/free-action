@@ -13,15 +13,20 @@ const has = (S, it) => {
   if (it.kind === 'spell') return inList(S.spells);
   if (it.kind === 'race') return S.species && S.species.toLowerCase() === n;
   if (it.kind === 'item') return false;
+  // Several classes share feature names (Spellcasting, Extra Attack), so a class feature only counts
+  // as added when its class tag or its text matches too.
+  if (it.kind === 'class') return S.feats.some(x => x.n.toLowerCase() === n && (x.t === clsOf(it) || x.d === it.desc));
   return inList(S.feats);
 };
+// "Paladin, level 1" -> "Paladin"; "Cleric: Life Domain, level 3" -> "Cleric: Life Domain".
+const clsOf = it => (it.sub || '').replace(/, level \d+$/, '') || 'Class feature';
 const owned = (S, it) => it.kind === 'item' ? (S.items.find(x => x.n.toLowerCase() === it.name.toLowerCase())?.q || 0) : 0;
 
 function add(it) {
   const S = getS();
   if (it.kind === 'spell') S.spells.push({ n: it.name, l: it.level, p: false, d: it.desc, ...(it.roll ? { r: { ...it.roll } } : {}) });
   else if (it.kind === 'feat') S.feats.push({ n: it.name, t: 'Feat', d: it.desc });
-  else if (it.kind === 'class') S.feats.push({ n: it.name, t: 'Class feature', d: it.desc });
+  else if (it.kind === 'class') S.feats.push({ n: it.name, t: clsOf(it), d: it.desc });
   else if (it.kind === 'item') {
     const x = S.items.find(o => o.n.toLowerCase() === it.name.toLowerCase());
     if (x) x.q = (Number(x.q) || 0) + 1;

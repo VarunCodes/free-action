@@ -53,6 +53,7 @@ button.x{min-height:32px;padding:2px 9px;color:var(--mute)}
 .ln .g{flex:1}
 .ln .a{color:var(--mute);font-size:.8rem}
 .pr{width:30px;min-height:30px;padding:0;border-radius:50%;line-height:1}
+.pm{display:inline-block;width:.85em;height:.85em;border:1.5px solid currentColor;border-radius:50%;box-sizing:border-box;vertical-align:-.1em}.pm.on{background:radial-gradient(circle,currentColor 0 34%,transparent 38%)}
 .pr:disabled{opacity:1;cursor:default;border-color:transparent;background:none}
 .slots{display:grid;gap:6px}
 .sl{display:flex;align-items:center;gap:10px}
