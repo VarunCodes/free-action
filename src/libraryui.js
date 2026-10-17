@@ -5,6 +5,13 @@ let dlg, data = null, status = 'idle', errors = [], kind = 'spell', query = '', 
 // Items tab filter: all, mundane, magic, or a rarity rank ('1'-'6').
 let rf = 'all';
 const rfOk = it => rf === 'all' || (rf === 'mundane' ? !it.rr : rf === 'magic' ? it.rr > 0 : it.rr === Number(rf));
+// Spells tab filter: a school of magic, read from the subtitle ("Level 3 Necromancy (Cleric, Wizard)"),
+// so saved Library copies and custom packs work without a re-download.
+const SCHOOLS = ['Abjuration', 'Conjuration', 'Divination', 'Enchantment', 'Evocation', 'Illusion', 'Necromancy', 'Transmutation'];
+let sf = 'all';
+const schoolOf = it => SCHOOLS.find(s => new RegExp('\\b' + s + '\\b', 'i').test(it.sub || '')) || '';
+const sfOk = it => sf === 'all' || schoolOf(it) === sf;
+const chipRow = (label, attr, cur, opts) => `<div class="chips" role="group" aria-label="${label}">${opts.map(([v, t, cls = '']) => `<button class="chip${cur === v ? ' on' : ''}${cls}" data-${attr}="${v}" aria-pressed="${cur === v}">${t}</button>`).join('')}</div>`;
 let getS, onChange;
 
 // Where a Library entry sits on the sheet: [list, index], or null. Items are never "added" (they stack).
@@ -60,11 +67,17 @@ function add(it) {
   onChange();
 }
 
-function draw() {
-  const S = getS();
-  const pool = data ? (kind === 'item' ? data.items.filter(it => it.kind !== 'item' || rfOk(it)) : data.items) : [];
+// Redrawing replaces the dialog's contents, which would jump the list back to the top. A new list
+// (tab, search, filter) starts at the top; anything else (open a description, Add, Remove) keeps the
+// scroll position and puts keyboard focus back on the same button.
+function draw(top) {
+  const S = getS(), body = dlg.querySelector('.lbody'), keep = !top && body ? [body.scrollTop, dlg.scrollTop] : null;
+  const a = document.activeElement, d = a && dlg.contains(a) ? a.dataset : {};
+  const refocus = d.lo ? `[data-lo="${CSS.escape(d.lo)}"]` : d.la || d.lrm ? `[data-la="${d.la || d.lrm}"],[data-lrm="${d.la || d.lrm}"]` : '';
+  const pool = data ? data.items.filter(it => it.kind === 'item' ? rfOk(it) : it.kind === 'spell' ? sfOk(it) : true) : [];
   const { shown, total } = data ? search(pool, kind, query) : { shown: [], total: 0 };
-  const chips = kind === 'item' ? `<div class="chips" role="group" aria-label="Filter by rarity">${[['all', 'All'], ['mundane', 'Mundane'], ['magic', 'Magic'], ...RARITY.slice(1).map((r, i) => [String(i + 1), r])].map(([v, t]) => `<button class="chip${rf === v ? ' on' : ''}${/^\d$/.test(v) ? ' r' + v : ''}" data-lrf="${v}" aria-pressed="${rf === v}">${t}</button>`).join('')}</div>` : '';
+  const chips = kind === 'item' ? chipRow('Filter by rarity', 'lrf', rf, [['all', 'All'], ['mundane', 'Mundane'], ['magic', 'Magic'], ...RARITY.slice(1).map((r, i) => [String(i + 1), r, ' r' + (i + 1)])])
+    : kind === 'spell' ? chipRow('Filter by school of magic', 'lsf', sf, [['all', 'All'], ...SCHOOLS.map(s => [s, s])]) : '';
   const rows = shown.map((it, idx) => {
     const id = kind + ':' + it.name + ':' + idx;
     const done = has(S, it);
@@ -94,6 +107,8 @@ function draw() {
   const q = dlg.querySelector('#lq');
   if (dlg._focusQ) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); dlg._focusQ = false; }
   dlg._shown = shown;
+  if (keep) { dlg.querySelector('.lbody').scrollTop = keep[0]; dlg.scrollTop = keep[1]; }
+  if (refocus && !dlg._focusQ) dlg.querySelector(refocus)?.focus({ preventScroll: true });
 }
 
 async function load(force) {
@@ -115,7 +130,7 @@ export function openLibrary(stateGetter, changed) {
     dlg.setAttribute('aria-label', 'Library');
     document.body.appendChild(dlg);
     dlg.addEventListener('toggle', e => { if (e.target.classList.contains('pack')) packOpen = e.target.open; }, true);
-    dlg.addEventListener('input', e => { if (e.target.id === 'lq') { query = e.target.value; dlg._focusQ = true; draw(); } });
+    dlg.addEventListener('input', e => { if (e.target.id === 'lq') { query = e.target.value; dlg._focusQ = true; draw(true); } });
     // Clicking the backdrop closes the Library. Only when the press also started there,
     // so dragging a text selection out of the search box doesn't close it, and never
     // while unimported custom content is sitting in the textarea.
@@ -136,8 +151,9 @@ export function openLibrary(stateGetter, changed) {
       }
       const b = e.target.closest('button'); if (!b) return;
       if (b.dataset.lc !== undefined) dlg.close();
-      else if (b.dataset.lk) { kind = b.dataset.lk; draw(); }
-      else if (b.dataset.lrf) { rf = b.dataset.lrf; draw(); }
+      else if (b.dataset.lk) { kind = b.dataset.lk; draw(true); }
+      else if (b.dataset.lrf) { rf = b.dataset.lrf; draw(true); }
+      else if (b.dataset.lsf) { sf = b.dataset.lsf; draw(true); }
       else if (b.dataset.lo) { open.has(b.dataset.lo) ? open.delete(b.dataset.lo) : open.add(b.dataset.lo); draw(); }
       else if (b.dataset.la) add(dlg._shown[+b.dataset.la]);
       // Add and Remove share a spot, so the second click of a double-click doesn't undo the first.
