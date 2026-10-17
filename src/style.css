@@ -10,7 +10,9 @@ h1,h2{font-family:Bitter,Georgia,serif;margin:0}
 h2{font-size:1.05rem;padding:18px 0 8px;border-bottom:2px solid var(--ink);margin-bottom:10px;display:flex;justify-content:space-between;align-items:baseline}
 h2 small{font:400 .8rem "Hanken Grotesk",sans-serif;color:var(--mute)}
 input,select,button,textarea{font:inherit;color:inherit}
-input,select,textarea{background:var(--sf);border:1px solid var(--line);border-radius:6px;padding:7px 9px;min-width:0;width:100%}
+/* box-sizing is set here too because fields inside <details> (feature descriptions) don't inherit it in Chrome,
+   so width:100% plus padding pushed them past the screen edge on phones. */
+input,select,textarea{background:var(--sf);border:1px solid var(--line);border-radius:6px;padding:7px 9px;min-width:0;width:100%;box-sizing:border-box}
 textarea{min-height:90px;resize:vertical}
 input[type=checkbox]{width:20px;height:20px;accent-color:var(--ac)}
 :focus-visible{outline:2px solid var(--ac);outline-offset:2px}
