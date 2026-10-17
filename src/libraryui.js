@@ -61,7 +61,7 @@ export function swapSpecies(S, items, it) {
   let added = 0;
   S.species = it ? it.name : '';
   if (it) for (const t of traitsOf(it)) {
-    const i = S.race.findIndex(x => x.n.toLowerCase() === t.n.toLowerCase()), x = { n: t.n, t: '', d: t.d };
+    const i = S.race.findIndex(x => x.n.toLowerCase() === t.n.toLowerCase()), x = { n: t.n, t: '', d: t.d, ...(t.fx ? { fx: t.fx.map(f => [...f]) } : {}) };
     if (i < 0) S.race.push(x); else S.race[i] = x;
     added++;
   }

@@ -41,14 +41,21 @@ const cleanArmor = a => {
   a = obj(a);
   return { k: pick(a.k, ['light', 'medium', 'heavy', 'shield', 'bonus', 'unarm'], ''), ac: int(a.ac, -10, 30, 0), str: int(a.str, 0, 30, 0), nu: bool(a.nu), sb: int(a.sb, -5, 10, 0), stl: bool(a.stl) };
 };
-// Item effects: [type, target, value]. See effectsOf() in library.js.
-const FX = ["set", "chk", "sv", "sa", "dc", "adv"];
-const cleanFx = l => arr(l, 12).filter(Array.isArray).map(([t, a, v]) => {
+// Item and trait effects: [type, target, value]. See effectsOf() and traitEffects() in library.js.
+const FX = ["set", "chk", "sv", "sa", "dc", "adv", "hp", "ab", "sk"];
+const SKN = SK.map(([n]) => n);
+// A skill effect's target: one skill, '?' (any skill), or '?A|B|C' (one of these); anything else is dropped.
+const skTarget = a => { a = String(a ?? ''); if (SKN.includes(a) || a === '?') return a; const l = a.startsWith('?') ? a.slice(1).split('|').filter(s => SKN.includes(s)) : []; return l.length ? '?' + l.join('|') : ''; };
+export const cleanFx = l => arr(l, 12).filter(Array.isArray).map(([t, a, v]) => {
   t = pick(t, FX, "");
-  a = t === "set" ? pick(a, AB, "") : t === "adv" ? pick(a, ["init", ...SK.map(([n]) => n)], "") : "";
-  return [t, a, int(v, t === "set" ? 1 : -10, 30, 0)];
-}).filter(([t, a]) => t && (a || !["set", "adv"].includes(t)));
-const cleanFeat = f => { f = obj(f); return { n: str(f.n), t: str(f.t, 60), d: str(f.d, 20000) }; };
+  a = t === "set" || t === "ab" ? pick(a, AB, "") : t === "adv" ? pick(a, ["init", ...SKN], "") : t === "sk" ? skTarget(a) : "";
+  return [t, a, int(v, t === "set" ? 1 : t === "sk" ? 1 : -10, t === "sk" ? 2 : 30, t === "sk" ? 1 : 0)];
+}).filter(([t, a]) => t && (a || !["set", "adv", "ab", "sk"].includes(t)));
+// A feature keeps its effects (custom packs can give them) and its skill picks, one per skill choice it offers.
+const cleanFeat = f => {
+  f = obj(f); const fx = cleanFx(f.fx), ch = arr(f.ch, 12).map(c => (SKN.includes(c) ? c : ''));
+  return { n: str(f.n), t: str(f.t, 60), d: str(f.d, 20000), ...(fx.length ? { fx } : {}), ...(ch.some(Boolean) ? { ch } : {}) };
+};
 
 export function cleanSheet(o) {
   o = obj(o);
