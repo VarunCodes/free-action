@@ -34,6 +34,7 @@ button.x{min-height:32px;padding:2px 9px;color:var(--mute)}
 .vit input{text-align:center;font-weight:700}
 .hp{border:1px solid var(--line);background:var(--sf);border-radius:10px;padding:12px;margin-top:8px}
 .hpn{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+p.hds{margin:6px 0 0;font-size:.85rem}div.hds{align-items:center;flex-wrap:wrap}
 .hpn b{font:700 2.4rem Bitter,serif;line-height:1}
 .bar{height:10px;background:var(--line);border-radius:5px;overflow:hidden;margin:8px 0}
 .bar i{display:block;height:100%;background:var(--ac)}

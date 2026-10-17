@@ -16,7 +16,7 @@ export const CLS = {
   Warlock: { sv: ['wis', 'cha'], ca: 'cha', hd: 8 }, Wizard: { sv: ['int', 'wis'], ca: 'int', hd: 6 },
 };
 export const CLASSES = Object.keys(CLS);
-export const DEF = () => ({ name: 'New Hero', cls: '', sub: '', species: '', bg: '', level: 1, mode: 'play', ab: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }, sv: {}, sk: {}, hp: { cur: 10, max: 10, temp: 0 }, ac: 10, speed: 30, init: 0, cast: '', slots: Array.from({ length: 9 }, () => ({ m: 0, u: 0 })), spells: [], items: [], notes: '', insp: false, feats: [], race: [], vtt: 'foundry', spc: false, inc: false, acAuto: true, acb: 0 });
+export const DEF = () => ({ name: 'New Hero', cls: '', sub: '', species: '', bg: '', level: 1, mode: 'play', ab: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }, sv: {}, sk: {}, hp: { cur: 10, max: 10, temp: 0 }, ac: 10, speed: 30, init: 0, cast: '', slots: Array.from({ length: 9 }, () => ({ m: 0, u: 0 })), spells: [], items: [], notes: '', insp: false, feats: [], race: [], vtt: 'foundry', spc: false, inc: false, acAuto: true, acb: 0, hd: 0, hdie: 0 });
 
 const obj = v => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 const arr = (v, max) => (Array.isArray(v) ? v.slice(0, max) : []);
@@ -79,5 +79,7 @@ export function cleanSheet(o) {
     vtt: pick(o.vtt, ['foundry', 'roll20', 'roll20t'], 'foundry'), spc: bool(o.spc), inc: bool(o.inc),
     // Sheets from before AC was calculated keep a hand-typed AC unless it was still the default.
     acAuto: o.acAuto === undefined ? (o.ac === undefined || Number(o.ac) === 10) : bool(o.acAuto), acb: int(o.acb, -10, 20, 0),
+    // Hit dice spent (one die per level) and, for a custom class, its hit die size (0 = not set).
+    hd: int(o.hd, 0, int(o.level, 1, 20, 1), 0), hdie: [6, 8, 10, 12].includes(Number(o.hdie)) ? Number(o.hdie) : 0,
   };
 }
