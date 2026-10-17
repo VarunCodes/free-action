@@ -168,7 +168,8 @@ export function openLibrary(stateGetter, changed) {
       }
       const b = e.target.closest('button'); if (!b) return;
       if (b.dataset.lc !== undefined) dlg.close();
-      else if (b.dataset.lk) { kind = b.dataset.lk; draw(true); }
+      // A new category usually means a new search, so land in the search box instead of on the tab.
+      else if (b.dataset.lk) { kind = b.dataset.lk; dlg._focusQ = true; draw(true); }
       else if (b.dataset.lrf) { rf = b.dataset.lrf; draw(true); }
       else if (b.dataset.lsf) { sf = b.dataset.lsf; draw(true); }
       else if (b.dataset.lff) { ff = b.dataset.lff; draw(true); }
