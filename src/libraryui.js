@@ -103,7 +103,7 @@ function draw(top) {
   }).join('');
   const stamp = data && data.at ? `SRD data saved ${new Date(data.at).toLocaleDateString(undefined, { dateStyle: 'medium' })}` : '';
   dlg.innerHTML = `<div class="dh"><h2>Library</h2><button data-lc>Close</button></div>
-  <div class="seg" role="tablist">${KINDS.map(k => `<button role="tab" data-lk="${k.id}" class="${k.id === kind ? 'on' : ''}">${k.label}</button>`).join('')}</div>
+  <div class="seg" role="tablist" aria-label="Library category">${KINDS.map(k => `<button role="tab" data-lk="${k.id}" class="${k.id === kind ? 'on' : ''}" aria-selected="${k.id === kind}">${k.label}</button>`).join('')}</div>
   <input id="lq" type="search" placeholder="Search ${KINDS.find(k => k.id === kind).label.toLowerCase()} (${kind === 'item' ? 'try weapon, armor or rare' : 'try a class name or level'})" value="${esc(query)}" aria-label="Search">
   ${chips}
   <div class="lbody">
