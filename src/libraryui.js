@@ -16,6 +16,10 @@ const sfOk = it => sf === 'all' || schoolOf(it) === sf;
 let cf = 'all';
 const classOf = it => (it.sub || '').split(/[:,]/)[0].trim();
 const cfOk = it => cf === 'all' || classOf(it) === cf;
+// The filter starts on your class, and again whenever the class changes; a chip you pick sticks until then.
+let cfFor = null;
+// Your class's features from a higher level than yours are dimmed, with your level beside theirs.
+const later = (S, it) => it.kind === 'class' && it.level > S.level && classOf(it) === S.cls;
 // Feats tab filter: feats or Epic Boons, or one feat category, from the subtitle ("Origin feat", "Epic boon feat").
 const FEATS = [['origin', 'Origin'], ['general', 'General'], ['fighting style', 'Fighting Style']];
 let ff = 'all';
@@ -88,16 +92,19 @@ function draw(top) {
   const refocus = !mine ? '' : a.id === 'lq' ? '' : a.id ? '#' + CSS.escape(a.id)
     : d.la || d.lrm ? `[data-la="${d.la || d.lrm}"],[data-lrm="${d.la || d.lrm}"]` : k0 ? `[${attr(k0)}="${CSS.escape(d[k0])}"]` : '';
   if (mine && a.id === 'lq') dlg._focusQ = true;
+  const classes = data ? [...new Set(data.items.filter(it => it.kind === 'class').map(classOf).filter(Boolean))].sort() : [];
+  if (data && S.cls !== cfFor) { cfFor = S.cls; cf = classes.includes(S.cls) ? S.cls : 'all'; }
   const pool = data ? data.items.filter(it => it.kind === 'item' ? rfOk(it) : it.kind === 'spell' ? sfOk(it) : it.kind === 'feat' ? ffOk(it) : it.kind === 'class' ? cfOk(it) : true) : [];
   const { shown, total } = data ? search(pool, kind, query) : { shown: [], total: 0 };
   const chips = kind === 'item' ? chipRow('Filter by rarity', 'lrf', rf, [['all', 'All'], ['mundane', 'Mundane'], ['magic', 'Magic'], ...RARITY.slice(1).map((r, i) => [String(i + 1), r, ' r' + (i + 1)])])
     : kind === 'spell' ? chipRow('Filter by school of magic', 'lsf', sf, [['all', 'All'], ...SCHOOLS.map(s => [s, s])])
     : kind === 'feat' ? chipRow('Filter feats', 'lff', ff, [['all', 'All'], ['feat', 'Feats'], ['boon', 'Boons'], ...FEATS])
-    : kind === 'class' && data ? chipRow('Filter by class', 'lcf', cf, [['all', 'All'], ...[...new Set(data.items.filter(it => it.kind === 'class').map(classOf).filter(Boolean))].sort().map(c => [c, c])]) : '';
+    : kind === 'class' && data ? chipRow('Filter by class', 'lcf', cf, [['all', 'All'], ...classes.map(c => [c, c === S.cls ? c + ' (your class)' : c])]) : '';
   const rows = shown.map((it, idx) => {
     const id = kind + ':' + it.name + ':' + idx;
     const done = has(S, it);
-    return `<div class="lrow"><div class="lhd"><button class="lk" data-lo="${esc(id)}" aria-expanded="${open.has(id)}"><span>${magicMark(it.rr)}${esc(it.name)}${rarityTag(it.rr)}</span><small>${esc(it.sub)}${it.src === 'Custom' ? ' (custom)' : ''}</small></button>
+    const lt = later(S, it);
+    return `<div class="lrow${lt ? ' later' : ''}"><div class="lhd"><button class="lk" data-lo="${esc(id)}" aria-expanded="${open.has(id)}"><span>${magicMark(it.rr)}${esc(it.name)}${rarityTag(it.rr)}</span><small>${esc(it.sub)}${it.src === 'Custom' ? ' (custom)' : ''}${lt ? ` &middot; you're level ${S.level}` : ''}</small></button>
       ${done ? `<button class="bad" data-lrm="${idx}" title="On your sheet. Click to remove it.">${kind === 'race' ? 'Remove species' : 'Remove'}</button>` : `<button class="pri" data-la="${idx}">${kind === 'race' ? (S.species ? 'Switch species' : 'Add species') : owned(S, it) ? `Add (have ${owned(S, it)})` : 'Add'}</button>`}</div>
       ${open.has(id) ? `<p class="sd">${md(it.desc) || 'No description.'}</p>` : ''}</div>`;
   }).join('');

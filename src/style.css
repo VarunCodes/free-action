@@ -93,7 +93,7 @@ dialog.lib::backdrop{background:rgba(10,18,22,.6)}
 .lhd .lk{display:flex;flex-direction:column;flex:1;text-decoration:none;min-height:44px;justify-content:center}
 .lhd .lk small{color:var(--mute);font-weight:400}
 .lhd .lk:hover span{text-decoration:underline}
-.lrow .sd{margin-left:0}
+.lrow .sd{margin-left:0}.lrow.later .lk span{opacity:.6}
 .err{color:var(--bad)}
 .pack summary{cursor:pointer;color:var(--mute);padding:4px 0}
 .foot{margin:0;font-size:.8rem}
