@@ -39,14 +39,33 @@ const onSheet = (S, it) => {
 };
 const has = (S, it) => it.kind === 'race' ? !!S.species && S.species.toLowerCase() === it.name.toLowerCase() : !!onSheet(S, it);
 const traitsOf = it => (it.traits && it.traits.length ? it.traits : [{ n: it.name, d: it.desc }]);
-// Take a species' own traits off the sheet. Each is matched by name; where several racial features
-// share a name (two Darkvisions), only the one with this species' text goes.
+// Take a species' own traits off the sheet. Each is matched by name, since every species has a Size and a
+// Speed and most have a Darkvision (worded differently). Where several racial features share a name, the one
+// with this species' text goes, or else the first, so a trait you reworded still goes with its species.
 function dropTraits(S, it) {
+  let n = 0;
   for (const t of traitsOf(it)) {
     const same = S.race.filter(x => x.n.toLowerCase() === t.n.toLowerCase());
-    const x = same.length > 1 ? same.find(x => x.d === t.d) : same[0];
-    if (x) S.race.splice(S.race.indexOf(x), 1);
+    const x = same.find(x => x.d === t.d) || same[0];
+    if (x) { S.race.splice(S.race.indexOf(x), 1); n++; }
   }
+  return n;
+}
+// A character has one species: the old one's traits come off before the new one's go on, so shared traits
+// (Size, Speed, Darkvision) end up with the new species' wording. A trait the new species has that is still on
+// the sheet under the same name (left by a custom species the Library doesn't know) is replaced, never doubled.
+// it = null just clears the species.
+export function swapSpecies(S, items, it) {
+  const old = S.species && items.find(x => x.kind === 'race' && x.name.toLowerCase() === S.species.toLowerCase());
+  const removed = old ? dropTraits(S, old) : 0;
+  let added = 0;
+  S.species = it ? it.name : '';
+  if (it) for (const t of traitsOf(it)) {
+    const i = S.race.findIndex(x => x.n.toLowerCase() === t.n.toLowerCase()), x = { n: t.n, t: '', d: t.d };
+    if (i < 0) S.race.push(x); else S.race[i] = x;
+    added++;
+  }
+  return { old: old ? old.name : '', removed, added };
 }
 // Undo an Add. A species also takes its traits with it.
 function remove(it) {
@@ -70,12 +89,7 @@ function add(it) {
     else S.items.push({ n: it.name, q: 1, d: it.desc, eq: !!it.eq, on: false, ...(it.w ? { w: { ...it.w } } : {}), ...(it.ar ? { ar: { ...it.ar } } : {}), ...(it.at ? { at: true } : {}), ...(it.fx ? { fx: it.fx.map(f => [...f]) } : {}), rr: it.rr || 0, v: 3 });
   }
   else {
-    // A character has one species: picking another swaps out the old one's traits.
-    const old = S.species && data.items.find(x => x.kind === 'race' && x.name.toLowerCase() === S.species.toLowerCase());
-    if (old) dropTraits(S, old);
-    S.species = it.name;
-    for (const t of traitsOf(it)) if (!S.race.some(x => x.n.toLowerCase() === t.n.toLowerCase() && x.d === t.d)) S.race.push({ n: t.n, t: '', d: t.d });
-    if (old) { onChange(true); return; }
+    if (swapSpecies(S, data.items, it).old) { onChange(true); return; }
   }
   onChange();
 }
