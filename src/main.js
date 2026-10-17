@@ -1,6 +1,6 @@
 import './style.css';
 import { openLibrary, swapSpecies } from './libraryui.js';
-import { cachedItems, cachedSpecies, loadLibrary } from './library.js';
+import { cachedItems, cachedSpecies, loadLibrary, traitEffects } from './library.js';
 import { md, rarityTag, magicMark } from './text.js';
 import { AB, ABN, SK, DEF, CLS, CLASSES, cleanSheet } from './sheet.js';
 let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null,RERR='',IOMSG=null,ATTMSG=-1,CC=false,CS=false,CMSG='',SPC=[];const UP={};
@@ -60,8 +60,9 @@ function setSpecies(n){const go=()=>{const it=n?SPC.find(x=>x.kind==='race'&&x.n
 // Hit dice: one per level, of the class's size (or the one picked for a custom class). A short rest spends them
 // one at a time (die + Con modifier, at least 1 HP); a long rest gives them all back (2024 rules).
 const hdOf=()=>CLS[knownCls(S.cls)]?.hd||S.hdie,hdLeft=()=>Math.max(0,S.level-S.hd);
-// Max HP by the fixed-average rule: the full die plus Con at level 1, then half the die + 1 + Con per level, each at least 1.
-const avgHP=()=>{const d=hdOf(),c=mod(sc('con'));return d?Math.max(1,d+c)+(S.level-1)*Math.max(1,d/2+1+c):0};
+// Max HP by the fixed-average rule: the full die plus Con at level 1, then half the die + 1 + Con per level, each at least 1;
+// plus any HP per level from features (Dwarven Toughness).
+const avgHP=()=>{const d=hdOf(),c=mod(sc('con'));return d?Math.max(1,d+c)+(S.level-1)*Math.max(1,d/2+1+c)+S.level*fxSum('hp'):0};
 // Picking a standard class swaps the old class's save proficiencies and spellcasting ability for the new one's.
 // Other saves, and an ability you chose by hand, stay; the sheet can't tell a hand-ticked save from one the old
 // class gave, so those go with the old class. The Spellcasting drop-down can always override what was picked.
@@ -78,12 +79,21 @@ const rd=m=>1+Math.floor(Math.random()*m);
 // attune to (up to 3). If a sheet somehow has more (an import), the first three count and the rest
 // are flagged.
 function gear(){const att=S.items.filter(x=>x.at&&x.att),ok=new Set(att.slice(0,3));return{live:S.items.filter(x=>x.eq&&x.on&&(!x.at||ok.has(x))),over:att.slice(3),attuned:att.length}}
-const fxOf=t=>gear().live.flatMap(x=>(x.fx||[]).filter(f=>f[0]===t).map(f=>[x,f]));
+// Effects come from live gear and from every feature and racial trait (see traitEffects in library.js), so a
+// species, feat or item that boosts something all feed the same sums. A skill choice ('?', '?A|B') becomes the
+// skill picked for it in Edit (x.ch, one pick per choice, in order); until then it counts for nothing.
+const featFx=x=>{let c=0;return traitEffects(x).map(f=>f[0]==='sk'&&f[1][0]==='?'?[f[0],x.ch?.[c++]||'',f[2],f[1]]:f)};
+const fxOf=t=>[...gear().live.map(x=>[x,x.fx||[]]),...[...S.feats,...S.race].map(x=>[x,featFx(x)])].flatMap(([x,l])=>l.filter(f=>f[0]===t).map(f=>[x,f]));
 const fxSum=t=>fxOf(t).reduce((n,[,f])=>n+f[2],0);
 const fxAdv=k=>fxOf('adv').filter(([,f])=>f[1]===k).map(([x])=>x);
-// Ability score after items: a "your Strength is 19" item raises it, never lowers it.
-const scBy=a=>fxOf('set').filter(([,f])=>f[1]===a&&f[2]>S.ab[a]).sort((p,q)=>q[1][2]-p[1][2])[0];
-const sc=a=>scBy(a)?.[1][2]??S.ab[a];
+// Ability score: your score plus any bonuses (a homebrew species' +2 Con), then a "your Strength is 19" item
+// raises it if that's higher, never lowers it.
+const abFx=a=>fxOf('ab').filter(([,f])=>f[1]===a),abB=a=>abFx(a).reduce((n,[,f])=>n+f[2],0);
+const scBase=a=>Math.max(1,Math.min(30,S.ab[a]+abB(a)));
+const scBy=a=>fxOf('set').filter(([,f])=>f[1]===a&&f[2]>scBase(a)).sort((p,q)=>q[1][2]-p[1][2])[0];
+const sc=a=>scBy(a)?.[1][2]??scBase(a);
+// Skill proficiency: what you ticked, or more if a feature grants it (a granted one can't be cycled below that).
+const skBy=n=>fxOf('sk').filter(([,f])=>f[1]===n),skG=n=>Math.max(0,...skBy(n).map(([,f])=>f[2])),prS=n=>Math.max(S.sk[n]||0,skG(n));
 // Equipped gear whose Strength requirement isn't met. As in the 2024 rules this costs 10 ft of Speed
 // (once, however many such items are worn) and doesn't change any rolls.
 const unmet=()=>S.items.filter(x=>x.eq&&x.on&&x.ar&&x.ar.str>sc('str'));
@@ -96,7 +106,7 @@ function acCalc(){const dx=mod(sc('dex')),on=gear().live.filter(x=>x.ar&&x.ar.k)
  const parts=[arm?[arm.x.n,arm.v]:[un>10?'Unarmored base '+un+' + Dex':'Unarmored (10 + Dex)',un+dx]];if(sh)parts.push([sh.x.n,sh.v]);
  for(const x of on.filter(x=>x.ar.k==='bonus'&&(!x.ar.nu||(!arm&&!sh))))parts.push([x.n,x.ar.ac]);if(S.acb)parts.push(['Other bonus',S.acb]);
  return{ac:parts.reduce((n,[,v])=>n+v,0),parts,used:new Set([arm?.x,sh?.x])}}
-const fxLabel=([t,a,v])=>t==='set'?`${ABN[a]} becomes ${v}`:t==='chk'?`${fmt(v)} ability checks`:t==='sv'?`${fmt(v)} saving throws`:t==='sa'?`${fmt(v)} spell attacks`:t==='dc'?`${fmt(v)} spell save DC`:`Advantage on ${a==='init'?'Initiative':a}`;
+const fxLabel=([t,a,v,o])=>t==='set'?`${ABN[a]} becomes ${v}`:t==='chk'?`${fmt(v)} ability checks`:t==='sv'?`${fmt(v)} saving throws`:t==='sa'?`${fmt(v)} spell attacks`:t==='dc'?`${fmt(v)} spell save DC`:t==='hp'?`${fmt(v)} HP per level`:t==='ab'?`${fmt(v)} ${ABN[a]}`:t==='sk'?(a?`${a} ${v>1?'expertise':'proficiency'}`:`Choose a skill${o&&o!=='?'?` (${o.slice(1).split('|').join(', ')})`:''} in Edit`):`Advantage on ${a==='init'?'Initiative':a}`;
 const FXO=[...AB.map(a=>[`set|${a}`,`Set ${ABN[a]} to (value)`]),['chk|','Bonus to ability checks'],['sv|','Bonus to saving throws'],['sa|','Bonus to spell attacks'],['dc|','Bonus to spell save DC'],['adv|init','Advantage on Initiative'],...SK.map(([n])=>[`adv|${n}`,`Advantage on ${n}`])].map(([v,t])=>`<option value="${v}">${t}</option>`).join('');
 const acNow=()=>S.acAuto?acCalc().ac:S.ac;
 const worn=f=>gear().live.filter(x=>x.ar&&f(x.ar));
@@ -129,7 +139,9 @@ function renderRoll(){const L=LAST,sg=(v,t)=>`<button data-a="rm" data-v="${v}" 
 document.getElementById('roll').innerHTML=`<div class="rp${RMIN?' min':''}"><div class="rpi"><button class="hd rt" data-a="rmin" aria-expanded="${!RMIN}" aria-label="${RMIN?'Show roll options':'Hide roll options'}" title="${RMIN?'Show roll options':'Hide roll options'}"></button><div class="rr">${L?`<b class="tot">${L.total}</b><span>${esc(L.label)} ${esc(L.detail)}</span>${L.crit?`<span class="crit">${L.crit}</span>`:''}`:RERR?`<span class="reqn" role="alert">${esc(RERR)}</span>`:'<span class="sub">Tap any modifier to roll</span>'}</div>${RMIN?'':`<div class="rc"><div class="seg" role="group" aria-label="Roll mode">${sg('','Normal')}${sg('adv','Adv')}${sg('dis','Dis')}</div><input id="cmd" readonly value="${esc(cmdFor())}" placeholder="Chat command" aria-label="Chat command"><button class="pri" data-a="cp" ${L?'':'disabled'}>${COP?'Copied':'Copy'}</button></div><details data-id="more" ${OPEN.has('more')?'open':''}><summary>VTT format and custom roll</summary><div class="rc"><select data-k="vtt" aria-label="Chat format">${op('foundry','Foundry (/r)')}${op('roll20','Roll20 (/roll)')}${op('roll20t','Roll20 template')}</select><input id="cx" placeholder="2d6+3" value="${esc(CX)}" aria-label="Custom dice"><button data-a="cx">Roll</button></div></details>`}</div></div>`;
  // The page leaves room at the bottom for however tall the bar is now.
  document.documentElement.style.setProperty('--rollh',document.getElementById('roll').firstChild.offsetHeight+'px')}
-const featSec=(t,k,typed,ed)=>{const L=S[k];let h=`<h2>${t}</h2>`;h+=L.length?L.map((x,i)=>{const id=k+'.'+i;return `<details class="ft" data-id="${id}" ${ed||OPEN.has(id)?'open':''}><summary><span class="g">${esc(x.n)}</span>${x.t?`<span class="pill">${esc(x.t)}</span>`:''}${ed?`<button class="x" data-a="delft" data-v="${id}" aria-label="Remove ${esc(x.n)}">\u2715</button>`:''}</summary>${ed?`<textarea data-k="${id}.d" placeholder="Description" aria-label="${esc(x.n)} description">${esc(x.d)}</textarea>`:`<p>${md(x.d)||'No description.'}</p>`}</details>`}).join(''):'<div class="empty">None yet.</div>';if(ed)h+=`<div class="add"><input class="n" id="ftn-${k}" placeholder="Name" aria-label="New ${k==='race'?'racial feature':'feature'} name">${typed?`<select id="ftt-${k}" aria-label="New feature type"><option>Class feature</option><option>Feat</option></select>`:''}<button class="pri" data-a="addft" data-v="${k}">Add</button></div>`;return h};
+// A feature that changes numbers says so under its name; a skill choice gets a drop-down in Edit (Play says to pick one).
+const fxPicks=(x,id,ed)=>{const N=esc(x.n);let c=0;const l=featFx(x),ch=l.filter(f=>f[0]==='sk'&&f[3]).length;return l.map(f=>{if(!(ed&&f[0]==='sk'&&f[3]))return `<span class="a">${esc(fxLabel(f))}</span>`;const j=c++,o=f[3]==='?'?SK.map(([n])=>n):f[3].slice(1).split('|');return `<select data-ch="${id}.${j}" aria-label="${N} skill${ch>1?' '+(j+1):''}"><option value="">Choose a skill</option>${o.map(s=>`<option ${f[1]===s?'selected':''}>${s}</option>`).join('')}</select>`}).join(' ')};
+const featSec=(t,k,typed,ed)=>{const L=S[k];let h=`<h2>${t}</h2>`;h+=L.length?L.map((x,i)=>{const id=k+'.'+i,fp=fxPicks(x,id,ed);return `<details class="ft" data-id="${id}" ${ed||OPEN.has(id)?'open':''}><summary><span class="g">${esc(x.n)}</span>${x.t?`<span class="pill">${esc(x.t)}</span>`:''}${ed?`<button class="x" data-a="delft" data-v="${id}" aria-label="Remove ${esc(x.n)}">\u2715</button>`:''}${!ed&&fp?` ${fp}`:''}</summary>${ed&&fp?`<div class="srl fxl">${fp}</div>`:''}${ed?`<textarea data-k="${id}.d" placeholder="Description" aria-label="${esc(x.n)} description">${esc(x.d)}</textarea>`:`<p>${md(x.d)||'No description.'}</p>`}</details>`}).join(''):'<div class="empty">None yet.</div>';if(ed)h+=`<div class="add"><input class="n" id="ftn-${k}" placeholder="Name" aria-label="New ${k==='race'?'racial feature':'feature'} name">${typed?`<select id="ftt-${k}" aria-label="New feature type"><option>Class feature</option><option>Feat</option></select>`:''}<button class="pri" data-a="addft" data-v="${k}">Add</button></div>`;return h};
 function spRow(x,i,ed,p,cm){const r=x.r,k=`spells.${i}.r.`,N=esc(x.n);
  if(ed)return `<div class="srl"><label class="row"><input type="checkbox" data-k="${k}a" ${r.a?'checked':''} aria-label="${N} attack"> Attack</label><select data-k="${k}s" aria-label="${N} saving throw"><option value="">No save</option>${AB.map(a=>`<option value="${a}" ${r.s===a?'selected':''}>${ABN[a].slice(0,3)} save</option>`).join('')}</select>${inp(k+'d',r.d,'text',`class="dmg" placeholder="Dice, e.g. 1d10" aria-label="${N} damage dice"`)}${inp(k+'t',r.t,'text',`class="dmt" placeholder="Type" aria-label="${N} damage type"`)}<label class="row"><input type="checkbox" data-k="${k}m" ${r.m?'checked':''} aria-label="${N} adds modifier"> + modifier</label></div>`;
  const sl=UP[i]??x.l,{d,n}=spDice(x,sl);if(!r.a&&!ABN[r.s]&&!d)return'';
@@ -153,19 +165,19 @@ function render(){
  <div class="hp"><div class="hpn"><b>${S.hp.cur}</b><span>/ ${S.hp.max} HP</span>${S.hp.temp?`<span class="pill">+${S.hp.temp} temp</span>`:''}</div>
  <div class="bar ${pct<25?'low':''}"><i style="width:${pct}%"></i></div>
  <div class="row"><input id="amt" type="number" min="0" value="${amt}" aria-label="Amount"><button class="bad" data-a="dmg">Damage</button><button class="pri" data-a="heal">Heal</button><button data-a="temp">Set temp</button></div>
- ${ed?`<div class="row" style="margin-top:8px">${fld('Max HP','hp.max',S.hp.max,'number','min=1 max=9999')}${fld('Current HP','hp.cur',S.hp.cur,'number',`min=0 max=${S.hp.max}`)}</div>${hdOf()?`<p class="sub hds">Average max HP for level ${S.level} (d${hdOf()}, Con ${fmt(mod(sc('con')))}): <b>${avgHP()}</b> <button data-a="avghp" ${avgHP()===S.hp.max?'disabled':''}>Use ${avgHP()}</button></p>`:''}`:''}
+ ${ed?`<div class="row" style="margin-top:8px">${fld('Max HP','hp.max',S.hp.max,'number','min=1 max=9999')}${fld('Current HP','hp.cur',S.hp.cur,'number',`min=0 max=${S.hp.max}`)}</div>${hdOf()?`<p class="sub hds">Average max HP for level ${S.level} (d${hdOf()}, Con ${fmt(mod(sc('con')))}${fxOf('hp').map(([x,f])=>`, ${esc(x.n)} ${fmt(f[2])}/level`).join('')}): <b>${avgHP()}</b> <button data-a="avghp" ${avgHP()===S.hp.max?'disabled':''}>Use ${avgHP()}</button></p>`:''}`:''}
  ${hdOf()?`<div class="row hds" style="margin-top:8px"><span>Hit dice <b>${hdLeft()}</b> of ${S.level} (d${hdOf()})</span><button data-a="hd" ${hdLeft()&&S.hp.cur<S.hp.max?'':'disabled'} title="${!hdLeft()?'No hit dice left. A long rest gives them all back.':S.hp.cur<S.hp.max?`Short rest: roll d${hdOf()} ${fmt(mod(sc('con')))} and heal that much`:'Already at full HP'}">Spend a hit die</button></div>`:''}
  <div class="row" style="margin-top:8px"><button data-a="long">Long rest</button>
  <label class="row" style="margin-left:auto"><input type="checkbox" data-k="insp" ${S.insp?'checked':''}> Heroic Inspiration</label></div></div>`;
  if(ed)h+=`<div class="row acset"><label class="row"><input type="checkbox" data-k="acAuto" ${S.acAuto?'checked':''}> Calculate AC from equipped gear</label>${S.acAuto?`<label class="row">Other AC bonus ${inp('acb',S.acb,'number','min=-10 max=20 style="width:72px" aria-label="Other AC bonus"')}</label>`:''}</div>`;
  cut('abil');
- h+=`<h2>Abilities ${!ed&&CK?`<small>${esc(ckT)} on checks</small>`:''}</h2><div class="abs">${AB.map(a=>{const by=scBy(a);return `<div class="ab${by?' boost':''}" ${by?`title="${esc(`${by[0].n} sets ${ABN[a]} to ${by[1][2]} (yours: ${S.ab[a]})`)}"`:''}><div class="n">${ABN[a].slice(0,3)}</div><button class="rb m" data-a="roll" data-l="${ABN[a]} check" data-b="${mod(sc(a))+CK}">${fmt(mod(sc(a))+CK)}</button>${ed?inp('ab.'+a,S.ab[a],'number',`min=1 max=30 aria-label="${ABN[a]} score"`):`<div class="s">${sc(a)}${by?` <span class="up">${esc(by[0].n)}</span>`:''}</div>`}</div>`}).join('')}</div>`;
+ h+=`<h2>Abilities ${!ed&&CK?`<small>${esc(ckT)} on checks</small>`:''}</h2><div class="abs">${AB.map(a=>{const by=scBy(a),bb=abFx(a);return `<div class="ab${by||bb.length?' boost':''}" ${by?`title="${esc(`${by[0].n} sets ${ABN[a]} to ${by[1][2]} (yours: ${scBase(a)})`)}"`:bb.length?`title="${esc(`${S.ab[a]}, plus ${srcText(bb.map(([x,f])=>[x.n,f[2]]))}`)}"`:''}><div class="n">${ABN[a].slice(0,3)}</div><button class="rb m" data-a="roll" data-l="${ABN[a]} check" data-b="${mod(sc(a))+CK}">${fmt(mod(sc(a))+CK)}</button>${ed?inp('ab.'+a,S.ab[a],'number',`min=1 max=30 aria-label="${ABN[a]} score"`):`<div class="s">${sc(a)}${by?` <span class="up">${esc(by[0].n)}</span>`:''}</div>`}</div>`}).join('')}</div>`;
  cut('save');
  const sb=saveBonus(),sbT=sb?`Includes ${srcText(saveSrc())}`:'';
  h+=`<h2>Saving throws ${ed?'<small>tap circles to set proficiency</small>':sb?`<small>${esc(sbT)}</small>`:''}</h2><div class="list two">${AB.map(a=>{const pr=S.sv[a]?1:0,v=mod(sc(a))+pr*p+sb;return `<div class="ln"><button class="pr" data-a="sv" data-v="${a}" aria-label="${ABN[a]} save proficiency" aria-pressed="${!!pr}" aria-description="${PL[pr]}" title="${PL[pr]}" ${ed?'':'disabled'}>${PM[pr]}</button><span class="g">${ABN[a]}</span><button class="rb" data-a="roll" data-l="${ABN[a]} save" data-b="${v}" title="${esc(sbT)}">${fmt(v)}</button></div>`}).join('')}</div>`;
  const sd=worn(a=>a.stl),sdT=sd.length?`Disadvantage from ${sd.map(x=>x.n).join(', ')}`:'';
- cut('skill');h+=`<h2>Skills ${ed?'<small>tap to cycle: none, proficient, expertise</small>':CK?`<small>${esc(ckT)}</small>`:''}</h2><div class="list two">${SK.map(([n,a])=>{const pr=S.sk[n]||0;return `<div class="ln"><button class="pr" data-a="sk" data-v="${n}" aria-label="${n} proficiency" aria-pressed="${!!pr}" aria-description="${PL[pr]}" title="${PL[pr]}" ${ed?'':'disabled'}>${PM[pr]}</button><span class="g">${n} <span class="a">${a}</span>${n==='Stealth'&&sd.length?` <span class="pill dis" title="${esc(sdT)}">Dis</span>`:''}${advT(n)?` <span class="pill adv" title="${esc(advT(n))}">Adv</span>`:''}</span><button class="rb" data-a="roll" data-l="${n}" data-b="${mod(sc(a))+pr*p+CK}" ${n==='Stealth'&&sd.length?`data-dis="1"`:''} ${advT(n)?`data-adv="1"`:''} title="${esc([n==='Stealth'?sdT:'',advT(n),ckT].filter(Boolean).join('. '))}">${fmt(mod(sc(a))+pr*p+CK)}</button></div>`}).join('')}</div>
- <div class="ln"><span class="g">Passive Perception</span><span class="v" title="${esc([ckT,advT('Perception')?'+5 for Advantage':''].filter(Boolean).join('. '))}">${10+mod(sc('wis'))+(S.sk.Perception||0)*p+CK+(advT('Perception')?5:0)}</span></div>`;
+ cut('skill');h+=`<h2>Skills ${ed?'<small>tap to cycle: none, proficient, expertise</small>':CK?`<small>${esc(ckT)}</small>`:''}</h2><div class="list two">${SK.map(([n,a])=>{const pr=prS(n),gb=pr&&skG(n)===pr?skBy(n).filter(([,f])=>f[2]===pr).map(([x])=>x.n):[],pT=PL[pr]+(gb.length?` (from ${gb.join(', ')})`:'');return `<div class="ln"><button class="pr" data-a="sk" data-v="${n}" aria-label="${n} proficiency" aria-pressed="${!!pr}" aria-description="${esc(pT)}" title="${esc(pT)}" ${ed?'':'disabled'}>${PM[pr]}</button><span class="g">${n} <span class="a">${a}</span>${n==='Stealth'&&sd.length?` <span class="pill dis" title="${esc(sdT)}">Dis</span>`:''}${advT(n)?` <span class="pill adv" title="${esc(advT(n))}">Adv</span>`:''}</span><button class="rb" data-a="roll" data-l="${n}" data-b="${mod(sc(a))+pr*p+CK}" ${n==='Stealth'&&sd.length?`data-dis="1"`:''} ${advT(n)?`data-adv="1"`:''} title="${esc([n==='Stealth'?sdT:'',advT(n),ckT].filter(Boolean).join('. '))}">${fmt(mod(sc(a))+pr*p+CK)}</button></div>`}).join('')}</div>
+ <div class="ln"><span class="g">Passive Perception</span><span class="v" title="${esc([ckT,advT('Perception')?'+5 for Advantage':''].filter(Boolean).join('. '))}">${10+mod(sc('wis'))+prS('Perception')*p+CK+(advT('Perception')?5:0)}</span></div>`;
  cut('feat');h+=featSec('Features and feats','feats',true,ed);cut('race');h+=featSec('Racial features','race',false,ed);
  cut('spell');
  h+=`<h2><button class="hd" data-a="spc" aria-expanded="${!S.spc}">Spellcasting</button>${S.spc?`<small>${S.spells.length} spell${S.spells.length===1?'':'s'}${ca?`, save DC ${8+p+cm+DCB}`:''}</small>`:''}</h2>`;const sp0=h.length;
@@ -219,6 +231,7 @@ document.addEventListener('change',e=>{
  if(t.id==='amt'){amt=Math.max(0,parseInt(t.value)||0);return}
  if(t.id==='cx'){CX=t.value;return}
  if(t.dataset.up!==undefined){UP[t.dataset.up]=+t.value;render();return}
+ if(t.dataset.ch){const[k,i,j]=t.dataset.ch.split('.'),x=S[k]?.[+i];if(x){x.ch=x.ch||[];x.ch[+j]=t.value}CMSG='';save();render();return}
  // Picking Custom clears a standard class so the box starts empty; a typed name that is a standard class snaps to it.
  // The note on what a class set stays until the next change anywhere on the sheet.
  if(t.id==='f-clsp'){CMSG='';CC=t.value==='*';if(!CC)setClass(t.value);else if(knownCls(S.cls))S.cls='';save();render();if(CC)document.getElementById('f-cls')?.focus();return}
@@ -249,7 +262,9 @@ document.addEventListener('click',e=>{
  else if(a==='avghp'){const m=avgHP();if(m>S.hp.max)S.hp.cur+=m-S.hp.max;S.hp.max=m}
  else if(a==='short'){}
  else if(a==='sv')S.sv[v]=!S.sv[v];
- else if(a==='sk')S.sk[v]=((S.sk[v]||0)+1)%3;
+ // A trait-granted skill cycles between its granted level and Expertise; only what you add on top is stored,
+ // so changing species never leaves a proficiency behind that you didn't pick.
+ else if(a==='sk'){const g=skG(v),nx=(prS(v)+1)%3;S.sk[v]=nx>g?nx:0}
  else if(a==='slot'){const[i,j]=v.split('.').map(Number),s=S.slots[i];s.u=(j<s.u)?j:j+1}
  else if(a==='addsp'){const nm=g('spn').value.trim();if(!nm)return;S.spells.push({n:nm,l:+g('spl').value,p:false})}
  else if(a==='delsp'){S.spells.splice(+v,1);[...OPEN].filter(k=>k.startsWith('sp')).forEach(k=>OPEN.delete(k));Object.keys(UP).forEach(k=>delete UP[k]);CRIT=null}

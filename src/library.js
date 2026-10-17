@@ -1,5 +1,6 @@
 // Library: loads the 2024 SRD (5.2, CC-BY 4.0) from the Open5e API, caches it in IndexedDB,
 // and merges in any custom content packs the user has imported.
+import { cleanFx } from './sheet.js';
 const BASE = 'https://api.open5e.com/v2';
 const SOURCE = 'srd-2024';
 const CACHE_VER = 10;
@@ -279,6 +280,9 @@ export async function loadLibrary({ force = false } = {}) {
 }
 
 // Custom pack format: [{ "kind": "spell|feat|race|class", "name": "...", "level": 0, "sub": "...", "desc": "..." }]
+// A species can list its traits, and each trait can say what it does with an fx list (see traitEffects):
+// { "kind": "race", "name": "Stoneborn", "traits": [{ "n": "Stone Hide", "d": "...", "fx": [["ab", "con", 2], ["hp", "", 1]] },
+//   { "n": "Deep Sight", "d": "...", "fx": [["sk", "?Perception|Survival", 1], ["adv", "Perception", 0]] }] }
 export async function importPack(text) {
   let data;
   try { data = JSON.parse(text); } catch { throw new Error('That is not valid JSON.'); }
@@ -290,7 +294,7 @@ export async function importPack(text) {
       kind: d.kind, name: String(d.name), level: Number(d.level) || 0,
       sub: String(d.sub || (d.kind === 'spell' ? (Number(d.level) ? 'Level ' + d.level : 'Cantrip') : 'Custom')),
       desc: String(d.desc || ''), src: 'Custom',
-      ...(d.kind === 'race' && Array.isArray(d.traits) ? { traits: d.traits.map(t => ({ n: String(t.n || t.name), d: String(t.d || t.desc || '') })) } : {}),
+      ...(d.kind === 'race' && Array.isArray(d.traits) ? { traits: d.traits.map(t => { const fx = cleanFx(t.fx); return { n: String(t.n || t.name), d: String(t.d || t.desc || ''), ...(fx.length ? { fx } : {}) }; }) } : {}),
     };
   });
   const old = (await kvGet('packs')) || [];
@@ -318,6 +322,29 @@ export function search(items, kind, query, limit = 80) {
 export async function cachedItems() {
   const c = await kvGet('srd-cache');
   return c && c.ver === CACHE_VER ? (c.kinds.item || []) : [];
+}
+// What a species trait (or any feature) does to the numbers, in the same [type, target, value] form as magic
+// item effects, plus three types of its own: hp (+value HP per level), ab (+value to an ability score) and
+// sk (skill proficiency: target is a skill, '?' for any skill of your choice, or '?A|B|C' to choose from a list).
+// Effects come from, in order: the trait's own fx (custom packs can give any trait effects), the SRD traits
+// named below, or wording the SRD uses, so homebrew written the same way works without an fx list.
+const TRAIT_FX = {
+  'dwarven toughness': [['hp', '', 1]],
+  'keen senses': [['sk', '?Insight|Perception|Survival', 1]],
+  skillful: [['sk', '?', 1]],
+};
+const SKILLS = ['Acrobatics', 'Animal Handling', 'Arcana', 'Athletics', 'Deception', 'History', 'Insight', 'Intimidation', 'Investigation', 'Medicine', 'Nature', 'Perception', 'Performance', 'Persuasion', 'Religion', 'Sleight of Hand', 'Stealth', 'Survival'];
+export function traitEffects(t) {
+  if (Array.isArray(t.fx) && t.fx.length) return t.fx;
+  const named = TRAIT_FX[String(t.n || '').trim().toLowerCase()];
+  if (named) return named;
+  const d = String(t.d || '').replace(/\s+/g, ' '), fx = [];
+  let m = /Hit Point maximum increases by (\d+),? and it increases by \1 again whenever you gain a level/i.exec(d);
+  if (m) fx.push(['hp', '', Number(m[1])]);
+  for (const a of d.matchAll(/\b(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) score increases by (\d+)/gi)) fx.push(['ab', ABL[a[1].toLowerCase()], Number(a[2])]);
+  for (const s of d.matchAll(/\bproficiency in the ([A-Z][a-z]+(?: [a-z]+ [A-Z][a-z]+| [A-Z][a-z]+)?) skill\b/g)) if (SKILLS.includes(s[1])) fx.push(['sk', s[1], 1]);
+  if (/\bproficiency in one skill of your choice\b/i.test(d)) fx.push(['sk', '?', 1]);
+  return fx;
 }
 // Species (with their traits) from the saved Library copy and custom packs, for the sheet's Species drop-down.
 export async function cachedSpecies() {
