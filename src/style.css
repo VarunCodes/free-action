@@ -26,7 +26,7 @@ button.x{min-height:32px;padding:2px 9px;color:var(--mute)}
 .seg button.on{background:var(--ink);color:var(--bg);font-weight:700}
 .id{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
 .id .w{grid-column:1/-1}
-.id .clsx{margin-top:6px}
+.id .clsx{margin-top:6px}.id .clsm{margin:0;font-size:.85rem}
 .lab{font-size:.78rem;color:var(--mute);display:block;margin-bottom:2px}
 .vitals{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;text-align:center}
 .vit{border:1px solid var(--line);background:var(--sf);border-radius:10px;padding:8px 4px}
