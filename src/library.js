@@ -319,3 +319,8 @@ export async function cachedItems() {
   const c = await kvGet('srd-cache');
   return c && c.ver === CACHE_VER ? (c.kinds.item || []) : [];
 }
+// Species (with their traits) from the saved Library copy and custom packs, for the sheet's Species drop-down.
+export async function cachedSpecies() {
+  const c = await kvGet('srd-cache'), packs = (await kvGet('packs')) || [];
+  return [...(c && c.ver === CACHE_VER ? c.kinds.race || [] : []), ...packs.filter(p => p.kind === 'race')];
+}

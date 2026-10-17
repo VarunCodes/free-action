@@ -1,9 +1,9 @@
 import './style.css';
-import { openLibrary } from './libraryui.js';
-import { cachedItems } from './library.js';
+import { openLibrary, swapSpecies } from './libraryui.js';
+import { cachedItems, cachedSpecies, loadLibrary } from './library.js';
 import { md, rarityTag, magicMark } from './text.js';
 import { AB, ABN, SK, DEF, CLS, CLASSES, cleanSheet } from './sheet.js';
-let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null,RERR='',IOMSG=null,ATTMSG=-1,CC=false,CMSG='';const UP={};
+let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null,RERR='',IOMSG=null,ATTMSG=-1,CC=false,CS=false,CMSG='',SPC=[];const UP={};
 const SR=()=>({a:false,s:'',d:'',b:'',t:'',h:false,m:false,by:'slot',up:[]});
 const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}},lsSet=(k,v)=>{try{localStorage.setItem(k,v);return true}catch(e){return false}};
 try{const r=lsGet('sheet');if(r)S=cleanSheet(JSON.parse(r))}catch(e){}
@@ -13,7 +13,7 @@ const snaps=()=>{try{const a=JSON.parse(lsGet('sheet-history')||'[]');return Arr
 function snapshot(why,force){const a=snaps(),now=Date.now(),s=JSON.stringify(S);if(a[0]&&a[0].s===s)return;if(!force&&a[0]&&now-a[0].at<30*60e3)return;a.unshift({at:now,why,name:S.name,s});while(a.length&&!lsSet('sheet-history',JSON.stringify(a.slice(0,6))))a.pop()}
 // Every save goes through the same limits as loading (scores 1-30, current HP no more than max, and so on).
 const save=()=>{S=cleanSheet(S);lsSet('sheet',JSON.stringify(S));snapshot('autosave')};
-function replaceSheet(o,why){snapshot(why,true);S=cleanSheet(o);io='';IOMSG=null;CC=false;OPEN.clear();Object.keys(UP).forEach(k=>delete UP[k]);CRIT=null}
+function replaceSheet(o,why){snapshot(why,true);S=cleanSheet(o);io='';IOMSG=null;CC=false;CS=false;OPEN.clear();Object.keys(UP).forEach(k=>delete UP[k]);CRIT=null}
 const ago=t=>{const d=Math.floor((Date.now()-t)/864e5);return d<1?'today':d===1?'yesterday':d+' days ago'};
 function downloadSheet(){const u=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download=(S.name||'character').replace(/[^\w-]+/g,'-')+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);lsSet('sheet-exported',String(Date.now()))}
 // Problems and results from Import, Open backup file and Restore show under the Backup buttons.
@@ -35,6 +35,20 @@ const fld=(l,k,v,t,x)=>`<div><label class="lab" for="${fid(k)}">${l}</label>${in
 // name that isn't one of them, like a homebrew class or an older sheet's "Bard 3") opens a text box instead.
 const knownCls=v=>CLASSES.find(c=>c.toLowerCase()===String(v).trim().toLowerCase());
 const clsFld=()=>{const k=knownCls(S.cls),cu=CC||(!k&&!!S.cls.trim());return `<div><label class="lab" for="f-clsp">Class</label><select id="f-clsp"><option value="">Choose a class</option>${CLASSES.map(c=>`<option ${k===c?'selected':''}>${c}</option>`).join('')}<option value="*" ${cu?'selected':''}>Custom…</option></select>${cu?inp('cls',S.cls,'text','class="clsx" placeholder="Class name" aria-label="Custom class"')+`<select class="clsx" data-k="hdie" aria-label="Custom class hit die"><option value="0">Hit die: not set</option>${[6,8,10,12].map(d=>`<option value="${d}" ${S.hdie===d?'selected':''}>Hit die: d${d}</option>`).join('')}</select>`:''}</div>`};
+// Species works like Class: the Library's species (SRD 5.2 and any custom packs), or Custom for anything else.
+// Before the Library has been downloaded once, the drop-down still lists the SRD names; picking one fetches the traits.
+const SPN=['Dragonborn','Dwarf','Elf','Gnome','Goliath','Halfling','Human','Orc','Tiefling'];
+const spNames=()=>SPC.length?[...new Set(SPC.map(x=>x.name))].sort():SPN;
+const knownSp=v=>spNames().find(c=>c.toLowerCase()===String(v).trim().toLowerCase());
+const spFld=()=>{const k=knownSp(S.species),cu=CS||(!k&&!!S.species.trim());return `<div><label class="lab" for="f-spp">Species</label><select id="f-spp"><option value="">Choose a species</option>${spNames().map(c=>`<option value="${esc(c)}" ${k===c?'selected':''}>${esc(c)}</option>`).join('')}<option value="*" ${cu?'selected':''}>Custom…</option></select>${cu?inp('species',S.species,'text','class="clsx" placeholder="Species name" aria-label="Custom species"'):''}</div>`};
+// Picking a species swaps the old species' racial traits for the new one's ('' or Custom only removes them).
+function setSpecies(n){const go=()=>{const it=n?SPC.find(x=>x.kind==='race'&&x.name===n):null;
+  if(n&&!it){S.species=n;CMSG=`Couldn't load ${n}'s traits. Open the Library once to download them, then pick ${n} again.`;return}
+  const r=swapSpecies(S,SPC,it),o=r.old&&r.old!==n?r.old:'';
+  const tr=(k,x)=>`${k} ${x} trait${k===1?'':'s'}`;
+  CMSG=it?(o?`Swapped ${tr(r.removed,o)} for ${tr(r.added,n)} in Racial features.`:`Added ${tr(r.added,n)} to Racial features.`):o&&r.removed?`Removed ${tr(r.removed,o)} from Racial features.`:''};
+ if(!n||SPC.some(x=>x.name===n)){go();return}
+ CMSG=`Loading ${n}'s traits…`;loadLibrary().then(d=>{SPC=d.items.filter(x=>x.kind==='race')}).catch(()=>{}).finally(()=>{go();save();render()})}
 // Hit dice: one per level, of the class's size (or the one picked for a custom class). A short rest spends them
 // one at a time (die + Con modifier, at least 1 HP); a long rest gives them all back (2024 rules).
 const hdOf=()=>CLS[knownCls(S.cls)]?.hd||S.hdie,hdLeft=()=>Math.max(0,S.level-S.hd);
@@ -121,7 +135,7 @@ function render(){
  const pct=Math.max(0,Math.min(100,S.hp.max?S.hp.cur/S.hp.max*100:0));
  let h=`<div class="top"><div><h1>${esc(S.name)||'Unnamed'}</h1><p class="sub">${esc([S.species,S.cls&&(S.cls+(S.sub?' ('+S.sub+')':'')),'Level '+S.level].filter(Boolean).join(', '))}</p></div>
  <div class="seg"><button data-a="mode" data-v="play" class="${ed?'':'on'}">Play</button><button data-a="mode" data-v="edit" class="${ed?'on':''}">Edit</button></div><button data-a="lib">Library</button></div>`;
- if(ed)h+=`<div class="id">${fld('Name','name',S.name)}${fld('Level','level',S.level,'number','min=1 max=20')}${clsFld()}${fld('Subclass','sub',S.sub)}${fld('Species','species',S.species)}${fld('Background','bg',S.bg)}${CMSG?`<p class="sub w clsm" role="status">${esc(CMSG)}</p>`:''}</div>`;
+ if(ed)h+=`<div class="id">${fld('Name','name',S.name)}${fld('Level','level',S.level,'number','min=1 max=20')}${clsFld()}${fld('Subclass','sub',S.sub)}${spFld()}${fld('Background','bg',S.bg)}${CMSG?`<p class="sub w clsm" role="status">${esc(CMSG)}</p>`:''}</div>`;
  cut('vit');
  h+=`<h2>Vitals</h2><div class="vitals">
  <div class="vit" title="${esc(S.acAuto?acCalc().parts.map(([n,v])=>n+' '+(v<0?v:'+'+v)).join('\n'):'Typed in by hand')}">${ed&&!S.acAuto?fld('AC','ac',S.ac,'number'):`<b>${acNow()}</b><span class="lab">Armor class</span>`}</div>
@@ -201,6 +215,8 @@ document.addEventListener('change',e=>{
  // The note on what a class set stays until the next change anywhere on the sheet.
  if(t.id==='f-clsp'){CMSG='';CC=t.value==='*';if(!CC)setClass(t.value);else if(knownCls(S.cls))S.cls='';save();render();if(CC)document.getElementById('f-cls')?.focus();return}
  if(t.dataset.k==='cls'&&knownCls(t.value)){CMSG='';setClass(knownCls(t.value));CC=false;save();render();return}
+ if(t.id==='f-spp'){CMSG='';CS=t.value==='*';setSpecies(CS?'':t.value);save();render();if(CS)document.getElementById('f-species')?.focus();return}
+ if(t.dataset.k==='species'&&knownSp(t.value)){CMSG='';CS=false;setSpecies(knownSp(t.value));save();render();return}
  if(!t.dataset.k)return;
  CMSG='';
  // A blank or non-numeric number box puts the old value back instead of becoming 0.
@@ -240,7 +256,8 @@ document.addEventListener('click',e=>{
  else if(a==='inc')S.inc=!S.inc;
  else if(a==='att'){const x=S.items[+v];if(!x.att&&S.items.filter(o=>o.at&&o.att).length>=3){ATTMSG=+v;render();return}x.att=!x.att}
  else if(a==='spd'){const k='sp'+v;OPEN.has(k)?OPEN.delete(k):OPEN.add(k)}
- else if(a==='lib'){openLibrary(()=>S,removed=>{if(removed){OPEN.clear();Object.keys(UP).forEach(k=>delete UP[k]);CRIT=null}save();render()});return}
+ // The Library may have just downloaded (or imported) species, so the drop-down re-reads them afterwards.
+ else if(a==='lib'){openLibrary(()=>S,removed=>{if(removed){OPEN.clear();Object.keys(UP).forEach(k=>delete UP[k]);CRIT=null}save();render();cachedSpecies().then(l=>{SPC=l;render()}).catch(()=>{})});return}
  else if(a==='addit'){const nm=g('itn').value.trim();if(!nm)return;S.items.push({n:nm,q:parseInt(g('itq').value)||1})}
  else if(a==='delit'){S.items.splice(+v,1);[...OPEN].filter(k=>k.startsWith('it')).forEach(k=>OPEN.delete(k));CRIT=null}
  else if(a==='addft'){const nm=g('ftn-'+v).value.trim();if(!nm)return;const t=g('ftt-'+v);S[v].push({n:nm,t:t?t.value:'',d:''})}
@@ -280,4 +297,5 @@ window.addEventListener('library-loaded',backfill);
 // Keep the bottom room right when the roll bar rewraps (window resized, phone rotated).
 window.addEventListener('resize',()=>{const r=document.getElementById('roll').firstChild;if(r)document.documentElement.style.setProperty('--rollh',r.offsetHeight+'px')});
 backfill();
+cachedSpecies().then(l=>{SPC=l;if(S.mode==='edit')render()}).catch(()=>{});
 render();
