@@ -1,0 +1,12 @@
+{
+ "name": "Brakka",
+ "cls": "Fighter",
+ "species": "Dwarf",
+ "bg": "Soldier",
+ "level": 5,
+ "ab": { "str": 16, "dex": 12, "con": 14, "int": 8, "wis": 10, "cha": 13 },
+ "sv": { "str": true, "con": true },
+ "sk": { "Athletics": 1, "Perception": 1 },
+ "hp": { "cur": 44, "max": 44, "temp": 0 },
+ "speed": 30
+}
