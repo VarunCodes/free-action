@@ -29,7 +29,7 @@ A D&D 5.5e (2024 rules) character sheet in plain HTML, CSS and JS. Vite builds i
 
 - IMPORTANT: never weaken an assertion, add a timeout, or update a snapshot to make a failing test pass. Report the failure and why.
 - A known app bug gets `test.fail()` with an issue annotation, not a deleted test.
-- Playwright conventions are in `.claude/rules/testing.md`.
+- Playwright conventions: @docs/testing.md
 
 ## Gotchas
 
