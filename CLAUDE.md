@@ -6,6 +6,11 @@ A D&D 5.5e (2024 rules) character sheet in plain HTML, CSS and JS. Vite builds i
 
 - Dev server: `npm run dev`, then open http://localhost:5173/
 - Build (CI runs this, so it must pass): `npm run build`
+- Serve the build: `npm run serve` (http://localhost:4173/)
+- All e2e tests: `npx playwright test`. They reuse a running dev server; `CI=1` tests the build instead, as CI does.
+- One file: `npx playwright test tests/e2e/smoke.spec.ts`. One browser: `--project=chromium` (also `webkit`, `phone`).
+- Only what changed vs main: `npx playwright test --only-changed=main`
+- Debug a failure: `npx playwright test --debug=cli`, or `npx playwright show-trace <trace.zip>`
 
 ## Rules
 
@@ -19,6 +24,12 @@ A D&D 5.5e (2024 rules) character sheet in plain HTML, CSS and JS. Vite builds i
 - Use Conventional Commits (`feat:`, `fix:`, `test:`, `ci:`, `chore:`, `docs:`).
 - One concern per PR, under about 400 changed lines. Open it with `gh pr create`. The description says what changed, why, which rule it follows, and how it was tested.
 - Test on localhost before asking for a merge. The user merges.
+
+## Testing
+
+- IMPORTANT: never weaken an assertion, add a timeout, or update a snapshot to make a failing test pass. Report the failure and why.
+- A known app bug gets `test.fail()` with an issue annotation, not a deleted test.
+- Playwright conventions: @docs/testing.md
 
 ## Gotchas
 

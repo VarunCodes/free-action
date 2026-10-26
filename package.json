@@ -6,9 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "serve": "vite build && vite preview --port 4173 --strictPort",
+    "test": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "vite": "^5.4.11"
   }
 }
