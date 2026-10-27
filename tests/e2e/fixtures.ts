@@ -6,7 +6,7 @@
 //   - nothing leaves the machine: Google Fonts gets an empty stylesheet, and any other outside
 //     request (the Open5e API, until a spec mocks it) is blocked and fails the test
 //   - the dice are fixed: Math.random follows the same sequence in every run
-//   - any uncaught error or console error on the page fails the test
+//   - any uncaught error or console error, in any tab the test opens, fails the test
 import { test as base, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
@@ -86,12 +86,20 @@ export const test = base.extend<Fixtures>({
   ],
 
   noPageErrors: [
-    async ({ page }, use) => {
+    // Watches every tab in the context, including ones a test opens later with context.newPage().
+    // Tabs are numbered in the order they open, so "tab 2" is the first extra tab.
+    async ({ context }, use) => {
       const errors: string[] = [];
-      page.on('pageerror', e => errors.push(e.message));
-      page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+      let tabs = 0;
+      const watch = (page: Page) => {
+        const tab = `tab ${++tabs}`;
+        page.on('pageerror', e => errors.push(`${tab} (${page.url()}): ${e.message}`));
+        page.on('console', m => { if (m.type() === 'error') errors.push(`${tab} (${page.url()}): ${m.text()}`); });
+      };
+      context.pages().forEach(watch);
+      context.on('page', watch);
       await use();
-      expect(errors, 'errors on the page').toEqual([]);
+      expect(errors, 'errors on any tab').toEqual([]);
     },
     { auto: true },
   ],
