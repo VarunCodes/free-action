@@ -1,7 +1,8 @@
 import { test, expect, loadSheet } from '../fixtures';
 
-// Every sheet passes through cleanSheet() on load. Sheets saved by older versions of the app,
-// or edited by hand, must still open, with impossible values brought back within the rules.
+// Sheets saved by older versions of the app, or edited by hand, must still open, with impossible
+// values brought back within the rules. Most upgrades happen in cleanSheet() (src/sheet.js) on
+// load; the gear flags are filled in by render() in src/main.js.
 
 test('a sheet from before AC was calculated keeps its hand-typed AC', async ({ page, seedSheet }) => {
   // Older sheets have no acAuto. A typed AC other than the old default (10) means the player set it.

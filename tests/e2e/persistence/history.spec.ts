@@ -10,6 +10,17 @@ test.beforeEach(async ({ page, seedSheet }) => {
 });
 
 test('New character starts a blank sheet, and the old one can be restored', async ({ page, savedSheet }) => {
+  let before: unknown;
+
+  // The app skips a snapshot identical to the newest one, and the newest is taken when the page
+  // opens. An edit after opening means the "before new character" snapshot is the only copy of it.
+  await test.step('take 14 damage, so the sheet differs from when the page opened', async () => {
+    await page.getByLabel('Amount').fill('14');
+    await page.getByRole('button', { name: 'Damage' }).click();
+    await expect.poll(savedSheet).toMatchObject({ hp: { cur: 30, max: 44 } });
+    before = await savedSheet();
+  });
+
   await test.step('start a new character', async () => {
     const asked = answerConfirm(page, 'accept');
     await page.getByRole('button', { name: 'New character' }).click();
@@ -18,21 +29,18 @@ test('New character starts a blank sheet, and the old one can be restored', asyn
     await expect.poll(savedSheet).toMatchObject({ name: 'New Hero', level: 1, cls: '' });
   });
 
-  await test.step('restore the latest version of the old character', async () => {
-    // The app skips a snapshot identical to the newest one, so the old character may be listed
-    // as "(opened)" rather than "(before new character)". Either way it must be in the list.
+  await test.step('restore the version saved before the new character', async () => {
     const versions = page.getByLabel('Earlier version');
-    const before = versions.getByRole('option', { name: /: Brakka( \(|$)/ }).first();
-    await versions.selectOption((await before.getAttribute('value'))!);
+    const snapshot = versions.getByRole('option', { name: /: Brakka \(before new character\)$/ });
+    await versions.selectOption((await snapshot.getAttribute('value'))!);
     const asked = answerConfirm(page, 'accept');
     await page.getByRole('button', { name: 'Restore an earlier version' }).click();
     expect(await asked).toContain('Restore "Brakka"');
   });
 
-  const original = loadSheet('fighter-5');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Brakka');
   await expect(page.getByText('Dwarf, Fighter, Level 5')).toBeVisible();
-  await expect.poll(savedSheet).toMatchObject({ name: 'Brakka', cls: 'Fighter', level: 5, ab: original.ab, sk: original.sk, hp: original.hp });
+  await expect.poll(savedSheet).toEqual(before);
 });
 
 test('cancelling New character keeps the current character', async ({ page, savedSheet }) => {
