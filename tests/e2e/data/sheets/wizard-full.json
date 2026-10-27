@@ -1,0 +1,43 @@
+{
+ "name": "Ilsa Vane",
+ "cls": "Wizard",
+ "sub": "Evoker",
+ "species": "Elf",
+ "bg": "Sage",
+ "level": 7,
+ "ab": { "str": 8, "dex": 14, "con": 14, "int": 18, "wis": 12, "cha": 10 },
+ "sv": { "int": true, "wis": true },
+ "sk": { "Arcana": 2, "History": 1, "Investigation": 1 },
+ "hp": { "cur": 31, "max": 44, "temp": 5 },
+ "acAuto": false,
+ "ac": 15,
+ "speed": 30,
+ "init": 1,
+ "cast": "int",
+ "insp": true,
+ "vtt": "roll20",
+ "hd": 2,
+ "slots": [
+  { "m": 4, "u": 1 }, { "m": 3, "u": 0 }, { "m": 3, "u": 2 }, { "m": 1, "u": 0 },
+  { "m": 0, "u": 0 }, { "m": 0, "u": 0 }, { "m": 0, "u": 0 }, { "m": 0, "u": 0 }, { "m": 0, "u": 0 }
+ ],
+ "spells": [
+  { "n": "Fire Bolt", "l": 0, "p": false, "d": "A mote of fire.", "r": { "a": true, "s": "", "d": "2d10", "b": "1d10", "t": "fire", "h": false, "m": false, "by": "char", "up": [[5, "2d10", 0], [11, "3d10", 0]] } },
+  { "n": "Fireball", "l": 3, "p": true, "d": "A bright streak.", "r": { "a": false, "s": "dex", "d": "8d6", "b": "8d6", "t": "fire", "h": false, "m": false, "by": "slot", "up": [[4, "9d6", 0]] } }
+ ],
+ "items": [
+  { "n": "Dagger", "q": 2, "d": "Finesse, light, thrown.", "eq": true, "on": true, "w": { "d": "1d4", "t": "piercing", "v": "", "b": 0, "ab": "fin" }, "ar": { "k": "", "ac": 0, "str": 0, "nu": false, "sb": 0, "stl": false }, "v": 3 },
+  { "n": "Cloak of Protection", "q": 1, "eq": true, "on": true, "at": true, "att": true, "rr": 2, "ar": { "k": "bonus", "ac": 1, "str": 0, "nu": false, "sb": 1, "stl": false }, "v": 3 },
+  { "n": "Headband of Intellect", "q": 1, "eq": true, "on": false, "at": true, "att": false, "rr": 2, "fx": [["set", "int", 19]], "ar": { "k": "", "ac": 0, "str": 0, "nu": false, "sb": 0, "stl": false }, "v": 3 },
+  { "n": "Spellbook", "q": 1, "d": "Your spells." }
+ ],
+ "feats": [
+  { "n": "Skilled", "t": "Feat", "d": "Gain proficiency in any combination of three skills or tools.", "fx": [["sk", "?", 1]], "ch": ["Insight"] },
+  { "n": "Arcane Recovery", "t": "Wizard", "d": "Recover spell slots on a Short Rest." }
+ ],
+ "race": [
+  { "n": "Darkvision", "t": "", "d": "You have Darkvision with a range of 60 feet." },
+  { "n": "Keen Senses", "t": "", "d": "You have proficiency in the Insight, Perception, or Survival skill.", "ch": ["Perception"] }
+ ],
+ "notes": "Owes the Arcane Brotherhood 40 gp.\nAllergic to cats."
+}

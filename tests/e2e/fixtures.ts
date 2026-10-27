@@ -1,12 +1,13 @@
 // Every spec imports test and expect from here. On top of Playwright's own, this adds:
 //   seedSheet(sheet)  put a character in the browser before the page opens
 //   savedSheet()      read the character the app has saved (for expect.poll)
+//   answerConfirm()   accept or cancel the next confirm() dialog, and get its message
 // and, in every test without asking, three guards:
 //   - nothing leaves the machine: Google Fonts gets an empty stylesheet, and any other outside
 //     request (the Open5e API, until a spec mocks it) is blocked and fails the test
 //   - the dice are fixed: Math.random follows the same sequence in every run
 //   - any uncaught error or console error on the page fails the test
-import { test as base, expect } from '@playwright/test';
+import { test as base, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
 export type Sheet = Record<string, unknown>;
@@ -14,6 +15,16 @@ export type Sheet = Record<string, unknown>;
 // A character from tests/e2e/data/sheets/<name>.json.
 export const loadSheet = (name: string): Sheet =>
   JSON.parse(readFileSync(new URL(`./data/sheets/${name}.json`, import.meta.url), 'utf8'));
+
+// Playwright cancels dialogs nobody handles, so a test that clicks something with a confirm()
+// calls this first. It resolves to the dialog's message, so the test can check what was asked.
+export const answerConfirm = (page: Page, answer: 'accept' | 'cancel') =>
+  new Promise<string>(resolve => {
+    page.once('dialog', async dialog => {
+      resolve(dialog.message());
+      await (answer === 'accept' ? dialog.accept() : dialog.dismiss());
+    });
+  });
 
 type Fixtures = {
   seedSheet: (sheet: Sheet) => Promise<void>;
