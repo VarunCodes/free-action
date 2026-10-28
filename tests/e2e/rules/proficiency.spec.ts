@@ -15,7 +15,7 @@ for (const [level, bonus] of bands) {
     await seedSheet({ ...loadSheet('fighter-5'), level });
     await page.goto('/');
 
-    await expect(page.getByRole('group', { name: 'Proficiency' }).getByText(bonus, { exact: true })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Proficiency', exact: true }).getByText(bonus, { exact: true })).toBeVisible();
   });
 }
 
@@ -24,7 +24,7 @@ test('levelling up raises the proficiency bonus everywhere it is used', async ({
   await seedSheet(loadSheet('fighter-5'));
   await page.goto('/');
   // Level 5: proficiency +3. Athletics = +3 Str + 3 = +6.
-  await expect(page.getByRole('button', { name: 'Athletics +6' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Athletics +6', exact: true })).toBeVisible();
 
   await test.step('change the level from 5 to 9 in Edit mode', async () => {
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
@@ -34,7 +34,7 @@ test('levelling up raises the proficiency bonus everywhere it is used', async ({
   });
 
   // Level 9: proficiency +4. Athletics = +3 Str + 4 = +7; Strength save = +3 + 4 = +7.
-  await expect(page.getByRole('group', { name: 'Proficiency' }).getByText('+4', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Athletics +7' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Strength save +7' })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Proficiency', exact: true }).getByText('+4', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Athletics +7', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Strength save +7', exact: true })).toBeVisible();
 });

@@ -22,7 +22,26 @@ for (const { scores, checks } of cases) {
     await page.goto('/');
 
     for (const [ability, modifier] of Object.entries(checks)) {
-      await expect(page.getByRole('button', { name: `${ability} check ${modifier}` })).toBeVisible();
+      await expect(page.getByRole('button', { name: `${ability} check ${modifier}`, exact: true })).toBeVisible();
     }
   });
 }
+
+test('a zero or negative modifier is rolled as written', async ({ page, seedSheet }) => {
+  await seedSheet({ ...loadSheet('fighter-5'), ab: cases[0].scores });
+  await page.goto('/');
+  const command = page.getByLabel('Chat command');
+
+  await test.step('roll Strength (score 1, modifier -5)', async () => {
+    await expect(page.getByRole('button', { name: 'Strength check -5', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Strength check -5', exact: true }).click();
+    await expect(command).toHaveValue('/r 1d20-5 # Strength check');
+  });
+
+  await test.step('roll Wisdom (score 10, modifier +0)', async () => {
+    await expect(page.getByRole('button', { name: 'Wisdom check +0', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Wisdom check +0', exact: true }).click();
+    // App convention, not a rule: a +0 bonus is left out of the formula.
+    await expect(command).toHaveValue('/r 1d20 # Wisdom check');
+  });
+});
