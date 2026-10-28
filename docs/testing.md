@@ -10,6 +10,7 @@
 - Tests are independent: they pass with `--shuffle --repeat-each=3`.
 - Title = the behaviour in plain English ("medium armor adds at most +2 Dex").
 - Tag the fast subset `{ tag: '@smoke' }`. Folders give the category; don't tag them.
+- Specs in `tests/e2e/rules/` run in Chromium only, because they check arithmetic. Anything that can differ by browser or screen size (storage, downloads, dialogs, layout) goes outside `rules/`, so it runs in all three projects.
 - Wrap flows of several actions in `test.step` with a readable title.
 - Known app bug: mark the test `test.fail()` and link the issue (`annotation: { type: 'issue', description: '<issue URL>' }`). It still runs. Once the bug is fixed it passes, Playwright reports that as a failure, and the fix PR removes the marker.
 - Broken or flaky test: `test.fixme()` with an issue link. It is skipped until fixed.

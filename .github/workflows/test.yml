@@ -18,6 +18,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      # Not cached on purpose: measured in #35, a browser cache saved nothing (40s without, 41s
+      # with), because the time goes on the system libraries, which every fresh runner needs.
       - run: npx playwright install --with-deps chromium webkit
       # CI is set by GitHub, so this builds the site and tests the build (see playwright.config.ts).
       # Random order catches tests that depend on each other. The github reporter doesn't print the
