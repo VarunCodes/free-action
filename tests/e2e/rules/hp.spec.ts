@@ -12,6 +12,8 @@ async function hpAction(page: Page, button: 'Damage' | 'Heal' | 'Set temp', amou
   await page.getByRole('button', { name: button, exact: true }).click();
 }
 
+// The Play-mode HP block: current HP, "/ max HP", and a "+N temp" pill when there are any.
+const hpBlock = (page: Page) => page.getByRole('group', { name: 'Hit points', exact: true });
 const hitDice = (page: Page) => page.getByText(/^Hit dice \d+ of \d+/);
 const spend = (page: Page) => page.getByRole('button', { name: 'Spend a hit die', exact: true });
 
@@ -21,6 +23,7 @@ test.describe('damage and healing', () => {
     await page.goto('/');
     await hpAction(page, 'Damage', 10);
     await expect.poll(savedSheet).toMatchObject(hp(34)); // 44 - 10
+    await expect(hpBlock(page)).toHaveText('34/ 44 HP');
   });
 
   test('damage comes off Temporary Hit Points first', { tag: '@smoke' }, async ({ page, seedSheet, savedSheet }) => {
@@ -29,6 +32,7 @@ test.describe('damage and healing', () => {
     await page.goto('/');
     await hpAction(page, 'Damage', 8);
     await expect.poll(savedSheet).toMatchObject(hp(41, 44, 0)); // 5 temp absorbed, 3 left over
+    await expect(hpBlock(page)).toHaveText('41/ 44 HP');
   });
 
   test('damage that only dents Temporary Hit Points leaves HP alone', async ({ page, seedSheet, savedSheet }) => {
@@ -36,7 +40,7 @@ test.describe('damage and healing', () => {
     await page.goto('/');
     await hpAction(page, 'Damage', 3);
     await expect.poll(savedSheet).toMatchObject(hp(44, 44, 2));
-    await expect(page.getByText('+2 temp', { exact: true })).toBeVisible();
+    await expect(hpBlock(page)).toHaveText('44/ 44 HP+2 temp');
   });
 
   test('HP never drops below 0', async ({ page, seedSheet, savedSheet }) => {
@@ -45,6 +49,7 @@ test.describe('damage and healing', () => {
     await page.goto('/');
     await hpAction(page, 'Damage', 25);
     await expect.poll(savedSheet).toMatchObject(hp(0));
+    await expect(hpBlock(page)).toHaveText('0/ 44 HP');
   });
 
   test('healing raises current HP but never above the maximum', async ({ page, seedSheet, savedSheet }) => {
@@ -54,10 +59,12 @@ test.describe('damage and healing', () => {
     await test.step('heal 5: 30 to 35', async () => {
       await hpAction(page, 'Heal', 5);
       await expect.poll(savedSheet).toMatchObject(hp(35));
+      await expect(hpBlock(page)).toHaveText('35/ 44 HP');
     });
     await test.step('heal 20: stops at 44', async () => {
       await hpAction(page, 'Heal', 20);
       await expect.poll(savedSheet).toMatchObject(hp(44));
+      await expect(hpBlock(page)).toHaveText('44/ 44 HP');
     });
   });
 
@@ -69,14 +76,17 @@ test.describe('damage and healing', () => {
     await test.step('set 5', async () => {
       await hpAction(page, 'Set temp', 5);
       await expect.poll(savedSheet).toMatchObject(hp(44, 44, 5));
+      await expect(hpBlock(page)).toHaveText('44/ 44 HP+5 temp');
     });
     await test.step('set 3: 5 is higher, so 5 stays', async () => {
       await hpAction(page, 'Set temp', 3);
       await expect.poll(savedSheet).toMatchObject(hp(44, 44, 5));
+      await expect(hpBlock(page)).toHaveText('44/ 44 HP+5 temp');
     });
     await test.step('set 8: 8 replaces 5', async () => {
       await hpAction(page, 'Set temp', 8);
       await expect.poll(savedSheet).toMatchObject(hp(44, 44, 8));
+      await expect(hpBlock(page)).toHaveText('44/ 44 HP+8 temp');
     });
   });
 });
@@ -152,10 +162,12 @@ test('a long rest restores HP, hit dice and spell slots, and ends Temporary Hit 
   const slots = Array.from({ length: 9 }, (_, i) => (i < 2 ? { m: 3, u: 2 } : { m: 0, u: 0 }));
   await seedSheet(brakka({ ...hp(10, 44, 5), hd: 3, slots }));
   await page.goto('/');
+  await expect(hpBlock(page)).toHaveText('10/ 44 HP+5 temp');
   await page.getByRole('button', { name: 'Long rest', exact: true }).click();
 
   const unused = Array.from({ length: 9 }, () => ({ u: 0 }));
   await expect.poll(savedSheet).toMatchObject({ ...hp(44, 44, 0), hd: 0, slots: unused });
+  await expect(hpBlock(page)).toHaveText('44/ 44 HP');
   await expect(hitDice(page)).toHaveText('Hit dice 5 of 5 (d10)');
 });
 
