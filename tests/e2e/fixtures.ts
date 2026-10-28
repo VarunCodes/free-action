@@ -1,5 +1,6 @@
 // Every spec imports test and expect from here. On top of Playwright's own, this adds:
 //   seedSheet(sheet)  put a character in the browser before the page opens
+//   seedPacks(packs)  put custom content packs (species, feats…) in the browser's Library store
 //   savedSheet()      read the character the app has saved (for expect.poll)
 //   answerConfirm()   accept or cancel the next confirm() dialog, and get its message
 //   switchMode()      switch the sheet to Play or Edit, and wait until it has
@@ -12,6 +13,8 @@ import { test as base, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
 export type Sheet = Record<string, unknown>;
+// A custom content pack entry, as the Library stores it: { kind, name, level, sub, desc, src, traits? }.
+export type Pack = Record<string, unknown>;
 
 // A character from tests/e2e/data/sheets/<name>.json.
 export const loadSheet = (name: string): Sheet =>
@@ -36,6 +39,7 @@ export async function switchMode(page: Page, mode: 'Play' | 'Edit') {
 
 type Fixtures = {
   seedSheet: (sheet: Sheet) => Promise<void>;
+  seedPacks: (packs: Pack[]) => Promise<void>;
   savedSheet: () => Promise<Sheet | null>;
   noInternet: void;
   fixedDice: void;
@@ -52,6 +56,25 @@ export const test = base.extend<Fixtures>({
         localStorage.setItem('sheet', json);
         sessionStorage.setItem('e2e-seeded', '1');
       }, JSON.stringify(sheet));
+    });
+  },
+
+  // Packs are stored as the app stores imported ones (IndexedDB dnd-sheet, key "packs"). They're written
+  // while the database is first created, and the app's own open waits for that, so the app never sees
+  // it empty. Later loads find the database already there and leave it alone. Call it once per test, with
+  // every pack: a second call would never run, since the database exists by then.
+  seedPacks: async ({ page }, use) => {
+    let seeded = false;
+    await use(async packs => {
+      if (page.url() !== 'about:blank') throw new Error('Call seedPacks() before page.goto().');
+      if (seeded) throw new Error('Call seedPacks() once, with every pack.');
+      seeded = true;
+      await page.addInitScript(list => {
+        const r = indexedDB.open('dnd-sheet', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('kv').put(list, 'packs');
+        r.onsuccess = () => r.result.close(); // so a later version of the app's database isn't blocked
+        r.onerror = () => console.error('seedPacks failed:', r.error); // reported by noPageErrors
+      }, packs);
     });
   },
 
