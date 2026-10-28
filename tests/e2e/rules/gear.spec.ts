@@ -4,8 +4,10 @@ import type { Page } from '@playwright/test';
 // Gear rules besides AC: Strength requirements, Stealth Disadvantage, and attunement.
 // Chain Mail, from the PHB 2024 Armor table: AC 16, Strength 13, Disadvantage on Stealth.
 const chain = { n: 'Chain Mail', q: 1, eq: true, on: true, ar: { k: 'heavy', ac: 16, str: 13, stl: true } };
+// PHB 2024, Ring of Protection: +1 to AC and saving throws, requires attunement.
 const ring = (n: string, att: boolean) => ({ n, q: 1, eq: true, on: true, at: true, att, ar: { k: 'bonus', ac: 1, str: 0, sb: 1 } });
 
+// Brakka (fighter-5): Str set per test, Dex 12 (+1), proficient in Strength saves, not in Stealth.
 const brakka = (str: number, items: Sheet[]) => {
   const base = loadSheet('fighter-5');
   return { ...base, ab: { ...(base.ab as object), str }, items };
@@ -31,44 +33,72 @@ test.describe('Strength requirement', () => {
     await expect(speed(page).getByText('30', { exact: true })).toBeVisible();
     await expect(page.getByText(/Needs Str 13/)).toHaveCount(0);
   });
+
+  test('armor that is carried but not worn costs no Speed', async ({ page, seedSheet }) => {
+    await seedSheet(brakka(12, [{ ...chain, on: false }]));
+    await page.goto('/');
+
+    await expect(speed(page).getByText('30', { exact: true })).toBeVisible();
+  });
 });
 
-test('armor with Stealth Disadvantage makes Stealth rolls use Disadvantage', async ({ page, seedSheet }) => {
-  // PHB 2024: Chain Mail gives Disadvantage on Dexterity (Stealth) checks. Stealth is Dex +1 for
-  // Brakka, so the roll is two d20s keeping the lower, plus 1.
-  await seedSheet(brakka(16, [chain]));
-  await page.goto('/');
+test.describe('Stealth Disadvantage', () => {
+  // PHB 2024: Chain Mail gives Disadvantage on Dexterity (Stealth) checks. Brakka's Stealth is
+  // Dex +1, so with the armor on, the roll is two d20s keeping the lower, plus 1.
+  const roll = async (page: Page, button: string, formula: string) => {
+    await expect(page.getByRole('button', { name: button, exact: true })).toBeVisible();
+    await page.getByRole('button', { name: button, exact: true }).click();
+    await expect(page.getByLabel('Chat command')).toHaveValue(formula);
+  };
 
-  await expect(page.getByRole('button', { name: 'Stealth +1', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Stealth +1', exact: true }).click();
-  await expect(page.getByLabel('Chat command')).toHaveValue('/r 2d20kl1+1 # Stealth');
+  test('worn armor with Stealth Disadvantage rolls Stealth with Disadvantage, and only Stealth', async ({ page, seedSheet }) => {
+    await seedSheet(brakka(16, [chain]));
+    await page.goto('/');
+
+    await test.step('Stealth: Disadvantage', () => roll(page, 'Stealth +1', '/r 2d20kl1+1 # Stealth'));
+    await test.step('Athletics: a normal roll', () => roll(page, 'Athletics +6', '/r 1d20+6 # Athletics'));
+  });
+
+  test('the same armor carried but not worn gives no Disadvantage', async ({ page, seedSheet }) => {
+    await seedSheet(brakka(16, [{ ...chain, on: false }]));
+    await page.goto('/');
+
+    await roll(page, 'Stealth +1', '/r 1d20+1 # Stealth');
+  });
 });
 
 test.describe('attunement', () => {
   // PHB 2024: a magic item that needs attunement works only while you're attuned to it, and you
-  // can be attuned to at most three items. Ring of Protection: +1 to AC and saving throws.
+  // can be attuned to at most three items.
 
-  test('an item needing attunement does nothing until attuned', async ({ page, seedSheet }) => {
+  test('an item needing attunement does nothing until attuned', { tag: '@smoke' }, async ({ page, seedSheet, savedSheet }) => {
     await seedSheet(brakka(16, [chain, ring('Ring of Protection', false)]));
     await page.goto('/');
+    const attune = page.getByRole('button', { name: 'Attune Ring of Protection' });
 
-    await test.step('not attuned: Chain Mail 16, Strength save +6', async () => {
+    await test.step('not attuned: AC 16, Strength save +6, Dexterity save +1', async () => {
       await expect(ac(page).getByText('16', { exact: true })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Strength save +6', exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Dexterity save +1', exact: true })).toBeVisible();
       await expect(page.getByText('not attuned, no effect')).toBeVisible();
     });
 
-    await test.step('attune: AC 16 + 1, Strength save +6 + 1', async () => {
-      await page.getByRole('button', { name: 'Attune Ring of Protection' }).click();
-      await expect(page.getByRole('button', { name: 'Attune Ring of Protection' })).toHaveAttribute('aria-pressed', 'true');
+    // +1 to every save, proficient or not: Strength +6 + 1, Dexterity +1 + 1.
+    await test.step('attune: AC 17, Strength save +7, Dexterity save +2, and it is saved', async () => {
+      await attune.click();
+      await expect(attune).toHaveAttribute('aria-pressed', 'true');
       await expect(ac(page).getByText('17', { exact: true })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Strength save +7', exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Dexterity save +2', exact: true })).toBeVisible();
+      await expect(page.getByText('not attuned, no effect')).toHaveCount(0);
+      await expect.poll(savedSheet).toMatchObject({ items: [{ n: 'Chain Mail' }, { n: 'Ring of Protection', att: true }] });
     });
   });
 
-  test('a fourth item cannot be attuned until one of the three is ended', async ({ page, seedSheet }) => {
+  test('a fourth item cannot be attuned until one of the three is ended', async ({ page, seedSheet, savedSheet }) => {
     await seedSheet(brakka(16, [ring('Ring A', true), ring('Ring B', true), ring('Ring C', true), ring('Ring D', false)]));
     await page.goto('/');
+    const ringA = page.getByRole('button', { name: 'Attune Ring A' });
     const ringD = page.getByRole('button', { name: 'Attune Ring D' });
 
     await test.step('try to attune a fourth', async () => {
@@ -78,10 +108,24 @@ test.describe('attunement', () => {
     });
 
     await test.step('end attunement to one, then attune the fourth', async () => {
-      await page.getByRole('button', { name: 'Attune Ring A' }).click();
-      await expect(page.getByRole('button', { name: 'Attune Ring A' })).toHaveAttribute('aria-pressed', 'false');
+      await ringA.click();
+      await expect(ringA).toHaveAttribute('aria-pressed', 'false');
       await ringD.click();
       await expect(ringD).toHaveAttribute('aria-pressed', 'true');
+      await expect.poll(savedSheet).toMatchObject({
+        items: [{ n: 'Ring A', att: false }, { n: 'Ring B', att: true }, { n: 'Ring C', att: true }, { n: 'Ring D', att: true }],
+      });
     });
+  });
+
+  test('a sheet imported with four items attuned applies only three', async ({ page, seedSheet }) => {
+    // Only reachable by importing or hand-editing a sheet. The app's policy: the first three count,
+    // and the rest are flagged. With Chain Mail 16, three +1 rings: 16 + 3 = 19.
+    await seedSheet(brakka(16, [chain, ring('Ring A', true), ring('Ring B', true), ring('Ring C', true), ring('Ring D', true)]));
+    await page.goto('/');
+
+    await expect(ac(page).getByText('19', { exact: true })).toBeVisible();
+    await expect(page.getByText('Over the 3-item attunement limit')).toHaveCount(1);
+    await expect(page.getByText(/^Ring D.*Over the 3-item attunement limit/)).toBeVisible();
   });
 });
