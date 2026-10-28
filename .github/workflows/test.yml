@@ -18,7 +18,24 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium webkit
+      # Browsers are cached between runs, keyed on the Playwright version, because each version
+      # needs its own browser builds. The system libraries they need are installed every time,
+      # since each run starts on a fresh machine.
+      - name: Read the Playwright version
+        id: playwright
+        run: echo "version=$(npx playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+      - name: Cache the browsers
+        id: browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Install the browsers and their system libraries
+        if: steps.browsers.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium webkit
+      - name: Install only the system libraries (browsers came from the cache)
+        if: steps.browsers.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium webkit
       # CI is set by GitHub, so this builds the site and tests the build (see playwright.config.ts).
       # Random order catches tests that depend on each other. The github reporter doesn't print the
       # seed, so the run id is the seed: replay an order with `CI=1 npx playwright test --shuffle=<run id>`.
