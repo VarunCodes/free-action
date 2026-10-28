@@ -90,7 +90,6 @@ test.describe('problems', () => {
     { annotation: { type: 'issue', description: 'https://github.com/VarunCodes/free-action/issues/25' } },
     async ({ page, browserName }) => {
       test.skip(browserName !== 'chromium', 'Only Chromium refuses the clipboard write here');
-      test.fail(); // Known bug #25: the refused clipboard write is an uncaught error on the page.
       await page.getByRole('button', { name: 'Export', exact: true }).click();
       await expect(page.getByLabel('Backup JSON')).toHaveValue(/"name": "Brakka"/);
     },

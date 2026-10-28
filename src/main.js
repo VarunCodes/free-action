@@ -290,7 +290,7 @@ document.addEventListener('click',e=>{
  else if(a==='rmin'){RMIN=!RMIN;lsSet('roll-min',RMIN?'1':'0');renderRoll();return}
  else if(a==='cx'){CX=g('cx').value;doCustom(CX);CRIT=null;if(LAST)COP=copyText(cmdFor())}
  else if(a==='cp'){if(LAST)COP=copyText(cmdFor())}
- else if(a==='exp'){IOMSG=null;io=JSON.stringify(S,null,1);lsSet('sheet-exported',String(Date.now()));save();render();const ta=g('io');ta.select();try{navigator.clipboard.writeText(io)}catch(x){}return}
+ else if(a==='exp'){IOMSG=null;io=JSON.stringify(S,null,1);lsSet('sheet-exported',String(Date.now()));save();render();const ta=g('io');ta.select();try{navigator.clipboard.writeText(io).catch(()=>{})}catch(x){}return}
  else if(a==='dl'){IOMSG=null;downloadSheet()}
  else if(a==='imp'){io=g('io').value;IOMSG=null;if(!importText(io)){render();return}}
  else if(a==='rst'){const x=snaps()[+g('snp').value];if(!x||!confirm(`Restore "${x.name}" from ${when(x.at)}? The current version is kept in the list.`))return;try{replaceSheet(JSON.parse(x.s),'before restore');IOMSG={t:`Restored "${x.name}" from ${when(x.at)}.`}}catch(e){IOMSG={bad:true,t:'That version could not be read.'};render();return}}
