@@ -2,6 +2,7 @@
 //   seedSheet(sheet)  put a character in the browser before the page opens
 //   savedSheet()      read the character the app has saved (for expect.poll)
 //   answerConfirm()   accept or cancel the next confirm() dialog, and get its message
+//   switchMode()      switch the sheet to Play or Edit, and wait until it has
 // and, in every test without asking, three guards:
 //   - nothing leaves the machine: Google Fonts gets an empty stylesheet, and any other outside
 //     request (the Open5e API, until a spec mocks it) is blocked and fails the test
@@ -25,6 +26,13 @@ export const answerConfirm = (page: Page, answer: 'accept' | 'cancel') =>
       await (answer === 'accept' ? dialog.accept() : dialog.dismiss());
     });
   });
+
+// Edit mode is the one with the Name field, so the switch is confirmed before the test goes on.
+export async function switchMode(page: Page, mode: 'Play' | 'Edit') {
+  await page.getByRole('button', { name: mode, exact: true }).click();
+  const name = page.getByLabel('Name', { exact: true });
+  await (mode === 'Edit' ? expect(name).toBeVisible() : expect(name).toBeHidden());
+}
 
 type Fixtures = {
   seedSheet: (sheet: Sheet) => Promise<void>;

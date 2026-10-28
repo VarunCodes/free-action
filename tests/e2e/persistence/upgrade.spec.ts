@@ -1,4 +1,4 @@
-import { test, expect, loadSheet } from '../fixtures';
+import { test, expect, loadSheet, switchMode } from '../fixtures';
 
 // Sheets saved by older versions of the app, or edited by hand, must still open, with impossible
 // values brought back within the rules. Most upgrades happen in cleanSheet() (src/sheet.js) on
@@ -8,7 +8,7 @@ test('a sheet from before AC was calculated keeps its hand-typed AC', async ({ p
   // Older sheets have no acAuto. A typed AC other than the old default (10) means the player set it.
   await seedSheet({ ...loadSheet('fighter-5'), ac: 17 });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await switchMode(page, 'Edit');
 
   await expect(page.getByRole('checkbox', { name: 'Calculate AC from equipped gear' })).not.toBeChecked();
   await expect(page.getByLabel('AC', { exact: true })).toHaveValue('17');
@@ -17,7 +17,7 @@ test('a sheet from before AC was calculated keeps its hand-typed AC', async ({ p
 test('a sheet from before AC was calculated, still on the default AC, switches to calculated AC', async ({ page, seedSheet }) => {
   await seedSheet({ ...loadSheet('fighter-5'), ac: 10 });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await switchMode(page, 'Edit');
 
   await expect(page.getByRole('checkbox', { name: 'Calculate AC from equipped gear' })).toBeChecked();
 });
@@ -26,7 +26,7 @@ test('impossible values are brought back within the rules', async ({ page, seedS
   // PHB 2024: an ability score can't exceed 30, and Hit Points can't exceed the Hit Point maximum.
   await seedSheet({ ...loadSheet('fighter-5'), ab: { str: 99, dex: 12, con: 14, int: 8, wis: 10, cha: 13 }, hp: { cur: 50, max: 44, temp: 0 } });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await switchMode(page, 'Edit');
 
   await expect(page.getByLabel('Strength score')).toHaveValue('30');
   await expect(page.getByLabel('Current HP')).toHaveValue('44');
