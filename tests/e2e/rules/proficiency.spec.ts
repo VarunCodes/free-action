@@ -1,4 +1,4 @@
-import { test, expect, loadSheet } from '../fixtures';
+import { test, expect, loadSheet, switchMode } from '../fixtures';
 
 // PHB 2024, Proficiency Bonus by character level: +2 at levels 1-4, +3 at 5-8, +4 at 9-12,
 // +5 at 13-16, +6 at 17-20. Both ends of every band are checked, so an off-by-one fails.
@@ -27,7 +27,7 @@ test('levelling up raises the proficiency bonus everywhere it is used', async ({
   await expect(page.getByRole('button', { name: 'Athletics +6', exact: true })).toBeVisible();
 
   await test.step('change the level from 5 to 9 in Edit mode', async () => {
-    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await switchMode(page, 'Edit');
     const level = page.getByLabel('Level', { exact: true });
     await level.fill('9');
     await level.blur();

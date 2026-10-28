@@ -4,6 +4,7 @@
 - Locators: getByRole, then getByLabel, then getByText. getByTestId only with a comment saying why. No CSS or XPath.
 - Web-first assertions (`await expect(locator).toHave…`). For saved state use `await expect.poll(savedSheet).toMatchObject(…)`. No waitForTimeout, no `isVisible()` in conditions.
 - Seed the starting state with `seedSheet(loadSheet('…'))` before `page.goto`; click only the behaviour the test is about. Seed characters live in `tests/e2e/data/sheets/`.
+- Switch between Play and Edit with `switchMode(page, 'Edit')`, not a bare click: it waits until the mode has changed.
 - Mock the Open5e API with saved responses in `tests/e2e/data/open5e/`; never call the real API.
 - Expected numbers come from the 2024 rules, worked out by hand, with a comment naming the rule. Never copy them from the app's output.
 - Tests are independent: they pass with `--shuffle --repeat-each=3`.

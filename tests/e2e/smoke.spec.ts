@@ -1,4 +1,4 @@
-import { test, expect, loadSheet } from './fixtures';
+import { test, expect, loadSheet, switchMode } from './fixtures';
 
 const smoke = { tag: '@smoke' };
 
@@ -20,7 +20,7 @@ test('an edit is saved and survives a reload', smoke, async ({ page, seedSheet, 
   await page.goto('/');
 
   await test.step('rename the character in Edit mode', async () => {
-    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await switchMode(page, 'Edit');
     const name = page.getByLabel('Name', { exact: true });
     await name.fill('Brakka Stonefist');
     await name.blur();

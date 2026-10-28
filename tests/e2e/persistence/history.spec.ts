@@ -1,4 +1,4 @@
-import { test, expect, loadSheet, answerConfirm } from '../fixtures';
+import { test, expect, loadSheet, answerConfirm, switchMode } from '../fixtures';
 
 // "New character" replaces the sheet, so the old one must stay recoverable from
 // "Restore an earlier version", which keeps the last few versions in this browser.
@@ -57,7 +57,7 @@ test('a change saved in one tab shows up in another open tab', async ({ page, co
   await expect(other.getByRole('heading', { level: 1 })).toHaveText('Brakka');
 
   await test.step('rename the character in the first tab', async () => {
-    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await switchMode(page, 'Edit');
     const name = page.getByLabel('Name', { exact: true });
     await name.fill('Brakka Stonefist');
     await name.blur();

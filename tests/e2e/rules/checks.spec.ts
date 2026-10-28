@@ -1,4 +1,4 @@
-import { test, expect, loadSheet } from '../fixtures';
+import { test, expect, loadSheet, switchMode } from '../fixtures';
 
 // Brakka at level 5 (proficiency +3), with six different ability modifiers, so a skill, save or
 // roll that uses the wrong ability always shows a different number:
@@ -102,11 +102,11 @@ test.describe('Brakka with six different modifiers', () => {
     await expect(page.getByRole('button', named('Initiative +1'))).toBeVisible();
 
     await test.step('add a +2 Initiative bonus in Edit mode', async () => {
-      await page.getByRole('button', named('Edit')).click();
+      await switchMode(page, 'Edit');
       const bonus = page.getByLabel('Init bonus');
       await bonus.fill('2');
       await bonus.blur();
-      await page.getByRole('button', named('Play')).click();
+      await switchMode(page, 'Play');
     });
 
     await test.step('roll it', async () => {
@@ -118,7 +118,7 @@ test.describe('Brakka with six different modifiers', () => {
 
   test('tapping a skill in Edit mode cycles none, proficient, Expertise and back to none', async ({ page }) => {
     // Stealth: Dex +1. Proficient adds +3, Expertise adds +6.
-    await page.getByRole('button', named('Edit')).click();
+    await switchMode(page, 'Edit');
     const stealth = page.getByRole('button', named('Stealth proficiency'));
     const steps: [state: string, total: string][] = [
       ['Proficient', '+4'],
