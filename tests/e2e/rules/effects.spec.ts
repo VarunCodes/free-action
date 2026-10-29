@@ -93,8 +93,6 @@ test.describe('bonuses to checks and saves', () => {
     'two of the same item do not add up',
     { annotation: { type: 'issue', description: 'https://github.com/VarunCodes/free-action/issues/38' } },
     async ({ page, seedSheet }) => {
-      // Known bug: the sheet adds both, so the check shows +5 and the save +8.
-      test.fail();
       // SRD 5.2, Magic Items, Attunement: a creature can't attune to more than one copy of a magic item.
       // So only one of two Stones of Good Luck works: +1, not +2.
       await seedSheet(brakka({ items: [luckstone(), luckstone()] }));
@@ -103,6 +101,16 @@ test.describe('bonuses to checks and saves', () => {
       await expect(button(page, 'Strength save +7')).toBeVisible();
     },
   );
+
+  test('a repeatable feat taken twice applies twice', async ({ page, seedSheet }) => {
+    // PHB 2024, Ability Score Improvement: repeatable; +2 to one score (max 20). Only magic item copies
+    // are limited to one, so two ASIs on Strength: 16 + 2 + 2 = 20 (+5). Check +5; save +5, proficient +3 = +8.
+    const asi = { n: 'Ability Score Improvement', t: 'Feat', d: '', fx: [['ab', 'str', 2]] };
+    await seedSheet(brakka({ feats: [asi, { ...asi }] }));
+    await page.goto('/');
+    await expect(button(page, 'Strength check +5')).toBeVisible();
+    await expect(button(page, 'Strength save +8')).toBeVisible();
+  });
 
   test('spell attack and save DC bonuses count everywhere they are shown', async ({ page, seedSheet }) => {
     // Charisma caster, Cha 13 (+1), proficiency +3.

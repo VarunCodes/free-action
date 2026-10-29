@@ -118,6 +118,46 @@ test.describe('attunement', () => {
     });
   });
 
+  // SRD 5.2, Magic Items, Attunement: a creature can't attune to more than one copy of a magic item.
+  // Brakka in Chain Mail: AC 16, Strength save +6 (+3, proficient +3), Dexterity save +1.
+  test('a second attuned Ring of Protection adds nothing to AC or saves', async ({ page, seedSheet }) => {
+    await seedSheet(brakka(16, [chain, ring('Ring of Protection', true), ring('ring of protection', true)]));
+    await page.goto('/');
+
+    // One ring counts, whatever the capitalisation: AC 16 + 1, saves + 1.
+    await expect(ac(page).getByText('17', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Strength save +7', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Dexterity save +2', exact: true })).toBeVisible();
+    await expect(page.getByText(/^ring of protection.*Already attuned to another copy, no effect/)).toBeVisible();
+    await expect(page.getByText('Already attuned to another copy, no effect')).toHaveCount(1);
+  });
+
+  test('two differently named rings both apply', async ({ page, seedSheet }) => {
+    await seedSheet(brakka(16, [chain, ring('Ring of Protection', true), ring('Ring of Warding', true)]));
+    await page.goto('/');
+
+    // Two different items, +1 each: AC 16 + 2, Strength save +6 + 2, Dexterity save +1 + 2.
+    await expect(ac(page).getByText('18', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Strength save +8', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Dexterity save +3', exact: true })).toBeVisible();
+    await expect(page.getByText('Already attuned to another copy, no effect')).toHaveCount(0);
+  });
+
+  test('a duplicate copy does not use up one of the three attunement slots', async ({ page, seedSheet }) => {
+    // Three items are marked attuned, but the second Ring A can't be, so only two slots are used
+    // and Ring C can still be attuned as the third.
+    await seedSheet(brakka(16, [chain, ring('Ring A', true), ring('Ring A', true), ring('Ring B', true), ring('Ring C', false)]));
+    await page.goto('/');
+    const ringC = page.getByRole('button', { name: 'Attune Ring C' });
+
+    await ringC.click();
+    await expect(ringC).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    // Ring A once, Ring B, Ring C: AC 16 + 3.
+    await expect(ac(page).getByText('19', { exact: true })).toBeVisible();
+    await expect(page.getByText('Over the 3-item attunement limit')).toHaveCount(0);
+  });
+
   test('a sheet imported with four items attuned applies only three', async ({ page, seedSheet }) => {
     // Only reachable by importing or hand-editing a sheet. The app's policy: the first three count,
     // and the rest are flagged. With Chain Mail 16, three +1 rings: 16 + 3 = 19.
