@@ -1,0 +1,247 @@
+{
+ "count": 6,
+ "next": null,
+ "previous": null,
+ "results": [
+  {
+   "key": "srd-2024_ring-of-protection",
+   "name": "Ring of Protection",
+   "desc": "You gain a +1 bonus to Armor Class and saving throws while wearing this ring.",
+   "category": {
+    "name": "Ring",
+    "key": "ring"
+   },
+   "rarity": {
+    "name": "Rare",
+    "key": "rare",
+    "rank": 3
+   },
+   "weapon": null,
+   "armor": null,
+   "size": {
+    "name": "Tiny",
+    "key": "tiny"
+   },
+   "weight": "0.000",
+   "weight_unit": "lb",
+   "cost": "0.00",
+   "requires_attunement": true,
+   "attunement_detail": null,
+   "document": {
+    "name": "System Reference Document 5.2",
+    "key": "srd-2024",
+    "type": "SOURCE",
+    "display_name": "5e 2024 Rules",
+    "publisher": {
+     "name": "Wizards of the Coast",
+     "key": "wizards-of-the-coast"
+    },
+    "gamesystem": {
+     "name": "5th Edition 2024",
+     "key": "5e-2024"
+    },
+    "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+   }
+  },
+  {
+   "key": "srd_ring-of-protection",
+   "name": "Ring of Protection",
+   "desc": "You gain a +1 bonus to AC and saving throws while wearing this ring.",
+   "category": {
+    "name": "Ring",
+    "key": "ring"
+   },
+   "rarity": {
+    "name": "Rare",
+    "key": "rare",
+    "rank": 3
+   },
+   "weapon": null,
+   "armor": null,
+   "size": {
+    "name": "Tiny",
+    "key": "tiny"
+   },
+   "weight": "0.000",
+   "weight_unit": "lb",
+   "cost": null,
+   "requires_attunement": true,
+   "attunement_detail": null,
+   "document": {
+    "name": "System Reference Document 5.1",
+    "key": "srd-2014",
+    "type": "SOURCE",
+    "display_name": "5e 2014 Rules",
+    "publisher": {
+     "name": "Wizards of the Coast",
+     "key": "wizards-of-the-coast"
+    },
+    "gamesystem": {
+     "name": "5th Edition 2014",
+     "key": "5e-2014"
+    },
+    "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+   }
+  },
+  {
+   "key": "srd-2024_stone-of-good-luck-luckstone",
+   "name": "Stone of Good Luck (Luckstone)",
+   "desc": "While this polished agate is on your person, you gain a +1 bonus to ability checks and saving throws.",
+   "category": {
+    "name": "Wondrous Item",
+    "key": "wondrous-item"
+   },
+   "rarity": {
+    "name": "Uncommon",
+    "key": "uncommon",
+    "rank": 2
+   },
+   "weapon": null,
+   "armor": null,
+   "size": {
+    "name": "Tiny",
+    "key": "tiny"
+   },
+   "weight": "0.000",
+   "weight_unit": "lb",
+   "cost": "0.00",
+   "requires_attunement": true,
+   "attunement_detail": null,
+   "document": {
+    "name": "System Reference Document 5.2",
+    "key": "srd-2024",
+    "type": "SOURCE",
+    "display_name": "5e 2024 Rules",
+    "publisher": {
+     "name": "Wizards of the Coast",
+     "key": "wizards-of-the-coast"
+    },
+    "gamesystem": {
+     "name": "5th Edition 2024",
+     "key": "5e-2024"
+    },
+    "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+   }
+  },
+  {
+   "key": "srd_stone-of-good-luck-luckstone",
+   "name": "Stone of Good Luck (Luckstone)",
+   "desc": "While this polished agate is on your person, you gain a +1 bonus to ability checks and saving throws.",
+   "category": {
+    "name": "Wondrous Item",
+    "key": "wondrous-item"
+   },
+   "rarity": {
+    "name": "Uncommon",
+    "key": "uncommon",
+    "rank": 2
+   },
+   "weapon": null,
+   "armor": null,
+   "size": {
+    "name": "Tiny",
+    "key": "tiny"
+   },
+   "weight": "0.000",
+   "weight_unit": "lb",
+   "cost": "0.00",
+   "requires_attunement": true,
+   "attunement_detail": null,
+   "document": {
+    "name": "System Reference Document 5.1",
+    "key": "srd-2014",
+    "type": "SOURCE",
+    "display_name": "5e 2014 Rules",
+    "publisher": {
+     "name": "Wizards of the Coast",
+     "key": "wizards-of-the-coast"
+    },
+    "gamesystem": {
+     "name": "5th Edition 2014",
+     "key": "5e-2014"
+    },
+    "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+   }
+  },
+  {
+   "key": "srd-2024_gauntlets-of-ogre-power",
+   "name": "Gauntlets of Ogre Power",
+   "desc": "Your Strength is 19 while you wear these gauntlets. They have no effect on you if your Strength is 19 or higher without them.",
+   "category": {
+    "name": "Wondrous Item",
+    "key": "wondrous-item"
+   },
+   "rarity": {
+    "name": "Uncommon",
+    "key": "uncommon",
+    "rank": 2
+   },
+   "weapon": null,
+   "armor": null,
+   "size": {
+    "name": "Tiny",
+    "key": "tiny"
+   },
+   "weight": "0.000",
+   "weight_unit": "lb",
+   "cost": "0.00",
+   "requires_attunement": true,
+   "attunement_detail": null,
+   "document": {
+    "name": "System Reference Document 5.2",
+    "key": "srd-2024",
+    "type": "SOURCE",
+    "display_name": "5e 2024 Rules",
+    "publisher": {
+     "name": "Wizards of the Coast",
+     "key": "wizards-of-the-coast"
+    },
+    "gamesystem": {
+     "name": "5th Edition 2024",
+     "key": "5e-2024"
+    },
+    "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+   }
+  },
+  {
+   "key": "srd_gauntlets-of-ogre-power",
+   "name": "Gauntlets of Ogre Power",
+   "desc": "Your Strength score is 19 while you wear these gauntlets. They have no effect on you if your Strength is already 19 or higher.",
+   "category": {
+    "name": "Wondrous Item",
+    "key": "wondrous-item"
+   },
+   "rarity": {
+    "name": "Uncommon",
+    "key": "uncommon",
+    "rank": 2
+   },
+   "weapon": null,
+   "armor": null,
+   "size": {
+    "name": "Tiny",
+    "key": "tiny"
+   },
+   "weight": "0.000",
+   "weight_unit": "lb",
+   "cost": "0.00",
+   "requires_attunement": true,
+   "attunement_detail": null,
+   "document": {
+    "name": "System Reference Document 5.1",
+    "key": "srd-2014",
+    "type": "SOURCE",
+    "display_name": "5e 2014 Rules",
+    "publisher": {
+     "name": "Wizards of the Coast",
+     "key": "wizards-of-the-coast"
+    },
+    "gamesystem": {
+     "name": "5th Edition 2014",
+     "key": "5e-2014"
+    },
+    "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+   }
+  }
+ ]
+}

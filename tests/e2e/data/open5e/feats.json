@@ -1,0 +1,38 @@
+{
+ "count": 1,
+ "next": null,
+ "previous": null,
+ "results": [
+  {
+   "key": "srd-2024_alert",
+   "has_prerequisite": false,
+   "benefits": [
+    {
+     "desc": "When you roll Initiative, you can add your Proficiency Bonus to the roll."
+    },
+    {
+     "desc": "Immediately after you roll Initiative, you can swap your Initiative with the Initiative of one willing ally in the same combat. You can't make this swap if you or the ally has the Incapacitated condition."
+    }
+   ],
+   "document": {
+    "name": "System Reference Document 5.2",
+    "key": "srd-2024",
+    "type": "SOURCE",
+    "display_name": "5e 2024 Rules",
+    "publisher": {
+     "name": "Wizards of the Coast",
+     "key": "wizards-of-the-coast"
+    },
+    "gamesystem": {
+     "name": "5th Edition 2024",
+     "key": "5e-2024"
+    },
+    "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+   },
+   "name": "Alert",
+   "desc": "You gain the following benefits.",
+   "prerequisite": "",
+   "type": "Origin"
+  }
+ ]
+}
