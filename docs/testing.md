@@ -1,6 +1,6 @@
 # Playwright conventions
 
-- Import `test`, `expect` and `loadSheet` from `tests/e2e/fixtures.ts`, never from `@playwright/test`. Its auto fixtures block the internet, fix the dice and fail on page errors. Don't work around them.
+- Import `test`, `expect` and `loadSheet` from `tests/e2e/fixtures.ts`, never from `@playwright/test`. Its auto fixtures block the internet, fix the dice and fail on page errors. Don't work around them. A test that needs a particular roll (a natural 20) sets it with `test.use({ dice: [0.99] })` (values come first on every page load, then the seeded sequence).
 - Locators: getByRole, then getByLabel, then getByText. getByTestId only with a comment saying why. No CSS or XPath.
 - Web-first assertions (`await expect(locator).toHave…`). For saved state use `await expect.poll(savedSheet).toMatchObject(…)`. No waitForTimeout, no `isVisible()` in conditions.
 - Seed the starting state with `seedSheet(loadSheet('…'))` before `page.goto`; click only the behaviour the test is about. Seed characters live in `tests/e2e/data/sheets/`. Library content (custom species, feats) is seeded the same way with `seedPacks([...])`.

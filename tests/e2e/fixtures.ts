@@ -7,7 +7,10 @@
 // and, in every test without asking, three guards:
 //   - nothing leaves the machine: Google Fonts gets an empty stylesheet, and any other outside
 //     request (the Open5e API, until a spec mocks it) is blocked and fails the test
-//   - the dice are fixed: Math.random follows the same sequence in every run
+//   - the dice are fixed: Math.random follows the same sequence in every run. A test that needs a
+//     particular roll sets the first values with test.use({ dice: [0.99] }): 0.99 rolls the highest
+//     face of any die up to a d100 (a natural 20 on a d20), 0 the lowest. After those, the seeded
+//     sequence runs. Every page load (a reload too) starts again from the first value.
 //   - any uncaught error or console error, in any tab the test opens, fails the test
 import { test as base, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
@@ -42,6 +45,7 @@ type Fixtures = {
   seedPacks: (packs: Pack[]) => Promise<void>;
   savedSheet: () => Promise<Sheet | null>;
   noInternet: void;
+  dice: number[];
   fixedDice: void;
   noPageErrors: void;
 };
@@ -99,18 +103,22 @@ export const test = base.extend<Fixtures>({
     { auto: true },
   ],
 
+  dice: [[], { option: true }],
+
   fixedDice: [
-    async ({ page }, use) => {
+    async ({ page, dice }, use) => {
+      if (dice.some(v => !(v >= 0 && v < 1))) throw new Error('dice values must be at least 0 and below 1, as Math.random returns.');
       // mulberry32: a small seeded random number generator, so every run rolls the same numbers.
-      await page.addInitScript(() => {
+      await page.addInitScript(first => {
         let seed = 20240101;
         Math.random = () => {
+          if (first.length) return first.shift()!;
           seed = (seed + 0x6d2b79f5) | 0;
           let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
           t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
           return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
         };
-      });
+      }, dice);
       await use();
     },
     { auto: true },
