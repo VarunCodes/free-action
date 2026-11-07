@@ -1,0 +1,287 @@
+{
+ "count": 6,
+ "next": null,
+ "previous": null,
+ "results": [
+  {
+   "key": "srd-2024_rapier",
+   "name": "Rapier",
+   "desc": "A rapier.",
+   "category": {
+    "name": "Weapon",
+    "key": "weapon"
+   },
+   "weapon": {
+    "name": "Rapier",
+    "key": "srd-2024_rapier",
+    "damage_type": {
+     "name": "Piercing",
+     "key": "piercing"
+    },
+    "damage_dice": "1d8",
+    "properties": [
+     {
+      "property": {
+       "name": "Finesse",
+       "type": null,
+       "desc": "When making an attack with a Finesse weapon, use your choice of your Strength or Dexterity modifier for the attack and damage rolls. You must use the same modifier for both rolls."
+      },
+      "detail": null
+     },
+     {
+      "property": {
+       "name": "Vex",
+       "type": "Mastery",
+       "desc": "If you hit a creature with this weapon and deal damage to the creature, you have Advantage on your next attack roll against that creature before the end of your next turn."
+      },
+      "detail": null
+     }
+    ],
+    "is_simple": false,
+    "is_martial": true,
+    "is_improvised": false,
+    "distance_unit": "feet"
+   },
+   "armor": null,
+   "size": {
+    "name": "Tiny",
+    "key": "tiny"
+   },
+   "weight": "2.000",
+   "weight_unit": "lb",
+   "cost": "25.00",
+   "document": {
+    "name": "System Reference Document 5.2",
+    "key": "srd-2024",
+    "type": "SOURCE",
+    "display_name": "5e 2024 Rules",
+    "publisher": {
+     "name": "Wizards of the Coast",
+     "key": "wizards-of-the-coast"
+    },
+    "gamesystem": {
+     "name": "5th Edition 2024",
+     "key": "5e-2024"
+    },
+    "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+   }
+  },
+  {
+   "key": "srd_rapier",
+   "name": "Rapier",
+   "desc": "A rapier.",
+   "category": {
+    "name": "Weapon",
+    "key": "weapon"
+   },
+   "weapon": {
+    "name": "Rapier",
+    "key": "srd_rapier",
+    "damage_type": {
+     "name": "Piercing",
+     "key": "piercing"
+    },
+    "damage_dice": "1d8",
+    "properties": [
+     {
+      "property": {
+       "name": "Finesse",
+       "type": null,
+       "desc": "When making an attack with a finesse weapon, you use your choice of your Strength or Dexterity modifier for the attack and damage rolls. You must use the same modifier for both rolls."
+      },
+      "detail": null
+     }
+    ],
+    "is_simple": false,
+    "is_martial": true,
+    "is_improvised": false,
+    "distance_unit": "feet"
+   },
+   "armor": null,
+   "size": {
+    "name": "Tiny",
+    "key": "tiny"
+   },
+   "weight": "2.000",
+   "weight_unit": "lb",
+   "cost": "25.00",
+   "document": {
+    "name": "System Reference Document 5.1",
+    "key": "srd-2014",
+    "type": "SOURCE",
+    "display_name": "5e 2014 Rules",
+    "publisher": {
+     "name": "Wizards of the Coast",
+     "key": "wizards-of-the-coast"
+    },
+    "gamesystem": {
+     "name": "5th Edition 2014",
+     "key": "5e-2014"
+    },
+    "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+   }
+  },
+  {
+   "key": "srd-2024_chain-mail",
+   "name": "Chain Mail",
+   "desc": "A chain mail.",
+   "category": {
+    "name": "Armor",
+    "key": "armor"
+   },
+   "weapon": null,
+   "armor": {
+    "name": "Chain Mail",
+    "key": "srd-2024_chain-mail",
+    "category": "heavy",
+    "ac_base": 16,
+    "ac_display": "16",
+    "ac_add_dexmod": false,
+    "ac_cap_dexmod": null,
+    "grants_stealth_disadvantage": true,
+    "strength_score_required": 13
+   },
+   "size": {
+    "name": "Tiny",
+    "key": "tiny"
+   },
+   "weight": "55.000",
+   "weight_unit": "lb",
+   "cost": "75.00",
+   "document": {
+    "name": "System Reference Document 5.2",
+    "key": "srd-2024",
+    "type": "SOURCE",
+    "display_name": "5e 2024 Rules",
+    "publisher": {
+     "name": "Wizards of the Coast",
+     "key": "wizards-of-the-coast"
+    },
+    "gamesystem": {
+     "name": "5th Edition 2024",
+     "key": "5e-2024"
+    },
+    "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+   }
+  },
+  {
+   "key": "srd_chain-mail",
+   "name": "Chain mail",
+   "desc": "Made of interlocking metal rings, chain mail includes a layer of quilted fabric worn underneath the mail to prevent chafing and to cushion the impact of blows. The suit includes gauntlets.",
+   "category": {
+    "name": "Armor",
+    "key": "armor"
+   },
+   "weapon": null,
+   "armor": {
+    "name": "Chain mail",
+    "key": "srd_chain-mail",
+    "category": "heavy",
+    "ac_base": 16,
+    "ac_display": "16",
+    "ac_add_dexmod": false,
+    "ac_cap_dexmod": null,
+    "grants_stealth_disadvantage": true,
+    "strength_score_required": 13
+   },
+   "size": {
+    "name": "Tiny",
+    "key": "tiny"
+   },
+   "weight": "55.000",
+   "weight_unit": "lb",
+   "cost": "75.00",
+   "document": {
+    "name": "System Reference Document 5.1",
+    "key": "srd-2014",
+    "type": "SOURCE",
+    "display_name": "5e 2014 Rules",
+    "publisher": {
+     "name": "Wizards of the Coast",
+     "key": "wizards-of-the-coast"
+    },
+    "gamesystem": {
+     "name": "5th Edition 2014",
+     "key": "5e-2014"
+    },
+    "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+   }
+  },
+  {
+   "key": "srd-2024_shield",
+   "name": "Shield",
+   "desc": "A shield.",
+   "category": {
+    "name": "Armor",
+    "key": "armor"
+   },
+   "weapon": null,
+   "armor": {
+    "name": "Shield",
+    "key": "srd-2024_shield",
+    "category": "heavy",
+    "ac_base": 2,
+    "ac_display": "2",
+    "ac_add_dexmod": false,
+    "ac_cap_dexmod": null,
+    "grants_stealth_disadvantage": false,
+    "strength_score_required": null
+   },
+   "size": {
+    "name": "Tiny",
+    "key": "tiny"
+   },
+   "weight": "6.000",
+   "weight_unit": "lb",
+   "cost": "10.00",
+   "document": {
+    "name": "System Reference Document 5.2",
+    "key": "srd-2024",
+    "type": "SOURCE",
+    "display_name": "5e 2024 Rules",
+    "publisher": {
+     "name": "Wizards of the Coast",
+     "key": "wizards-of-the-coast"
+    },
+    "gamesystem": {
+     "name": "5th Edition 2024",
+     "key": "5e-2024"
+    },
+    "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+   }
+  },
+  {
+   "key": "srd_shield",
+   "name": "Shield",
+   "desc": "A shield is made from wood or metal and is carried in one hand. Wielding a shield increases your Armor Class by 2. You can benefit from only one shield at a time.",
+   "category": {
+    "name": "Shield",
+    "key": "shield"
+   },
+   "weapon": null,
+   "armor": null,
+   "size": {
+    "name": "Tiny",
+    "key": "tiny"
+   },
+   "weight": "6.000",
+   "weight_unit": "lb",
+   "cost": "10.00",
+   "document": {
+    "name": "System Reference Document 5.1",
+    "key": "srd-2014",
+    "type": "SOURCE",
+    "display_name": "5e 2014 Rules",
+    "publisher": {
+     "name": "Wizards of the Coast",
+     "key": "wizards-of-the-coast"
+    },
+    "gamesystem": {
+     "name": "5th Edition 2014",
+     "key": "5e-2014"
+    },
+    "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+   }
+  }
+ ]
+}

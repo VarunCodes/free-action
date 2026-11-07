@@ -1,0 +1,125 @@
+{
+ "count": 2,
+ "next": "http://api.open5e.com/v2/items/?document__key=srd-2024&limit=500&page=2",
+ "previous": null,
+ "results": [
+  {
+   "key": "srd-2024_longsword",
+   "name": "Longsword",
+   "desc": "A longsword.",
+   "category": {
+    "name": "Weapon",
+    "key": "weapon"
+   },
+   "weapon": {
+    "name": "Longsword",
+    "key": "srd-2024_longsword",
+    "damage_type": {
+     "name": "Slashing",
+     "key": "slashing"
+    },
+    "damage_dice": "1d8",
+    "properties": [
+     {
+      "property": {
+       "name": "Sap",
+       "type": "Mastery",
+       "desc": "If you hit a creature with this weapon, that creature has Disadvantage on its next attack roll before the start of your next turn."
+      },
+      "detail": null
+     },
+     {
+      "property": {
+       "name": "Versatile",
+       "type": null,
+       "desc": "A Versatile weapon can be used with one or two hands. A damage value in parentheses appears with the property. The weapon deals that damage when used with two hands to make a melee attack."
+      },
+      "detail": "1d10"
+     }
+    ],
+    "is_simple": false,
+    "is_martial": true,
+    "is_improvised": false,
+    "distance_unit": "feet"
+   },
+   "armor": null,
+   "size": {
+    "name": "Tiny",
+    "key": "tiny"
+   },
+   "weight": "3.000",
+   "weight_unit": "lb",
+   "cost": "15.00",
+   "document": {
+    "name": "System Reference Document 5.2",
+    "key": "srd-2024",
+    "type": "SOURCE",
+    "display_name": "5e 2024 Rules",
+    "publisher": {
+     "name": "Wizards of the Coast",
+     "key": "wizards-of-the-coast"
+    },
+    "gamesystem": {
+     "name": "5th Edition 2024",
+     "key": "5e-2024"
+    },
+    "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+   }
+  },
+  {
+   "key": "srd_longsword",
+   "name": "Longsword",
+   "desc": "A longsword",
+   "category": {
+    "name": "Weapon",
+    "key": "weapon"
+   },
+   "weapon": {
+    "name": "Longsword",
+    "key": "srd_longsword",
+    "damage_type": {
+     "name": "Slashing",
+     "key": "slashing"
+    },
+    "damage_dice": "1d8",
+    "properties": [
+     {
+      "property": {
+       "name": "Versatile",
+       "type": null,
+       "desc": "This weapon can be used with one or two hands. A damage value in parentheses appears with the property—the damage when the weapon is used with two hands to make a melee attack."
+      },
+      "detail": "1d10"
+     }
+    ],
+    "is_simple": false,
+    "is_martial": true,
+    "is_improvised": false,
+    "distance_unit": "feet"
+   },
+   "armor": null,
+   "size": {
+    "name": "Tiny",
+    "key": "tiny"
+   },
+   "weight": "3.000",
+   "weight_unit": "lb",
+   "cost": "15.00",
+   "document": {
+    "name": "System Reference Document 5.1",
+    "key": "srd-2014",
+    "type": "SOURCE",
+    "display_name": "5e 2014 Rules",
+    "publisher": {
+     "name": "Wizards of the Coast",
+     "key": "wizards-of-the-coast"
+    },
+    "gamesystem": {
+     "name": "5th Edition 2014",
+     "key": "5e-2014"
+    },
+    "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+   }
+  }
+ ]
+}

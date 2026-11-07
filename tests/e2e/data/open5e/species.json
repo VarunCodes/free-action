@@ -1,0 +1,85 @@
+{
+ "count": 1,
+ "next": null,
+ "previous": null,
+ "results": [
+  {
+   "key": "srd-2024_dwarf",
+   "is_subspecies": false,
+   "document": {
+    "name": "System Reference Document 5.2",
+    "key": "srd-2024",
+    "type": "SOURCE",
+    "display_name": "5e 2024 Rules",
+    "publisher": {
+     "name": "Wizards of the Coast",
+     "key": "wizards-of-the-coast"
+    },
+    "gamesystem": {
+     "name": "5th Edition 2024",
+     "key": "5e-2024"
+    },
+    "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+   },
+   "traits": [
+    {
+     "name": "Size",
+     "desc": "Medium (about 4–5 feet tall) ",
+     "type": "SIZE",
+     "order": 1,
+     "crossreferences": {
+      "to": []
+     }
+    },
+    {
+     "name": "Speed",
+     "desc": "30 feet",
+     "type": "SPEED",
+     "order": 2,
+     "crossreferences": {
+      "to": []
+     }
+    },
+    {
+     "name": "Darkvision",
+     "desc": "You have Darkvision with a range of 120 feet.",
+     "type": null,
+     "order": 3,
+     "crossreferences": {
+      "to": []
+     }
+    },
+    {
+     "name": "Dwarven Resilience",
+     "desc": "You have Resistance to Poison damage. You also have Advantage on saving throws you make to avoid or end the Poisoned condition.",
+     "type": null,
+     "order": 4,
+     "crossreferences": {
+      "to": []
+     }
+    },
+    {
+     "name": "Dwarven Toughness",
+     "desc": "Your Hit Point maximum increases by 1, and it increases by 1 again whenever you gain a level.",
+     "type": null,
+     "order": 5,
+     "crossreferences": {
+      "to": []
+     }
+    },
+    {
+     "name": "Stonecunning",
+     "desc": "As a Bonus Action, you gain Tremorsense with a range of 60 feet for 10 minutes. You must be on a stone surface or touching a stone surface to use this Tremorsense. The stone can be natural or worked.\n\nYou can use this Bonus Action a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
+     "type": null,
+     "order": 6,
+     "crossreferences": {
+      "to": []
+     }
+    }
+   ],
+   "name": "Dwarf",
+   "desc": "",
+   "subspecies_of": null
+  }
+ ]
+}
