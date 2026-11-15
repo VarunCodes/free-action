@@ -64,7 +64,27 @@ test.describe('downloading', () => {
     });
   });
 
-  test('a part that fails to load shows an error with Retry, and the rest still loads', async ({ page, seedSheet, open5e }) => {
+  test('a saved copy from an older version of the app is downloaded again', async ({ page, seedSheet, open5e }) => {
+    // A saved copy stores the version of the app's data format (CACHE_VER in src/library.js). When that
+    // changes, the old copy may be shaped wrongly, so it must be replaced, not reused. Seeded here by
+    // hand because seedPacks only writes custom packs; one entry per part, so no part counts as missing.
+    await page.addInitScript(() => {
+      const kinds = Object.fromEntries(['spell', 'feat', 'race', 'class', 'item'].map(k => [k, [{ kind: k, name: `Stale ${k}`, sub: '', desc: '' }]]));
+      const r = indexedDB.open('dnd-sheet', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('kv').put({ ver: 1, at: 1, kinds }, 'srd-cache');
+      r.onsuccess = () => r.result.close();
+      r.onerror = () => console.error('seeding the old saved copy failed:', r.error);
+    });
+    await seedSheet(brakka());
+    await page.goto('/');
+    const lib = await openLibrary(page);
+
+    await expect(row(lib, 'Fire Bolt')).toBeVisible();
+    await expect(row(lib, 'Stale spell')).toHaveCount(0);
+    expect(open5e.requests).toHaveLength(7);
+  });
+
+  test('a part that fails to load shows an error with Retry, and the rest still loads',async ({ page, seedSheet, open5e }) => {
     open5e.fail('spells');
     await seedSheet(brakka());
     await page.goto('/');
