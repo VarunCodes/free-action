@@ -43,6 +43,16 @@ test('New character starts a blank sheet, and the old one can be restored', asyn
   await expect.poll(savedSheet).toEqual(before);
 });
 
+test('a version identical to the newest saved one is not saved twice', async ({ page }) => {
+  // Opening the page saves Brakka. Starting a new character straight away would save the same Brakka
+  // again; the list holds only six versions, so duplicates would push out real ones.
+  answerConfirm(page, 'accept');
+  await page.getByRole('button', { name: 'New character' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('New Hero');
+
+  await expect(page.getByLabel('Earlier version').getByRole('option', { name: /: Brakka/ })).toHaveCount(1);
+});
+
 test('cancelling New character keeps the current character', async ({ page, savedSheet }) => {
   answerConfirm(page, 'cancel');
   await page.getByRole('button', { name: 'New character' }).click();

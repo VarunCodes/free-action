@@ -14,3 +14,4 @@
 - Wrap flows of several actions in `test.step` with a readable title.
 - Known app bug: mark the test `test.fail()` and link the issue (`annotation: { type: 'issue', description: '<issue URL>' }`). It still runs. Once the bug is fixed it passes, Playwright reports that as a failure, and the fix PR removes the marker.
 - Broken or flaky test: `test.fixme()` with an issue link. It is skipped until fixed.
+- Seeded-bug results (which tests catch which mistakes) are in `docs/seeded-bugs.md`. Before deleting or weakening a test, check there whether it is the only one catching a bug.
