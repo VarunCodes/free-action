@@ -19,6 +19,8 @@ const rapier = weapon('Rapier', { d: '1d8', t: 'piercing', ab: 'fin' });
 const fireBolt = { n: 'Fire Bolt', l: 0, p: true, d: '', r: { a: true, d: '1d10', b: '1d10', t: 'fire', by: 'char', up: [[5, '2d10', 0], [11, '3d10', 0], [17, '4d10', 0]] } };
 
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
+// The big number on the roll bar.
+const total = (page: Page) => page.getByRole('status', { name: 'Roll total', exact: true });
 
 // Clicks a roll button and checks the chat command it produced.
 async function roll(page: Page, name: string, formula: string) {
@@ -114,6 +116,7 @@ test.describe('critical hits', () => {
       await roll(page, '1d8+3 slashing', '/r 2d8+3 # Longsword damage');
       // Two d8s, both 8, then +3 once.
       await expect(page.getByText('Longsword damage [8, 8] + 3', { exact: true })).toBeVisible();
+      await expect(total(page)).toHaveText('19'); // 8 + 8 + 3
       await test.step('the crit is used up: the next damage roll is normal', async () => {
         await roll(page, '1d8+3 slashing', '/r 1d8+3 # Longsword damage');
       });
@@ -197,5 +200,74 @@ test.describe('spell damage', () => {
     await expect(button(page, '2d8+4 healing')).toBeVisible();
     await page.getByLabel('Cure Wounds slot level', { exact: true }).selectOption('Slot 3');
     await roll(page, '6d8+4 healing', '/r 6d8+4 # Cure Wounds healing');
+  });
+});
+
+test.describe('totals', () => {
+  // A die with n sides rolls 1 + floor(value × n) for each value fixed with test.use({ dice }).
+  test.describe('the d20 rolls 11', () => {
+    test.use({ dice: [0.5] });
+
+    test("a d20 roll's total is the die plus the bonus", async ({ page, seedSheet }) => {
+      await seedSheet(brakka());
+      await page.goto('/');
+      await roll(page, 'Athletics +6', '/r 1d20+6 # Athletics');
+      await expect(page.getByText('Athletics [11] + 6', { exact: true })).toBeVisible();
+      await expect(total(page)).toHaveText('17'); // 11 + 6
+    });
+  });
+
+  test.describe('with Disadvantage the d20s roll 11 and 5', () => {
+    test.use({ dice: [0.5, 0.2] });
+
+    test('the total uses the die that was kept', async ({ page, seedSheet }) => {
+      // PHB 2024, Disadvantage: roll two d20s and use the lower. 1 + floor(0.2 × 20) = 5.
+      await seedSheet(brakka());
+      await page.goto('/');
+      await page.getByRole('group', { name: 'Roll mode', exact: true }).getByRole('button', { name: 'Dis', exact: true }).click();
+      await roll(page, 'Athletics +6', '/r 2d20kl1+6 # Athletics');
+      await expect(page.getByText('Athletics [11, 5] take 5 + 6', { exact: true })).toBeVisible();
+      await expect(total(page)).toHaveText('11'); // 5 + 6
+    });
+  });
+
+  test.describe('the attack rolls a 19, then the damage die rolls 8', () => {
+    test.use({ dice: [0.9, 0.99] });
+
+    test('a natural 19 is not a critical hit', async ({ page, seedSheet }) => {
+      // PHB 2024, Critical Hits: only a natural 20. Brakka has no subclass, so no Champion's Improved Critical.
+      await seedSheet(brakka({ items: [longsword] }));
+      await page.goto('/');
+      await roll(page, 'Hit +6', '/r 1d20+6 # Longsword attack');
+      await expect(total(page)).toHaveText('25'); // 19 + 6
+      await expect(page.getByText('Natural 20', { exact: true })).toHaveCount(0);
+      await roll(page, '1d8+3 slashing', '/r 1d8+3 # Longsword damage');
+      await expect(total(page)).toHaveText('11'); // one d8 (8) + 3
+    });
+  });
+
+  test.describe('the damage die rolls 1', () => {
+    test.use({ dice: [0] });
+
+    test('damage never goes below 0', async ({ page, seedSheet }) => {
+      // Str 4 (-3), SRD 5.2 Club 1d4 (not Finesse, so Str): 1 - 3 is -2. The sheet shows damage as at
+      // least 0; that's the app's choice, since a hit can't heal the target.
+      const club = weapon('Club', { d: '1d4', t: 'bludgeoning', ab: 'str' });
+      await seedSheet(brakka({ items: [club] }, { str: 4 }));
+      await page.goto('/');
+      await roll(page, '1d4-3 bludgeoning', '/r 1d4-3 # Club damage');
+      await expect(page.getByText('Club damage [1] - 3', { exact: true })).toBeVisible();
+      await expect(total(page)).toHaveText('0');
+    });
+  });
+
+  test('spell dice with anything but dice and numbers are refused, not rolled in part', async ({ page, seedSheet }) => {
+    // Typed by hand in Edit: "1d10+fire". Rolling just the 1d10 would hide the mistake.
+    await seedSheet(caster([{ ...fireBolt, r: { ...fireBolt.r, d: '1d10+fire' } }]));
+    await page.goto('/');
+    await button(page, '1d10+fire fire').click();
+    await expect(page.getByText('Fire Bolt has no valid dice. Use dice like 1d10 or 2d6+3; fix them in Edit.', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Chat command', { exact: true })).toHaveValue('');
+    await expect(total(page)).toHaveCount(0);
   });
 });
