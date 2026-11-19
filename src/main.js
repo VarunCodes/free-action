@@ -1,8 +1,13 @@
 import './style.css';
 import { openLibrary, swapSpecies } from './libraryui.js';
-import { cachedItems, cachedSpecies, loadLibrary, traitEffects } from './library.js';
+import { cachedItems, cachedSpecies, loadLibrary } from './library.js';
 import { md, rarityTag, magicMark } from './text.js';
 import { AB, ABN, SK, DEF, CLS, CLASSES, cleanSheet } from './sheet.js';
+import {
+  abilityMod as mod, signed as fmt, profBonus, knownClass as knownCls, hitDie, hitDiceLeft, averageHP, activeGear,
+  featureEffects as featFx, effectsOf, effectTotal, advantageFrom, scoreBonuses, baseScore, scoreSetBy, score,
+  skillGrants, skillGranted, skillProf, unmetStrength, currentSpeed, wornWith, armorClass, currentAC, saveBonuses, saveBonus as totalSaveBonus,
+} from './rules.js';
 import { readKey, writeKey, loadSaved, saveSheet, snapshots, snapshot, lastBackup, markBackedUp, downloadSheet, readBackup } from './storage.js';
 let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null,RERR='',IOMSG=null,ATTMSG=-1,CC=false,CS=false,CMSG='',SPC=[];const UP={};
 const SR=()=>({a:false,s:'',d:'',b:'',t:'',h:false,m:false,by:'slot',up:[]});
@@ -44,8 +49,29 @@ function importText(t){
 // Dates spell out the month, so 03/04 can't be read two ways; the order still follows the browser's language.
 const when=t=>new Date(t).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'});
 const esc=v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const mod=n=>Math.floor((n-10)/2), fmt=n=>(n>=0?'+':'')+n;
-const prof=()=>Math.ceil(Math.max(1,S.level)/4)+1;
+// The rules (src/rules.js) applied to the character on screen, under the short names the templates below use.
+const prof=()=>profBonus(S);
+const hdOf=()=>hitDie(S);
+const hdLeft=()=>hitDiceLeft(S);
+const avgHP=()=>averageHP(S);
+const gear=()=>activeGear(S);
+const fxOf=t=>effectsOf(S,t);
+const fxSum=t=>effectTotal(S,t);
+const fxAdv=k=>advantageFrom(S,k);
+const abFx=a=>scoreBonuses(S,a);
+const scBase=a=>baseScore(S,a);
+const scBy=a=>scoreSetBy(S,a);
+const sc=a=>score(S,a);
+const skBy=n=>skillGrants(S,n);
+const skG=n=>skillGranted(S,n);
+const prS=n=>skillProf(S,n);
+const unmet=()=>unmetStrength(S);
+const speedNow=()=>currentSpeed(S);
+const worn=f=>wornWith(S,f);
+const acCalc=()=>armorClass(S);
+const acNow=()=>currentAC(S);
+const saveSrc=()=>saveBonuses(S);
+const saveBonus=()=>totalSaveBonus(S);
 // Proficiency marks: an empty ring, the same ring with a dot inside, and a diamond for Expertise.
 const PM=['<i class="pm"></i>','<i class="pm on"></i>','\u25C6'],PL=['Not proficient','Proficient','Expertise'];
 function setPath(k,v){const p=k.split('.');let o=S;while(p.length>1)o=o[p.shift()];o[p[0]]=v}
@@ -55,7 +81,6 @@ const inp=(k,v,t='text',x='')=>`<input id="${fid(k)}" data-k="${k}" type="${t}" 
 const fld=(l,k,v,t,x)=>`<div><label class="lab" for="${fid(k)}">${l}</label>${inp(k,v,t,x)}</div>`;
 // Class is a drop-down of the standard classes, so other parts of the sheet can rely on the name. Custom (or any
 // name that isn't one of them, like a homebrew class or an older sheet's "Bard 3") opens a text box instead.
-const knownCls=v=>CLASSES.find(c=>c.toLowerCase()===String(v).trim().toLowerCase());
 const clsFld=()=>{const k=knownCls(S.cls),cu=CC||(!k&&!!S.cls.trim());return `<div><label class="lab" for="f-clsp">Class</label><select id="f-clsp"><option value="">Choose a class</option>${CLASSES.map(c=>`<option ${k===c?'selected':''}>${c}</option>`).join('')}<option value="*" ${cu?'selected':''}>Custom…</option></select>${cu?inp('cls',S.cls,'text','class="clsx" placeholder="Class name" aria-label="Custom class"')+`<select class="clsx" data-k="hdie" aria-label="Custom class hit die"><option value="0">Hit die: not set</option>${[6,8,10,12].map(d=>`<option value="${d}" ${S.hdie===d?'selected':''}>Hit die: d${d}</option>`).join('')}</select>`:''}</div>`};
 // Species works like Class: the Library's species (SRD 5.2 and any custom packs), or Custom for anything else.
 // Before the Library has been downloaded once, the drop-down still lists the SRD names; picking one fetches the traits.
@@ -79,12 +104,6 @@ function setSpecies(n){const go=()=>{const it=n?SPC.find(x=>x.kind==='race'&&x.n
   CMSG=(it?(o?`Swapped ${tr(r.removed,o)} for ${tr(r.added,n)} in Racial features.`:`Added ${tr(r.added,n)} to Racial features.`):o&&r.removed?`Removed ${tr(r.removed,o)} from Racial features.`:'')+spd};
  if(!n||SPC.some(x=>x.name===n)){go();return}
  CMSG=`Loading ${n}'s traits…`;loadLibrary().then(d=>{SPC=d.items.filter(x=>x.kind==='race')}).catch(()=>{}).finally(()=>{go();save();render()})}
-// Hit dice: one per level, of the class's size (or the one picked for a custom class). A short rest spends them
-// one at a time (die + Con modifier, at least 1 HP); a long rest gives them all back (2024 rules).
-const hdOf=()=>CLS[knownCls(S.cls)]?.hd||S.hdie,hdLeft=()=>Math.max(0,S.level-S.hd);
-// Max HP by the fixed-average rule: the full die plus Con at level 1, then half the die + 1 + Con per level, each at least 1;
-// plus any HP per level from features (Dwarven Toughness).
-const avgHP=()=>{const d=hdOf(),c=mod(sc('con'));return d?Math.max(1,d+c)+(S.level-1)*Math.max(1,d/2+1+c)+S.level*fxSum('hp'):0};
 // Picking a standard class swaps the old class's save proficiencies and spellcasting ability for the new one's.
 // Other saves, and an ability you chose by hand, stay; the sheet can't tell a hand-ticked save from one the old
 // class gave, so those go with the old class. The Spellcasting drop-down can always override what was picked.
@@ -97,59 +116,8 @@ function setClass(c){const o=CLS[knownCls(S.cls)],n=CLS[c],n0=ABN[S.cast];S.cls=
 const cmdFor=()=>{if(!LAST)return'';const{label,expr}=LAST,v=S.vtt;return v==='roll20t'?`&{template:default} {{name=${label}}} {{Roll=[[${expr}]]}}`:v==='roll20'?`/roll ${expr}`:`/r ${expr} # ${label}`};
 function copyText(t){try{navigator.clipboard.writeText(t).catch(()=>{});return true}catch(e){}try{const x=document.createElement('textarea');x.value=t;document.body.appendChild(x);x.select();const ok=document.execCommand('copy');x.remove();return ok}catch(e){return false}}
 const rd=m=>1+Math.floor(Math.random()*m);
-// Gear whose magic is working: equipped and, if it needs attunement, attuned. You choose what to
-// attune to (up to 3). If a sheet somehow has more (an import), the first three count and the rest
-// are flagged.
-// A creature can't attune to more than one copy of a magic item (SRD 5.2,
-// Attunement). A second same-named copy is flagged as a duplicate and takes no slot.
-function gear() {
-  const att = S.items.filter(x => x.at && x.att);
-  const seen = new Set();
-  const uniq = [];
-  const dup = [];
-  for (const x of att) {
-    const key = String(x.n || '').trim().toLowerCase();
-    if (seen.has(key)) dup.push(x);
-    else { seen.add(key); uniq.push(x); }
-  }
-  const ok = new Set(uniq.slice(0, 3));
-  const live = S.items.filter(x => x.eq && x.on && (!x.at || ok.has(x)));
-  return { live, over: uniq.slice(3), dup, attuned: uniq.length };
-}
-// Effects come from live gear and from every feature and racial trait (see traitEffects in library.js), so a
-// species, feat or item that boosts something all feed the same sums. A skill choice ('?', '?A|B') becomes the
-// skill picked for it in Edit (x.ch, one pick per choice, in order); until then it counts for nothing.
-const featFx=x=>{let c=0;return traitEffects(x).map(f=>f[0]==='sk'&&f[1][0]==='?'?[f[0],x.ch?.[c++]||'',f[2],f[1]]:f)};
-const fxOf=t=>[...gear().live.map(x=>[x,x.fx||[]]),...[...S.feats,...S.race].map(x=>[x,featFx(x)])].flatMap(([x,l])=>l.filter(f=>f[0]===t).map(f=>[x,f]));
-const fxSum=t=>fxOf(t).reduce((n,[,f])=>n+f[2],0);
-const fxAdv=k=>fxOf('adv').filter(([,f])=>f[1]===k).map(([x])=>x);
-// Ability score: your score plus any bonuses (a homebrew species' +2 Con), then a "your Strength is 19" item
-// raises it if that's higher, never lowers it.
-const abFx=a=>fxOf('ab').filter(([,f])=>f[1]===a),abB=a=>abFx(a).reduce((n,[,f])=>n+f[2],0);
-const scBase=a=>Math.max(1,Math.min(30,S.ab[a]+abB(a)));
-const scBy=a=>fxOf('set').filter(([,f])=>f[1]===a&&f[2]>scBase(a)).sort((p,q)=>q[1][2]-p[1][2])[0];
-const sc=a=>scBy(a)?.[1][2]??scBase(a);
-// Skill proficiency: what you ticked, or more if a feature grants it (a granted one can't be cycled below that).
-const skBy=n=>fxOf('sk').filter(([,f])=>f[1]===n),skG=n=>Math.max(0,...skBy(n).map(([,f])=>f[2])),prS=n=>Math.max(S.sk[n]||0,skG(n));
-// Equipped gear whose Strength requirement isn't met. As in the 2024 rules this costs 10 ft of Speed
-// (once, however many such items are worn) and doesn't change any rolls.
-const unmet=()=>S.items.filter(x=>x.eq&&x.on&&x.ar&&x.ar.str>sc('str'));
-const speedNow=()=>Math.max(0,S.speed-(unmet().length?10:0));
-// Armor class from equipped gear: the best body armor (or 10 + Dex, or a better unarmored base),
-// plus the best shield, plus every equipped AC bonus item, plus the sheet's own bonus.
-function acCalc(){const dx=mod(sc('dex')),on=gear().live.filter(x=>x.ar&&x.ar.k),best=(l,f)=>l.map(x=>({x,v:f(x)})).sort((a,b)=>b.v-a.v)[0];
- const arm=best(on.filter(x=>['light','medium','heavy'].includes(x.ar.k)),x=>x.ar.ac+(x.ar.k==='light'?dx:x.ar.k==='medium'?Math.min(dx,2):0));
- const sh=best(on.filter(x=>x.ar.k==='shield'),x=>x.ar.ac),un=Math.max(10,...on.filter(x=>x.ar.k==='unarm').map(x=>x.ar.ac));
- const parts=[arm?[arm.x.n,arm.v]:[un>10?'Unarmored base '+un+' + Dex':'Unarmored (10 + Dex)',un+dx]];if(sh)parts.push([sh.x.n,sh.v]);
- for(const x of on.filter(x=>x.ar.k==='bonus'&&(!x.ar.nu||(!arm&&!sh))))parts.push([x.n,x.ar.ac]);if(S.acb)parts.push(['Other bonus',S.acb]);
- return{ac:parts.reduce((n,[,v])=>n+v,0),parts,used:new Set([arm?.x,sh?.x])}}
 const fxLabel=([t,a,v,o])=>t==='set'?`${ABN[a]} becomes ${v}`:t==='chk'?`${fmt(v)} ability checks`:t==='sv'?`${fmt(v)} saving throws`:t==='sa'?`${fmt(v)} spell attacks`:t==='dc'?`${fmt(v)} spell save DC`:t==='hp'?`${fmt(v)} HP per level`:t==='ab'?`${fmt(v)} ${ABN[a]}`:t==='sk'?(a?`${a} ${v>1?'expertise':'proficiency'}`:`Choose a skill${o&&o!=='?'?` (${o.slice(1).split('|').join(', ')})`:''} in Edit`):`Advantage on ${a==='init'?'Initiative':a}`;
 const FXO=[...AB.map(a=>[`set|${a}`,`Set ${ABN[a]} to (value)`]),['chk|','Bonus to ability checks'],['sv|','Bonus to saving throws'],['sa|','Bonus to spell attacks'],['dc|','Bonus to spell save DC'],['adv|init','Advantage on Initiative'],...SK.map(([n])=>[`adv|${n}`,`Advantage on ${n}`])].map(([v,t])=>`<option value="${v}">${t}</option>`).join('');
-const acNow=()=>S.acAuto?acCalc().ac:S.ac;
-const worn=f=>gear().live.filter(x=>x.ar&&f(x.ar));
-// Saving throw bonus: protection items (+AC and saves) and magic items like the Luckstone, with sources.
-const saveSrc=()=>[...worn(a=>a.sb).map(x=>[x.n,x.ar.sb]),...fxOf('sv').map(([x,f])=>[x.n,f[2]])];
-const saveBonus=()=>saveSrc().reduce((n,[,v])=>n+v,0);
 const srcText=l=>l.map(([n,v])=>`${n} ${fmt(v)}`).join(', ');
 // dis/adv: this roll's own Disadvantage (Stealth in noisy armor) or Advantage (Cloak of Elvenkind).
 // Any Advantage and any Disadvantage cancel out.
