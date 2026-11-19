@@ -46,24 +46,11 @@ export function rollDice(label, expression, crit = false, raw = false) {
   const detail = [];
   const expr = [];
   for (const term of terms) {
-    const negative = term[0] === '-';
-    const body = term.replace(/^[+-]/, '');
-    const dice = body.match(/^(\d*)d(\d+)$/i);
-    if (dice && +dice[2] > 0) {
-      const count = Math.min(200, (+dice[1] || 1) * (crit ? 2 : 1));
-      const sides = +dice[2];
-      const rolls = Array.from({ length: count }, () => rollDie(sides));
-      const sum = rolls.reduce((a, b) => a + b, 0);
-      total += negative ? -sum : sum;
-      detail.push((negative ? '- ' : detail.length ? '+ ' : '') + '[' + rolls.join(', ') + ']');
-      expr.push((negative ? '-' : '+') + count + 'd' + sides);
-    } else if (/^\d+$/.test(body)) {
-      total += negative ? -body : +body;
-      detail.push((negative ? '- ' : '+ ') + body);
-      expr.push((negative ? '-' : '+') + body);
-    } else {
-      return null;
-    }
+    const rolled = rollTerm(term, crit, detail.length === 0);
+    if (!rolled) return null;
+    total += rolled.value;
+    detail.push(rolled.detail);
+    expr.push(rolled.expr);
   }
   if (!expr.length) return null;
   return {
@@ -73,6 +60,31 @@ export function rollDice(label, expression, crit = false, raw = false) {
     total: raw ? total : Math.max(0, total),
     crit: crit ? 'Critical hit, dice doubled' : '',
   };
+}
+
+// One term of a dice expression ("2d6", "-1d4" or "+3"): its value, how it's shown, and its part of the
+// chat command. A negative term counts against the total. null if the term is neither dice nor a number.
+function rollTerm(term, crit, first) {
+  const negative = term[0] === '-';
+  const sign = negative ? '-' : '+';
+  const body = term.replace(/^[+-]/, '');
+  const dice = body.match(/^(\d*)d(\d+)$/i);
+  if (dice && +dice[2] > 0) {
+    const count = Math.min(200, (+dice[1] || 1) * (crit ? 2 : 1));
+    const sides = +dice[2];
+    const rolls = Array.from({ length: count }, () => rollDie(sides));
+    const sum = rolls.reduce((a, b) => a + b, 0);
+    const join = negative ? '- ' : first ? '' : '+ ';
+    return {
+      value: negative ? -sum : sum,
+      detail: join + '[' + rolls.join(', ') + ']',
+      expr: sign + count + 'd' + sides,
+    };
+  }
+  if (/^\d+$/.test(body)) {
+    return { value: negative ? -body : +body, detail: (negative ? '- ' : '+ ') + body, expr: sign + body };
+  }
+  return null;
 }
 
 // Why a typed custom roll can't be made, or '' if it can. Too many dice is refused, not trimmed.
@@ -107,17 +119,20 @@ export function spellDice(sheet, spell, slot) {
   const r = spell.r;
   let d = String(r.d).replace(/\s+/g, '');
   let n = 0;
-  if (d && d === r.b) {
-    const level = r.by === 'char' ? sheet.level : slot;
-    for (const [at, dice, count] of r.up) {
-      if (at <= level) {
-        if (dice) d = dice;
-        if (count) n = count;
-      }
-    }
-  }
+  if (d && d === r.b) ({ d, n } = scaledDice(r, r.by === 'char' ? sheet.level : slot));
   const castMod = sheet.cast ? abilityMod(score(sheet, sheet.cast)) : 0;
   if (d && r.m && castMod) d += signed(castMod);
+  return { d, n };
+}
+
+// The Library's scaling steps (r.up: [from level, dice, attacks]) that apply at this level; the last one wins.
+function scaledDice(r, level) {
+  let d = r.b;
+  let n = 0;
+  for (const [, dice, count] of r.up.filter(([at]) => at <= level)) {
+    if (dice) d = dice;
+    if (count) n = count;
+  }
   return { d, n };
 }
 
