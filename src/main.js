@@ -249,14 +249,14 @@ function acSettings(){
 }
 
 // The six ability scores, with their modifiers and checks.
-function abilitiesSection({ed,p,ca,cm,CK,SA,DCB,ckT,advT}){
+function abilitiesSection({ed,CK,ckT}){
  let h='';
  h+=`<h2>Abilities ${!ed&&CK?`<small>${esc(ckT)} on checks</small>`:''}</h2><div class="abs">${AB.map(a=>{const by=scBy(a),bb=abFx(a);return `<div class="ab${by||bb.length?' boost':''}" ${by?`title="${esc(`${by[0].n} sets ${ABN[a]} to ${by[1][2]} (yours: ${scBase(a)})`)}"`:bb.length?`title="${esc(`${S.ab[a]}, plus ${srcText(bb.map(([x,f])=>[x.n,f[2]]))}`)}"`:''}><div class="n">${ABN[a].slice(0,3)}</div><button class="rb m" data-a="roll" data-l="${ABN[a]} check" data-b="${mod(sc(a))+CK}" aria-label="${ABN[a]} check ${fmt(mod(sc(a))+CK)}">${fmt(mod(sc(a))+CK)}</button>${ed?inp('ab.'+a,S.ab[a],'number',`min=1 max=30 aria-label="${ABN[a]} score"`):`<div class="s">${sc(a)}${by?` <span class="up">${esc(by[0].n)}</span>`:''}</div>`}</div>`}).join('')}</div>`;
  return h;
 }
 
 // Saving throws.
-function savesSection({ed,p,ca,cm,CK,SA,DCB,ckT,advT}){
+function savesSection({ed,p}){
  let h='';
  const sb=saveBonus(),sbT=sb?`Includes ${srcText(saveSrc())}`:'';
  h+=`<h2>Saving throws ${ed?'<small>tap circles to set proficiency</small>':sb?`<small>${esc(sbT)}</small>`:''}</h2><div class="list two">${AB.map(a=>{const pr=S.sv[a]?1:0,v=mod(sc(a))+pr*p+sb;return `<div class="ln"><button class="pr" data-a="sv" data-v="${a}" aria-label="${ABN[a]} save proficiency" aria-pressed="${!!pr}" aria-description="${PL[pr]}" title="${PL[pr]}" ${ed?'':'disabled'}>${PM[pr]}</button><span class="g">${ABN[a]}</span><button class="rb" data-a="roll" data-l="${ABN[a]} save" data-b="${v}" aria-label="${ABN[a]} save ${fmt(v)}" title="${esc(sbT)}">${fmt(v)}</button></div>`}).join('')}</div>`;
@@ -264,7 +264,7 @@ function savesSection({ed,p,ca,cm,CK,SA,DCB,ckT,advT}){
 }
 
 // Skills and Passive Perception.
-function skillsSection({ed,p,ca,cm,CK,SA,DCB,ckT,advT}){
+function skillsSection({ed,p,CK,ckT,advT}){
  let h='';
  const sd=worn(a=>a.stl),sdT=sd.length?`Disadvantage from ${sd.map(x=>x.n).join(', ')}`:'';
  h+=`<h2>Skills ${ed?'<small>tap to cycle: none, proficient, expertise</small>':CK?`<small>${esc(ckT)}</small>`:''}</h2><div class="list two">${SK.map(([n,a])=>{const pr=prS(n),gb=pr&&skG(n)===pr?skBy(n).filter(([,f])=>f[2]===pr).map(([x])=>x.n):[],pT=PL[pr]+(gb.length?` (from ${gb.join(', ')})`:'');return `<div class="ln"><button class="pr" data-a="sk" data-v="${n}" aria-label="${n} proficiency" aria-pressed="${!!pr}" aria-description="${esc(pT)}" title="${esc(pT)}" ${ed?'':'disabled'}>${PM[pr]}</button><span class="g">${n} <span class="a">${a}</span>${n==='Stealth'&&sd.length?` <span class="pill dis" title="${esc(sdT)}">Dis</span>`:''}${advT(n)?` <span class="pill adv" title="${esc(advT(n))}">Adv</span>`:''}</span><button class="rb" data-a="roll" data-l="${n}" data-b="${mod(sc(a))+pr*p+CK}" aria-label="${n} ${fmt(mod(sc(a))+pr*p+CK)}" ${n==='Stealth'&&sd.length?`data-dis="1"`:''} ${advT(n)?`data-adv="1"`:''} title="${esc([n==='Stealth'?sdT:'',advT(n),ckT].filter(Boolean).join('. '))}">${fmt(mod(sc(a))+pr*p+CK)}</button></div>`}).join('')}</div>
@@ -273,21 +273,21 @@ function skillsSection({ed,p,ca,cm,CK,SA,DCB,ckT,advT}){
 }
 
 // Features and feats.
-function featuresSection({ed,p,ca,cm,CK,SA,DCB,ckT,advT}){
+function featuresSection({ed}){
  let h='';
  h+=featSec('Features and feats','feats',true,ed);
  return h;
 }
 
 // Racial features.
-function racialSection({ed,p,ca,cm,CK,SA,DCB,ckT,advT}){
+function racialSection({ed}){
  let h='';
  h+=featSec('Racial features','race',false,ed);
  return h;
 }
 
 // Spellcasting: save DC and attack, slots, and the spell list. Collapsed, only the heading.
-function spellsSection({ed,p,ca,cm,CK,SA,DCB,ckT,advT}){
+function spellsSection({ed,p,ca,cm,SA,DCB}){
  let h='';
  h+=`<h2><button class="hd" data-a="spc" aria-expanded="${!S.spc}">Spellcasting</button>${S.spc?`<small>${S.spells.length} spell${S.spells.length===1?'':'s'}${ca?`, save DC ${8+p+cm+DCB}`:''}</small>`:''}</h2>`;const sp0=h.length;
  if(ed)h+=`<div class="row" style="margin-bottom:8px"><div style="flex:1"><label class="lab" for="f-cast">Spellcasting ability</label><select id="f-cast" data-k="cast"><option value="">None</option>${AB.map(a=>`<option value="${a}" ${ca===a?'selected':''}>${ABN[a]}</option>`).join('')}</select></div></div>`;
@@ -308,7 +308,7 @@ function spellsSection({ed,p,ca,cm,CK,SA,DCB,ckT,advT}){
 }
 
 // Inventory, with equipping, attunement, the AC breakdown and weapon rolls.
-function inventorySection({ed,p,ca,cm,CK,SA,DCB,ckT,advT}){
+function inventorySection({ed,p}){
  let h='';
  // Only gear you wear or wield gets an Equipped box; it works like Prepared for spells.
  // Sheets from before attuning was a separate choice: whatever was equipped stays attuned.
@@ -327,14 +327,14 @@ function inventorySection({ed,p,ca,cm,CK,SA,DCB,ckT,advT}){
 }
 
 // Notes.
-function notesSection({ed,p,ca,cm,CK,SA,DCB,ckT,advT}){
+function notesSection(){
  let h='';
  h+=`<h2>Notes</h2><textarea data-k="notes" aria-label="Notes" placeholder="Features, backstory, session notes">${esc(S.notes)}</textarea>`;
  return h;
 }
 
 // Backup: download, open, export, import, new character and earlier versions.
-function backupSection({ed,p,ca,cm,CK,SA,DCB,ckT,advT}){
+function backupSection(){
  let h='';
  const ex=lastBackup(),hist=snapshots();
  h+=`<h2>Backup</h2><p class="sub" style="margin:0 0 8px">Saves automatically in this browser only. Browsers can clear saved data (Safari after 7 days without a visit), so keep a backup file. <b>${ex?`Last backup ${ago(ex)}.`:'No backup downloaded yet.'}</b></p>
