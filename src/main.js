@@ -3,22 +3,44 @@ import { openLibrary, swapSpecies } from './libraryui.js';
 import { cachedItems, cachedSpecies, loadLibrary, traitEffects } from './library.js';
 import { md, rarityTag, magicMark } from './text.js';
 import { AB, ABN, SK, DEF, CLS, CLASSES, cleanSheet } from './sheet.js';
+import { readKey, writeKey, loadSaved, saveSheet, snapshots, snapshot, lastBackup, markBackedUp, downloadSheet, readBackup } from './storage.js';
 let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null,RERR='',IOMSG=null,ATTMSG=-1,CC=false,CS=false,CMSG='',SPC=[];const UP={};
 const SR=()=>({a:false,s:'',d:'',b:'',t:'',h:false,m:false,by:'slot',up:[]});
-const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}},lsSet=(k,v)=>{try{localStorage.setItem(k,v);return true}catch(e){return false}};
-try{const r=lsGet('sheet');if(r)S=cleanSheet(JSON.parse(r))}catch(e){}
-// Earlier versions kept in this browser: one when the page opens, one per 30 minutes of editing,
-// and one right before Import, Restore or New character replaces the sheet.
-const snaps=()=>{try{const a=JSON.parse(lsGet('sheet-history')||'[]');return Array.isArray(a)?a.filter(x=>x&&typeof x.s==='string'):[]}catch(e){return[]}};
-function snapshot(why,force){const a=snaps(),now=Date.now(),s=JSON.stringify(S);if(a[0]&&a[0].s===s)return;if(!force&&a[0]&&now-a[0].at<30*60e3)return;a.unshift({at:now,why,name:S.name,s});while(a.length&&!lsSet('sheet-history',JSON.stringify(a.slice(0,6))))a.pop()}
-// Every save goes through the same limits as loading (scores 1-30, current HP no more than max, and so on).
-const save=()=>{S=cleanSheet(S);lsSet('sheet',JSON.stringify(S));snapshot('autosave')};
-function replaceSheet(o,why){snapshot(why,true);S=cleanSheet(o);io='';IOMSG=null;CC=false;CS=false;OPEN.clear();Object.keys(UP).forEach(k=>delete UP[k]);CRIT=null}
+S=loadSaved()||S;
+function save(){
+  S=saveSheet(S);
+}
+
+// Import, Restore and New character all replace the whole sheet. The current one goes into the history
+// first, and anything that belonged to it (open sections, messages, a pending critical hit) is reset.
+function replaceSheet(o,why){
+  snapshot(S,why,true);
+  S=cleanSheet(o);
+  io='';
+  IOMSG=null;
+  CC=false;
+  CS=false;
+  OPEN.clear();
+  Object.keys(UP).forEach(k=>delete UP[k]);
+  CRIT=null;
+}
+
 const ago=t=>{const d=Math.floor((Date.now()-t)/864e5);return d<1?'today':d===1?'yesterday':d+' days ago'};
-function downloadSheet(){const u=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download=(S.name||'character').replace(/[^\w-]+/g,'-')+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);lsSet('sheet-exported',String(Date.now()))}
-// Problems and results from Import, Open backup file and Restore show under the Backup buttons.
-function importText(t){let o;try{o=JSON.parse(t);if(!o||typeof o!=='object'||!o.ab)throw 0}catch(x){IOMSG={bad:true,t:'That is not a valid exported sheet. Use a file from Download backup, or paste the full JSON from Export.'};return false}
- const nm=cleanSheet(o).name;if(!confirm(`Replace "${S.name}" with "${nm}"? The current character can be brought back from "Restore an earlier version".`))return false;replaceSheet(o,'before import');IOMSG={t:`Imported "${nm}".`};return true}
+
+// Import (pasted) and Open backup file. Problems and results show under the Backup buttons.
+// Returns true if the sheet was replaced.
+function importText(t){
+  const o=readBackup(t);
+  if(!o){
+    IOMSG={bad:true,t:'That is not a valid exported sheet. Use a file from Download backup, or paste the full JSON from Export.'};
+    return false;
+  }
+  const nm=cleanSheet(o).name;
+  if(!confirm(`Replace "${S.name}" with "${nm}"? The current character can be brought back from "Restore an earlier version".`))return false;
+  replaceSheet(o,'before import');
+  IOMSG={t:`Imported "${nm}".`};
+  return true;
+}
 // Dates spell out the month, so 03/04 can't be read two ways; the order still follows the browser's language.
 const when=t=>new Date(t).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'});
 const esc=v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -50,7 +72,7 @@ const spSpeed=it=>{const t=it&&(it.traits||[]).find(x=>/^speed$/i.test(x.n));con
 function setSpecies(n){const go=()=>{const it=n?SPC.find(x=>x.kind==='race'&&x.name===n):null;
   if(n&&!it){S.species=n;CMSG=`Couldn't load ${n}'s traits. Open the Library once to download them, then pick ${n} again.`;return}
   const ob=S.species&&SPC.find(x=>x.kind==='race'&&x.name.toLowerCase()===S.species.toLowerCase());
-  if((S.species||S.race.length)&&snaps()[0]?.why!=='before species change')snapshot('before species change',true);
+  if((S.species||S.race.length)&&snapshots()[0]?.why!=='before species change')snapshot(S,'before species change',true);
   const r=swapSpecies(S,SPC,it),o=r.old&&r.old!==n?r.old:'',sp0=S.speed,ns=spSpeed(it)||(it?0:DEF().speed);
   if(ns&&(sp0===DEF().speed||sp0===spSpeed(ob)))S.speed=ns;
   const tr=(k,x)=>`${k} ${x} trait${k===1?'':'s'}`,spd=S.speed!==sp0?` Speed set to ${S.speed} ft.`:'';
@@ -149,7 +171,7 @@ function spDice(x,slot){const r=x.r;let d=String(r.d).replace(/\s+/g,''),n=0;if(
 const wMod=x=>{const w=x.w,s=mod(sc('str')),d=mod(sc('dex'));return (w.ab==='dex'?d:w.ab==='fin'?Math.max(s,d):s)+(x.at&&!x.att?0:(+w.b||0))};
 const withMod=(d,m)=>m?d+fmt(m):d;
 // The roll bar can shrink to just the last result; the choice is kept per device, not in the sheet.
-let RMIN=lsGet('roll-min')==='1';
+let RMIN=readKey('roll-min')==='1';
 function renderRoll(){const L=LAST,sg=(v,t)=>`<button data-a="rm" data-v="${v}" class="${RM===v?'on':''}" aria-pressed="${RM===v}">${t}</button>`,op=(v,t)=>`<option value="${v}" ${S.vtt===v?'selected':''}>${t}</option>`;
 document.getElementById('roll').innerHTML=`<div class="rp${RMIN?' min':''}"><div class="rpi"><button class="hd rt" data-a="rmin" aria-expanded="${!RMIN}" aria-label="${RMIN?'Show roll options':'Hide roll options'}" title="${RMIN?'Show roll options':'Hide roll options'}"></button><div class="rr">${L?`<b class="tot">${L.total}</b><span>${esc(L.label)} ${esc(L.detail)}</span>${L.crit?`<span class="crit">${L.crit}</span>`:''}`:RERR?`<span class="reqn" role="alert">${esc(RERR)}</span>`:'<span class="sub">Tap any modifier to roll</span>'}</div>${RMIN?'':`<div class="rc"><div class="seg" role="group" aria-label="Roll mode">${sg('','Normal')}${sg('adv','Adv')}${sg('dis','Dis')}</div><input id="cmd" readonly value="${esc(cmdFor())}" placeholder="Chat command" aria-label="Chat command"><button class="pri" data-a="cp" ${L?'':'disabled'}>${COP?'Copied':'Copy'}</button></div><details data-id="more" ${OPEN.has('more')?'open':''}><summary>VTT format and custom roll</summary><div class="rc"><select data-k="vtt" aria-label="Chat format">${op('foundry','Foundry (/r)')}${op('roll20','Roll20 (/roll)')}${op('roll20t','Roll20 template')}</select><input id="cx" placeholder="2d6+3" value="${esc(CX)}" aria-label="Custom dice"><button data-a="cx">Roll</button></div></details>`}</div></div>`;
  // The page leaves room at the bottom for however tall the bar is now.
@@ -226,7 +248,7 @@ function render(){
  if(ed&&!S.inc)h+=`<div class="add"><input class="n" id="itn" placeholder="Item name" aria-label="New item name"><input class="q" id="itq" type="number" value="1" min="0" aria-label="New item quantity"><button class="pri" data-a="addit">Add</button></div>`;
  cut('notes');h+=`<h2>Notes</h2><textarea data-k="notes" aria-label="Notes" placeholder="Features, backstory, session notes">${esc(S.notes)}</textarea>`;
  cut('backup');
- const ex=+lsGet('sheet-exported')||0,hist=snaps();
+ const ex=lastBackup(),hist=snapshots();
  h+=`<h2>Backup</h2><p class="sub" style="margin:0 0 8px">Saves automatically in this browser only. Browsers can clear saved data (Safari after 7 days without a visit), so keep a backup file. <b>${ex?`Last backup ${ago(ex)}.`:'No backup downloaded yet.'}</b></p>
  <div class="row" style="margin-bottom:8px"><button class="pri" data-a="dl">Download backup</button><label class="btn">Open backup file<input type="file" id="imf" class="vh" accept=".json,application/json"></label></div>
  <textarea id="io" aria-label="Backup JSON" placeholder="Exported JSON appears here. Paste JSON here to import.">${esc(io)}</textarea>
@@ -302,13 +324,13 @@ document.addEventListener('click',e=>{
  else if(a==='delft'){const[k,i]=v.split('.');S[k].splice(+i,1);OPEN.clear()}
  else if(a==='roll'){doRoll(b.dataset.l,+b.dataset.b,b.dataset.dis==='1',b.dataset.adv==='1');CRIT=null;COP=copyText(cmdFor())}
  else if(a==='rm')RM=v;
- else if(a==='rmin'){RMIN=!RMIN;lsSet('roll-min',RMIN?'1':'0');renderRoll();return}
+ else if(a==='rmin'){RMIN=!RMIN;writeKey('roll-min',RMIN?'1':'0');renderRoll();return}
  else if(a==='cx'){CX=g('cx').value;doCustom(CX);CRIT=null;if(LAST)COP=copyText(cmdFor())}
  else if(a==='cp'){if(LAST)COP=copyText(cmdFor())}
- else if(a==='exp'){IOMSG=null;io=JSON.stringify(S,null,1);lsSet('sheet-exported',String(Date.now()));save();render();const ta=g('io');ta.select();try{navigator.clipboard.writeText(io).catch(()=>{})}catch(x){}return}
- else if(a==='dl'){IOMSG=null;downloadSheet()}
+ else if(a==='exp'){IOMSG=null;io=JSON.stringify(S,null,1);markBackedUp();save();render();const ta=g('io');ta.select();try{navigator.clipboard.writeText(io).catch(()=>{})}catch(x){}return}
+ else if(a==='dl'){IOMSG=null;downloadSheet(S)}
  else if(a==='imp'){io=g('io').value;IOMSG=null;if(!importText(io)){render();return}}
- else if(a==='rst'){const x=snaps()[+g('snp').value];if(!x||!confirm(`Restore "${x.name}" from ${when(x.at)}? The current version is kept in the list.`))return;try{replaceSheet(JSON.parse(x.s),'before restore');IOMSG={t:`Restored "${x.name}" from ${when(x.at)}.`}}catch(e){IOMSG={bad:true,t:'That version could not be read.'};render();return}}
+ else if(a==='rst'){const x=snapshots()[+g('snp').value];if(!x||!confirm(`Restore "${x.name}" from ${when(x.at)}? The current version is kept in the list.`))return;try{replaceSheet(JSON.parse(x.s),'before restore');IOMSG={t:`Restored "${x.name}" from ${when(x.at)}.`}}catch(e){IOMSG={bad:true,t:'That version could not be read.'};render();return}}
  else if(a==='reset'){if(!confirm('Start a new character? The current one can be brought back from "Restore an earlier version".'))return;replaceSheet({},'before new character')}
  save();render();
 });
@@ -317,7 +339,7 @@ document.addEventListener('change',e=>{const f=e.target.id==='imf'&&e.target.fil
 window.addEventListener('storage',e=>{if(e.key!=='sheet'||!e.newValue)return;try{S=cleanSheet(JSON.parse(e.newValue));render()}catch(x){}});
 // Ask the browser not to clear this site's data under storage pressure (granted silently or not at all).
 try{navigator.storage?.persisted?.().then(p=>p||navigator.storage.persist()).catch(()=>{})}catch(e){}
-snapshot('opened',true);
+snapshot(S,'opened',true);
 // Gear added before the Library knew about AC, save bonuses or Stealth gets that data filled in
 // from the saved Library copy, matched by name. Each item is filled once per data version (v), so
 // later hand edits stick. v2 adds attunement, magic effects and the Mithral fix; v3 adds rarity.
