@@ -75,3 +75,40 @@ test('a change saved in one tab shows up in another open tab', async ({ page, co
 
   await expect(other.getByRole('heading', { level: 1 })).toHaveText('Brakka Stonefist');
 });
+
+test('the list keeps the six newest versions and drops the oldest when a seventh is added', async ({ page }) => {
+  // Each Import keeps the sheet it replaces. The first one replaces Brakka, who is already the newest
+  // version (saved when the page opened), so it adds nothing; every later one adds the previous hero.
+  const versions = page.getByLabel('Earlier version').getByRole('option');
+  const importHero = async (n: number) => {
+    const asked = answerConfirm(page, 'accept');
+    await page.getByLabel('Backup JSON').fill(JSON.stringify({ ...loadSheet('fighter-5'), name: `Hero ${n}` }));
+    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    await asked;
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(`Hero ${n}`);
+  };
+
+  await test.step('import six heroes, making six versions', async () => {
+    for (let n = 1; n <= 6; n++) await importHero(n);
+  });
+  await expect(versions).toHaveText([
+    /: Hero 5 \(before import\)$/,
+    /: Hero 4 \(before import\)$/,
+    /: Hero 3 \(before import\)$/,
+    /: Hero 2 \(before import\)$/,
+    /: Hero 1 \(before import\)$/,
+    /: Brakka \(opened\)$/,
+  ]);
+
+  await test.step('import one more, making a seventh version', async () => {
+    await importHero(7);
+  });
+  await expect(versions).toHaveText([
+    /: Hero 6 \(before import\)$/,
+    /: Hero 5 \(before import\)$/,
+    /: Hero 4 \(before import\)$/,
+    /: Hero 3 \(before import\)$/,
+    /: Hero 2 \(before import\)$/,
+    /: Hero 1 \(before import\)$/,
+  ]);
+});

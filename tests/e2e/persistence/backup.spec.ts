@@ -124,3 +124,34 @@ test.describe('problems', () => {
     await expect.poll(savedSheet).toMatchObject({ name: 'Brakka' });
   });
 });
+
+test.describe('last backup', () => {
+  test.beforeEach(async ({ page, seedSheet }) => {
+    await seedSheet(loadSheet('fighter-5'));
+    await page.goto('/');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Brakka');
+  });
+
+  // Export records the time through its own call, so this test uses Download backup only.
+  test('Download backup records when the last backup was made, and it survives a reload', async ({ page }) => {
+    await expect(page.getByText('No backup downloaded yet.')).toBeVisible();
+
+    const before = Date.now();
+    await test.step('download a backup file', async () => {
+      const download = page.waitForEvent('download');
+      await page.getByRole('button', { name: 'Download backup' }).click();
+      expect((await download).suggestedFilename()).toBe('Brakka.json');
+    });
+    await expect(page.getByText('Last backup today.')).toBeVisible();
+    // "today" would also show for a wrong time (one in the future, or in seconds), so check the saved
+    // time too. It must be in localStorage: sessionStorage survives a reload but not closing the tab.
+    const saved = await page.evaluate(() => Number(localStorage.getItem('sheet-exported')));
+    expect(saved).toBeGreaterThanOrEqual(before);
+    expect(saved).toBeLessThanOrEqual(Date.now());
+    await expect(page.getByText('No backup downloaded yet.')).toBeHidden();
+
+    await page.reload();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Brakka');
+    await expect(page.getByText('Last backup today.')).toBeVisible();
+  });
+});
