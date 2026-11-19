@@ -1,14 +1,16 @@
 import './style.css';
 import { openLibrary, swapSpecies } from './libraryui.js';
 import { cachedItems, cachedSpecies, loadLibrary } from './library.js';
-import { md, rarityTag, magicMark } from './text.js';
+import { esc, md, rarityTag, magicMark } from './text.js';
 import { AB, ABN, SK, DEF, CLS, CLASSES, cleanSheet } from './sheet.js';
 import {
   abilityMod as mod, signed as fmt, profBonus, knownClass as knownCls, hitDie, hitDiceLeft, averageHP, activeGear,
-  featureEffects as featFx, effectsOf, effectTotal, advantageFrom, scoreBonuses, baseScore, scoreSetBy, score,
-  skillGrants, skillGranted, skillProf, unmetStrength, currentSpeed, wornWith, armorClass, currentAC, saveBonuses, saveBonus as totalSaveBonus,
+  featureEffects as featFx, effectsOf, effectTotal, advantageFrom, score,
+  skillGranted, skillProf, unmetStrength, currentSpeed, armorClass, currentAC,
 } from './rules.js';
 import { rollMode, rollD20, rollDice, customRollError, chatCommand, spellDice, weaponMod, withMod } from './rolls.js';
+import { input as inp, field as fld, sourcesText as srcText } from './html.js';
+import { abilitiesSection, savesSection, skillsSection } from './sections/stats.js';
 import { readKey, writeKey, loadSaved, saveSheet, snapshots, snapshot, lastBackup, markBackedUp, downloadSheet, readBackup } from './storage.js';
 let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null,RERR='',IOMSG=null,ATTMSG=-1,CC=false,CS=false,CMSG='',SPC=[];const UP={};
 const SR=()=>({a:false,s:'',d:'',b:'',t:'',h:false,m:false,by:'slot',up:[]});
@@ -49,7 +51,6 @@ function importText(t){
 }
 // Dates spell out the month, so 03/04 can't be read two ways; the order still follows the browser's language.
 const when=t=>new Date(t).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'});
-const esc=v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 // The rules (src/rules.js) applied to the character on screen, under the short names the templates below use.
 const prof=()=>profBonus(S);
 const hdOf=()=>hitDie(S);
@@ -59,27 +60,14 @@ const gear=()=>activeGear(S);
 const fxOf=t=>effectsOf(S,t);
 const fxSum=t=>effectTotal(S,t);
 const fxAdv=k=>advantageFrom(S,k);
-const abFx=a=>scoreBonuses(S,a);
-const scBase=a=>baseScore(S,a);
-const scBy=a=>scoreSetBy(S,a);
 const sc=a=>score(S,a);
-const skBy=n=>skillGrants(S,n);
 const skG=n=>skillGranted(S,n);
 const prS=n=>skillProf(S,n);
 const unmet=()=>unmetStrength(S);
 const speedNow=()=>currentSpeed(S);
-const worn=f=>wornWith(S,f);
 const acCalc=()=>armorClass(S);
 const acNow=()=>currentAC(S);
-const saveSrc=()=>saveBonuses(S);
-const saveBonus=()=>totalSaveBonus(S);
-// Proficiency marks: an empty ring, the same ring with a dot inside, and a diamond for Expertise.
-const PM=['<i class="pm"></i>','<i class="pm on"></i>','\u25C6'],PL=['Not proficient','Proficient','Expertise'];
 function setPath(k,v){const p=k.split('.');let o=S;while(p.length>1)o=o[p.shift()];o[p[0]]=v}
-// Every bound field gets an id from its key (f-hp-max), so a visible label can point at it with for=.
-const fid=k=>'f-'+k.split('.').join('-');
-const inp=(k,v,t='text',x='')=>`<input id="${fid(k)}" data-k="${k}" type="${t}" value="${esc(v)}" ${x}>`;
-const fld=(l,k,v,t,x)=>`<div><label class="lab" for="${fid(k)}">${l}</label>${inp(k,v,t,x)}</div>`;
 // Class is a drop-down of the standard classes, so other parts of the sheet can rely on the name. Custom (or any
 // name that isn't one of them, like a homebrew class or an older sheet's "Bard 3") opens a text box instead.
 const clsFld=()=>{const k=knownCls(S.cls),cu=CC||(!k&&!!S.cls.trim());return `<div><label class="lab" for="f-clsp">Class</label><select id="f-clsp"><option value="">Choose a class</option>${CLASSES.map(c=>`<option ${k===c?'selected':''}>${c}</option>`).join('')}<option value="*" ${cu?'selected':''}>Custom…</option></select>${cu?inp('cls',S.cls,'text','class="clsx" placeholder="Class name" aria-label="Custom class"')+`<select class="clsx" data-k="hdie" aria-label="Custom class hit die"><option value="0">Hit die: not set</option>${[6,8,10,12].map(d=>`<option value="${d}" ${S.hdie===d?'selected':''}>Hit die: d${d}</option>`).join('')}</select>`:''}</div>`};
@@ -118,7 +106,6 @@ const cmdFor=()=>chatCommand(LAST,S.vtt);
 function copyText(t){try{navigator.clipboard.writeText(t).catch(()=>{});return true}catch(e){}try{const x=document.createElement('textarea');x.value=t;document.body.appendChild(x);x.select();const ok=document.execCommand('copy');x.remove();return ok}catch(e){return false}}
 const fxLabel=([t,a,v,o])=>t==='set'?`${ABN[a]} becomes ${v}`:t==='chk'?`${fmt(v)} ability checks`:t==='sv'?`${fmt(v)} saving throws`:t==='sa'?`${fmt(v)} spell attacks`:t==='dc'?`${fmt(v)} spell save DC`:t==='hp'?`${fmt(v)} HP per level`:t==='ab'?`${fmt(v)} ${ABN[a]}`:t==='sk'?(a?`${a} ${v>1?'expertise':'proficiency'}`:`Choose a skill${o&&o!=='?'?` (${o.slice(1).split('|').join(', ')})`:''} in Edit`):`Advantage on ${a==='init'?'Initiative':a}`;
 const FXO=[...AB.map(a=>[`set|${a}`,`Set ${ABN[a]} to (value)`]),['chk|','Bonus to ability checks'],['sv|','Bonus to saving throws'],['sa|','Bonus to spell attacks'],['dc|','Bonus to spell save DC'],['adv|init','Advantage on Initiative'],...SK.map(([n])=>[`adv|${n}`,`Advantage on ${n}`])].map(([v,t])=>`<option value="${v}">${t}</option>`).join('');
-const srcText=l=>l.map(([n,v])=>`${n} ${fmt(v)}`).join(', ');
 // A d20 roll (checks, saves, attacks). dis/adv are this roll's own Disadvantage or Advantage; the
 // mode picked on the roll bar is added to them.
 function doRoll(label,b,dis,adv){
@@ -248,30 +235,6 @@ function acSettings(){
  return `<div class="row acset"><label class="row"><input type="checkbox" data-k="acAuto" ${S.acAuto?'checked':''}> Calculate AC from equipped gear</label>${bonus}</div>`;
 }
 
-// The six ability scores, with their modifiers and checks.
-function abilitiesSection({ed,CK,ckT}){
- let h='';
- h+=`<h2>Abilities ${!ed&&CK?`<small>${esc(ckT)} on checks</small>`:''}</h2><div class="abs">${AB.map(a=>{const by=scBy(a),bb=abFx(a);return `<div class="ab${by||bb.length?' boost':''}" ${by?`title="${esc(`${by[0].n} sets ${ABN[a]} to ${by[1][2]} (yours: ${scBase(a)})`)}"`:bb.length?`title="${esc(`${S.ab[a]}, plus ${srcText(bb.map(([x,f])=>[x.n,f[2]]))}`)}"`:''}><div class="n">${ABN[a].slice(0,3)}</div><button class="rb m" data-a="roll" data-l="${ABN[a]} check" data-b="${mod(sc(a))+CK}" aria-label="${ABN[a]} check ${fmt(mod(sc(a))+CK)}">${fmt(mod(sc(a))+CK)}</button>${ed?inp('ab.'+a,S.ab[a],'number',`min=1 max=30 aria-label="${ABN[a]} score"`):`<div class="s">${sc(a)}${by?` <span class="up">${esc(by[0].n)}</span>`:''}</div>`}</div>`}).join('')}</div>`;
- return h;
-}
-
-// Saving throws.
-function savesSection({ed,p}){
- let h='';
- const sb=saveBonus(),sbT=sb?`Includes ${srcText(saveSrc())}`:'';
- h+=`<h2>Saving throws ${ed?'<small>tap circles to set proficiency</small>':sb?`<small>${esc(sbT)}</small>`:''}</h2><div class="list two">${AB.map(a=>{const pr=S.sv[a]?1:0,v=mod(sc(a))+pr*p+sb;return `<div class="ln"><button class="pr" data-a="sv" data-v="${a}" aria-label="${ABN[a]} save proficiency" aria-pressed="${!!pr}" aria-description="${PL[pr]}" title="${PL[pr]}" ${ed?'':'disabled'}>${PM[pr]}</button><span class="g">${ABN[a]}</span><button class="rb" data-a="roll" data-l="${ABN[a]} save" data-b="${v}" aria-label="${ABN[a]} save ${fmt(v)}" title="${esc(sbT)}">${fmt(v)}</button></div>`}).join('')}</div>`;
- return h;
-}
-
-// Skills and Passive Perception.
-function skillsSection({ed,p,CK,ckT,advT}){
- let h='';
- const sd=worn(a=>a.stl),sdT=sd.length?`Disadvantage from ${sd.map(x=>x.n).join(', ')}`:'';
- h+=`<h2>Skills ${ed?'<small>tap to cycle: none, proficient, expertise</small>':CK?`<small>${esc(ckT)}</small>`:''}</h2><div class="list two">${SK.map(([n,a])=>{const pr=prS(n),gb=pr&&skG(n)===pr?skBy(n).filter(([,f])=>f[2]===pr).map(([x])=>x.n):[],pT=PL[pr]+(gb.length?` (from ${gb.join(', ')})`:'');return `<div class="ln"><button class="pr" data-a="sk" data-v="${n}" aria-label="${n} proficiency" aria-pressed="${!!pr}" aria-description="${esc(pT)}" title="${esc(pT)}" ${ed?'':'disabled'}>${PM[pr]}</button><span class="g">${n} <span class="a">${a}</span>${n==='Stealth'&&sd.length?` <span class="pill dis" title="${esc(sdT)}">Dis</span>`:''}${advT(n)?` <span class="pill adv" title="${esc(advT(n))}">Adv</span>`:''}</span><button class="rb" data-a="roll" data-l="${n}" data-b="${mod(sc(a))+pr*p+CK}" aria-label="${n} ${fmt(mod(sc(a))+pr*p+CK)}" ${n==='Stealth'&&sd.length?`data-dis="1"`:''} ${advT(n)?`data-adv="1"`:''} title="${esc([n==='Stealth'?sdT:'',advT(n),ckT].filter(Boolean).join('. '))}">${fmt(mod(sc(a))+pr*p+CK)}</button></div>`}).join('')}</div>
- <div class="ln" role="group" aria-label="Passive Perception"><span class="g">Passive Perception</span><span class="v" title="${esc([ckT,advT('Perception')?'+5 for Advantage':''].filter(Boolean).join('. '))}">${10+mod(sc('wis'))+prS('Perception')*p+CK+(advT('Perception')?5:0)}</span></div>`;
- return h;
-}
-
 // Features and feats.
 function featuresSection({ed}){
  let h='';
@@ -357,7 +320,7 @@ function render(){
  // everything after it is drawn), then placed in the columns.
  const header=headerSection(v);
  const html={};
- for(const [k,f] of [['vit',vitalsSection],['abil',abilitiesSection],['save',savesSection],['skill',skillsSection],['feat',featuresSection],['race',racialSection],['spell',spellsSection],['inv',inventorySection],['notes',notesSection],['backup',backupSection]])html[k]=f(v);
+ for(const [k,f] of [['vit',vitalsSection],['abil',v=>abilitiesSection(S,v)],['save',v=>savesSection(S,v)],['skill',v=>skillsSection(S,v)],['feat',featuresSection],['race',racialSection],['spell',spellsSection],['inv',inventorySection],['notes',notesSection],['backup',backupSection]])html[k]=f(v);
  const sec=(k,order)=>`<section class="c" style="order:${order}">${html[k]}</section>`;
  const columns=[
   [['vit',1],['abil',2],['save',3],['skill',4]],
