@@ -48,8 +48,12 @@ export function activeGear(sheet) {
   const dup = [];
   for (const x of att) {
     const key = String(x.n || '').trim().toLowerCase();
-    if (seen.has(key)) dup.push(x);
-    else { seen.add(key); uniq.push(x); }
+    if (seen.has(key)) {
+      dup.push(x);
+    } else {
+      seen.add(key);
+      uniq.push(x);
+    }
   }
   const ok = new Set(uniq.slice(0, 3));
   const live = sheet.items.filter(x => x.eq && x.on && (!x.at || ok.has(x)));
@@ -132,7 +136,7 @@ export function armorClass(sheet) {
 
   const parts = [];
   if (body) parts.push([body.x.n, body.v]);
-  else parts.push([unarmored > 10 ? 'Unarmored base ' + unarmored + ' + Dex' : 'Unarmored (10 + Dex)', unarmored + dex]);
+  else parts.push([unarmored > 10 ? `Unarmored base ${unarmored} + Dex` : 'Unarmored (10 + Dex)', unarmored + dex]);
   if (shield) parts.push([shield.x.n, shield.v]);
   for (const x of armor.filter(x => x.ar.k === 'bonus' && (!x.ar.nu || (!body && !shield)))) parts.push([x.n, x.ar.ac]);
   if (sheet.acb) parts.push(['Other bonus', sheet.acb]);
