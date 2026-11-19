@@ -8,6 +8,7 @@ import {
   featureEffects as featFx, effectsOf, effectTotal, advantageFrom, scoreBonuses, baseScore, scoreSetBy, score,
   skillGrants, skillGranted, skillProf, unmetStrength, currentSpeed, wornWith, armorClass, currentAC, saveBonuses, saveBonus as totalSaveBonus,
 } from './rules.js';
+import { rollMode, rollD20, rollDice, customRollError, chatCommand, spellDice, weaponMod, withMod } from './rolls.js';
 import { readKey, writeKey, loadSaved, saveSheet, snapshots, snapshot, lastBackup, markBackedUp, downloadSheet, readBackup } from './storage.js';
 let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null,RERR='',IOMSG=null,ATTMSG=-1,CC=false,CS=false,CMSG='',SPC=[];const UP={};
 const SR=()=>({a:false,s:'',d:'',b:'',t:'',h:false,m:false,by:'slot',up:[]});
@@ -113,31 +114,35 @@ function setClass(c){const o=CLS[knownCls(S.cls)],n=CLS[c],n0=ABN[S.cast];S.cls=
  const ca=S.cast===n.ca?(n.ca?`${ABN[n.ca]} for spellcasting`:n0?'no spellcasting ability (pick one below if your subclass casts spells)':''):`spellcasting stays ${ABN[S.cast]}${n.ca?` (${c}s usually use ${ABN[n.ca]})`:''}`;
  CMSG=`${c}: proficient in ${n.sv.map(a=>ABN[a]).join(' and ')} saving throws${ca?', '+ca:''}. You can change these below.`}
 
-const cmdFor=()=>{if(!LAST)return'';const{label,expr}=LAST,v=S.vtt;return v==='roll20t'?`&{template:default} {{name=${label}}} {{Roll=[[${expr}]]}}`:v==='roll20'?`/roll ${expr}`:`/r ${expr} # ${label}`};
+const cmdFor=()=>chatCommand(LAST,S.vtt);
 function copyText(t){try{navigator.clipboard.writeText(t).catch(()=>{});return true}catch(e){}try{const x=document.createElement('textarea');x.value=t;document.body.appendChild(x);x.select();const ok=document.execCommand('copy');x.remove();return ok}catch(e){return false}}
-const rd=m=>1+Math.floor(Math.random()*m);
 const fxLabel=([t,a,v,o])=>t==='set'?`${ABN[a]} becomes ${v}`:t==='chk'?`${fmt(v)} ability checks`:t==='sv'?`${fmt(v)} saving throws`:t==='sa'?`${fmt(v)} spell attacks`:t==='dc'?`${fmt(v)} spell save DC`:t==='hp'?`${fmt(v)} HP per level`:t==='ab'?`${fmt(v)} ${ABN[a]}`:t==='sk'?(a?`${a} ${v>1?'expertise':'proficiency'}`:`Choose a skill${o&&o!=='?'?` (${o.slice(1).split('|').join(', ')})`:''} in Edit`):`Advantage on ${a==='init'?'Initiative':a}`;
 const FXO=[...AB.map(a=>[`set|${a}`,`Set ${ABN[a]} to (value)`]),['chk|','Bonus to ability checks'],['sv|','Bonus to saving throws'],['sa|','Bonus to spell attacks'],['dc|','Bonus to spell save DC'],['adv|init','Advantage on Initiative'],...SK.map(([n])=>[`adv|${n}`,`Advantage on ${n}`])].map(([v,t])=>`<option value="${v}">${t}</option>`).join('');
 const srcText=l=>l.map(([n,v])=>`${n} ${fmt(v)}`).join(', ');
-// dis/adv: this roll's own Disadvantage (Stealth in noisy armor) or Advantage (Cloak of Elvenkind).
-// Any Advantage and any Disadvantage cancel out.
-function doRoll(label,b,dis,adv){const A=RM==='adv'||adv,D=RM==='dis'||dis,M=A&&D?'':A?'adv':D?'dis':'';const r=[rd(20)];if(M)r.push(rd(20));const pk=M==='adv'?Math.max(...r):M==='dis'?Math.min(...r):r[0];RERR='';LAST={label,expr:(M?'2d20'+(M==='adv'?'kh1':'kl1'):'1d20')+(b?fmt(b):''),detail:(M?'['+r.join(', ')+'] take '+pk:'['+pk+']')+(b?' '+(b>0?'+':'-')+' '+Math.abs(b):''),total:pk+b,crit:pk===20?'Natural 20':pk===1?'Natural 1':''}}
+// A d20 roll (checks, saves, attacks). dis/adv are this roll's own Disadvantage or Advantage; the
+// mode picked on the roll bar is added to them.
+function doRoll(label,b,dis,adv){
+  RERR='';
+  LAST=rollD20(label,b,rollMode(RM,dis,adv));
+}
 // A roll that can't be made clears the last one, so its chat command can't be pasted by mistake.
 const rollErr=t=>{LAST=null;RERR=t;COP=false};
-// Custom rolls: dice and numbers joined by + and -, like 2d6+3 or 1d20+1d4-1. Too many dice is refused, not trimmed.
-function doCustom(s){const e=s.replace(/\s/g,''),dice=[...e.matchAll(/(\d*)d(\d+)/gi)];
- if(!e)return rollErr('Type a roll first, like 2d6+3.');
- if(!/^[+-]?(\d*d\d+|\d+)([+-](\d*d\d+|\d+))*$/i.test(e)||!dice.length||dice.some(m=>(m[1]!==''&&+m[1]<1)||+m[2]<1))return rollErr(`"${s.trim().slice(0,40)}" is not a roll. Use dice like 2d6+3 or 1d20+1d4.`);
- if(dice.reduce((n,m)=>n+(+m[1]||1),0)>100||dice.some(m=>+m[2]>1000))return rollErr('That roll is too big. Use up to 100 dice, each with up to 1000 sides.');
- rollExpr('Roll',e,false,true)}
-function rollExpr(label,e,crit,raw){const ts=String(e).replace(/\s/g,'').match(/[+-]?[^+-]+/g)||[];let tot=0;const det=[],ex=[];for(const t of ts){const neg=t[0]==='-',q=t.replace(/^[+-]/,''),m=q.match(/^(\d*)d(\d+)$/i);if(m&&+m[2]>0){const n=Math.min(200,(+m[1]||1)*(crit?2:1)),f=+m[2],r=Array.from({length:n},()=>rd(f)),s=r.reduce((a,c)=>a+c,0);tot+=neg?-s:s;det.push((neg?'- ':det.length?'+ ':'')+'['+r.join(', ')+']');ex.push((neg?'-':'+')+n+'d'+f)}else if(/^\d+$/.test(q)){tot+=neg?-q:+q;det.push((neg?'- ':'+ ')+q);ex.push((neg?'-':'+')+q)}else return false}if(!ex.length)return false;RERR='';LAST={label,expr:ex.join('').replace(/^\+/,''),detail:det.join(' '),total:raw?tot:Math.max(0,tot),crit:crit?'Critical hit, dice doubled':''};return true}
-// Damage dice for a spell: cantrips scale with character level, other spells with the slot used.
-// Scaling only applies while the dice still match what the Library gave, so hand edits win.
-function spDice(x,slot){const r=x.r;let d=String(r.d).replace(/\s+/g,''),n=0;if(d&&d===r.b){const lv=r.by==='char'?S.level:slot;for(const[at,dd,nn]of r.up)if(at<=lv){if(dd)d=dd;if(nn)n=nn}}const cm=S.cast?mod(sc(S.cast)):0;if(d&&r.m&&cm)d+=fmt(cm);return{d,n}}
-// Weapons: ranged use Dex, Finesse the better of Str and Dex, others Str; magic +N adds to both rolls.
-// x is the inventory item; a magic weapon that needs attunement only gets its +N once attuned.
-const wMod=x=>{const w=x.w,s=mod(sc('str')),d=mod(sc('dex'));return (w.ab==='dex'?d:w.ab==='fin'?Math.max(s,d):s)+(x.at&&!x.att?0:(+w.b||0))};
-const withMod=(d,m)=>m?d+fmt(m):d;
+// Custom rolls from the roll bar, like 2d6+3 or 1d20+1d4-1.
+function doCustom(text){
+  const error=customRollError(text);
+  if(error)return rollErr(error);
+  rollExpr('Roll',text.replace(/\s/g,''),false,true);
+}
+// Rolls dice and shows the result. Returns false, changing nothing, if the dice can't be read.
+function rollExpr(label,e,crit,raw){
+  const result=rollDice(label,e,crit,raw);
+  if(!result)return false;
+  RERR='';
+  LAST=result;
+  return true;
+}
+const spDice=(x,slot)=>spellDice(S,x,slot);
+const wMod=x=>weaponMod(S,x);
 // The roll bar can shrink to just the last result; the choice is kept per device, not in the sheet.
 let RMIN=readKey('roll-min')==='1';
 function renderRoll(){const L=LAST,sg=(v,t)=>`<button data-a="rm" data-v="${v}" class="${RM===v?'on':''}" aria-pressed="${RM===v}">${t}</button>`,op=(v,t)=>`<option value="${v}" ${S.vtt===v?'selected':''}>${t}</option>`;
