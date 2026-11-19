@@ -1,4 +1,4 @@
-import { test, expect, loadSheet, type Sheet } from '../fixtures';
+import { test, expect, loadSheet, switchMode, type Sheet } from '../fixtures';
 import type { Page } from '@playwright/test';
 
 // PHB 2024, Armor Class. Without armor: 10 + Dex modifier. Light armor: its AC + Dex modifier.
@@ -98,4 +98,28 @@ test('a worse armor that is also equipped is marked as not counted', async ({ pa
   await page.goto('/');
   await expect(page.getByText('Leather Armor not counted, a better one is equipped')).toBeVisible();
   await expect(page.getByText(/Scale Mail\s+not counted/)).toHaveCount(0);
+});
+
+test('a hand-typed AC is shown instead of the calculated one until the calculation is turned back on', async ({ page, seedSheet, savedSheet }) => {
+  // Calculated from gear this would be Chain Mail 16 (heavy armor, no Dex). The player typed 13 instead.
+  await seedSheet(brakka(12, [chain], { acAuto: false, ac: 13 }));
+  await page.goto('/');
+
+  // The line under the gear list that shows how the calculated AC is made up.
+  const breakdown = page.getByText(/Armor class \d+: Chain Mail/);
+
+  await test.step('Play shows the typed AC, not the calculated one', async () => {
+    await expectAC(page, 13);
+    await expect(breakdown).toHaveCount(0);
+  });
+
+  await test.step('turning the calculation back on shows the AC from gear', async () => {
+    await switchMode(page, 'Edit');
+    await expect(page.getByLabel('AC', { exact: true })).toHaveValue('13');
+    await page.getByRole('checkbox', { name: 'Calculate AC from equipped gear' }).check();
+    await switchMode(page, 'Play');
+    await expectAC(page, 16); // Chain Mail 16, no Dex
+    await expect(breakdown).toBeVisible();
+    await expect.poll(savedSheet).toMatchObject({ acAuto: true, ac: 13 }); // the typed AC is kept for later
+  });
 });
