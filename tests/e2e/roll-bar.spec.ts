@@ -94,3 +94,18 @@ test('a custom roll accepts dice and numbers, and refuses anything else', async 
   await refused('1d1001', 'That roll is too big. Use up to 100 dice, each with up to 1000 sides.');
   await refused('', 'Type a roll first, like 2d6+3.');
 });
+
+test.describe('a custom roll of 1d4-1d6-2 where the d4 rolls 1 and the d6 rolls 6', () => {
+  // A die with n sides rolls 1 + floor(value × n): 1 + floor(0 × 4) = 1 and 1 + floor(0.99 × 6) = 6.
+  test.use({ dice: [0, 0.99] });
+
+  test('subtracts dice, and its total can go below 0', async ({ page }) => {
+    await openRollOptions(page);
+    await page.getByLabel('Custom dice', { exact: true }).fill('1d4-1d6-2');
+    await button(page, 'Roll').click();
+    await expect(command(page)).toHaveValue('/r 1d4-1d6-2 # Roll');
+    await expect(page.getByText('Roll [1] - [6] - 2', { exact: true })).toBeVisible();
+    // 1 - 6 - 2. Unlike damage, a custom roll isn't held at 0.
+    await expect(page.getByRole('status', { name: 'Roll total', exact: true })).toHaveText('-7');
+  });
+});
