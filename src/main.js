@@ -403,7 +403,6 @@ document.addEventListener('click',e=>{
  else if(a==='hd'){const d=hdOf(),c=mod(sc('con'));if(d&&hdLeft()&&rollExpr(`Hit die (d${d})`,`1d${d}${fmt(c)}`,false,true)){const g=Math.max(1,LAST.total);LAST.total=g;LAST.detail+=` · healed ${Math.min(g,S.hp.max-S.hp.cur)}`;S.hp.cur=Math.min(S.hp.max,S.hp.cur+g);S.hd++;CRIT=null;COP=copyText(cmdFor())}}
  // Leveling up: the new max comes with the HP gained, so current HP rises by the same amount.
  else if(a==='avghp'){const m=avgHP();if(m>S.hp.max)S.hp.cur+=m-S.hp.max;S.hp.max=m}
- else if(a==='short'){}
  else if(a==='sv')S.sv[v]=!S.sv[v];
  // A trait-granted skill cycles between its granted level and Expertise; only what you add on top is stored,
  // so changing species never leaves a proficiency behind that you didn't pick.
