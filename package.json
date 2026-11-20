@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "serve": "vite build && vite preview --port 4173 --strictPort",
     "test": "playwright test",
+    "test:unit": "node --test tests/unit/*.test.js",
     "lint": "eslint ."
   },
   "devDependencies": {
