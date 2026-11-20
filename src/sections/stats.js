@@ -8,19 +8,19 @@
 //
 // Buttons with data-a="roll" roll a d20 plus data-b when tapped (see doRoll in main.js).
 import { AB, ABN, SK } from '../sheet.js';
-import { esc } from '../text.js';
 import {
     abilityMod, signed, score, scoreSetBy, scoreBonuses, baseScore,
     skillProf, skillGranted, skillGrants, saveBonus, saveBonuses, wornWith,
 } from '../rules.js';
-import { input, PROF_MARK, PROF_LABEL, sourcesText } from '../html.js';
+import { html, when, input, PROF_MARK, PROF_LABEL, sourcesText } from '../html.js';
 
 // Abilities. In Play, a note on top lists bonuses to every ability check; each ability shows its
 // check bonus (tap to roll) and its score. In Edit, the score becomes a field.
 export function abilitiesSection(sheet, { editing, checkBonus, checkBonusSources }) {
-    const note = !editing && checkBonus ? `<small>${esc(checkBonusSources)} on checks</small>` : '';
-    const boxes = AB.map(ability => abilityBox(sheet, ability, editing, checkBonus)).join('');
-    return `<h2>Abilities ${note}</h2><div class="abs">${boxes}</div>`;
+    const showNote = !editing && checkBonus !== 0;
+    return html`
+        <h2>Abilities ${when(showNote, html`<small>${checkBonusSources} on checks</small>`)}</h2>
+        <div class="abs">${AB.map(ability => abilityBox(sheet, ability, editing, checkBonus))}</div>`;
 }
 
 // One ability. A score raised by an item or a bonus is highlighted, and its tooltip says by what.
@@ -28,6 +28,7 @@ function abilityBox(sheet, ability, editing, checkBonus) {
     const name = ABN[ability];
     const setBy = scoreSetBy(sheet, ability);
     const bonuses = scoreBonuses(sheet, ability);
+    const raised = setBy !== undefined || bonuses.length > 0;
 
     let why = '';
     if (setBy) {
@@ -39,25 +40,27 @@ function abilityBox(sheet, ability, editing, checkBonus) {
     }
 
     const check = abilityMod(score(sheet, ability)) + checkBonus;
-    const rollButton = `<button class="rb m" data-a="roll" data-l="${name} check" data-b="${check}" `
-    + `aria-label="${name} check ${signed(check)}">${signed(check)}</button>`;
-    const raisedBy = setBy ? ` <span class="up">${esc(setBy[0].n)}</span>` : '';
+    const raisedBy = when(setBy, () => html` <span class="up">${setBy[0].n}</span>`);
     const scoreShown = editing
         ? input('ab.' + ability, sheet.ab[ability], 'number', `min=1 max=30 aria-label="${name} score"`)
-        : `<div class="s">${score(sheet, ability)}${raisedBy}</div>`;
+        : html`<div class="s">${score(sheet, ability)}${raisedBy}</div>`;
 
-    const highlight = setBy || bonuses.length ? ' boost' : '';
-    const tooltip = why ? `title="${esc(why)}"` : '';
-    const shortName = name.slice(0, 3);
-    return `<div class="ab${highlight}" ${tooltip}><div class="n">${shortName}</div>${rollButton}${scoreShown}</div>`;
+    return html`
+        <div class="ab${when(raised, ' boost')}" ${when(why, html`title="${why}"`)}>
+            <div class="n">${name.slice(0, 3)}</div>
+            <button class="rb m" data-a="roll" data-l="${name} check" data-b="${check}"
+                aria-label="${name} check ${signed(check)}">${signed(check)}</button>
+            ${scoreShown}
+        </div>`;
 }
 
 // The proficiency mark in front of a save or skill (see PROF_MARK). In Edit, tapping it changes the
 // proficiency; in Play it's disabled.
 function proficiencyMark({ action, value, label, level, description, editing }) {
-    return `<button class="pr" data-a="${action}" data-v="${value}" aria-label="${label} proficiency" `
-    + `aria-pressed="${!!level}" aria-description="${esc(description)}" title="${esc(description)}" `
-    + `${editing ? '' : 'disabled'}>${PROF_MARK[level]}</button>`;
+    return html`
+        <button class="pr" data-a="${action}" data-v="${value}" aria-label="${label} proficiency"
+            aria-pressed="${level > 0}" aria-description="${description}"
+            title="${description}" ${when(!editing, 'disabled')}>${PROF_MARK[level]}</button>`;
 }
 
 // Saving throws: ability modifier, plus proficiency if proficient, plus bonuses to every save
@@ -66,23 +69,26 @@ export function savesSection(sheet, { editing, proficiency }) {
     const bonus = saveBonus(sheet);
     const bonusSources = bonus ? `Includes ${sourcesText(saveBonuses(sheet))}` : '';
     let note = '';
-    if (editing) note = '<small>tap circles to set proficiency</small>';
-    else if (bonus) note = `<small>${esc(bonusSources)}</small>`;
+    if (editing) note = html`<small>tap circles to set proficiency</small>`;
+    else if (bonus) note = html`<small>${bonusSources}</small>`;
     const save = { editing, proficiency, bonus, bonusSources };
-    const rows = AB.map(ability => saveRow(sheet, ability, save)).join('');
-    return `<h2>Saving throws ${note}</h2><div class="list two">${rows}</div>`;
+    return html`
+        <h2>Saving throws ${note}</h2>
+        <div class="list two">${AB.map(ability => saveRow(sheet, ability, save))}</div>`;
 }
 
 function saveRow(sheet, ability, { editing, proficiency, bonus, bonusSources }) {
     const name = ABN[ability];
     const level = sheet.sv[ability] ? 1 : 0;
     const total = abilityMod(score(sheet, ability)) + level * proficiency + bonus;
-    const mark = proficiencyMark({
-        action: 'sv', value: ability, label: `${name} save`, level, description: PROF_LABEL[level], editing,
-    });
-    const rollButton = `<button class="rb" data-a="roll" data-l="${name} save" data-b="${total}" `
-    + `aria-label="${name} save ${signed(total)}" title="${esc(bonusSources)}">${signed(total)}</button>`;
-    return `<div class="ln">${mark}<span class="g">${name}</span>${rollButton}</div>`;
+    const description = PROF_LABEL[level];
+    return html`
+        <div class="ln">
+            ${proficiencyMark({ action: 'sv', value: ability, label: `${name} save`, level, description, editing })}
+            <span class="g">${name}</span>
+            <button class="rb" data-a="roll" data-l="${name} save" data-b="${total}"
+                aria-label="${name} save ${signed(total)}" title="${bonusSources}">${signed(total)}</button>
+        </div>`;
 }
 
 // Skills: ability modifier, plus proficiency (doubled for Expertise), plus bonuses to every check.
@@ -96,17 +102,21 @@ export function skillsSection(sheet, view) {
         : '';
 
     let note = '';
-    if (editing) note = '<small>tap to cycle: none, proficient, expertise</small>';
-    else if (checkBonus) note = `<small>${esc(checkBonusSources)}</small>`;
-    const rows = SK.map(([skill, ability]) => skillRow(sheet, view, skill, ability, stealthPenalty)).join('');
+    if (editing) note = html`<small>tap to cycle: none, proficient, expertise</small>`;
+    else if (checkBonus) note = html`<small>${checkBonusSources}</small>`;
 
     const perceptionAdvantage = advantageSources('Perception');
     const perception = abilityMod(score(sheet, 'wis')) + skillProf(sheet, 'Perception') * proficiency + checkBonus;
     const passive = 10 + perception + (perceptionAdvantage ? 5 : 0);
     const passiveWhy = [checkBonusSources, perceptionAdvantage ? '+5 for Advantage' : ''].filter(Boolean).join('. ');
-    return `<h2>Skills ${note}</h2><div class="list two">${rows}</div>
- <div class="ln" role="group" aria-label="Passive Perception"><span class="g">Passive Perception</span>`
-    + `<span class="v" title="${esc(passiveWhy)}">${passive}</span></div>`;
+    const rows = SK.map(([skill, ability]) => skillRow(sheet, view, skill, ability, stealthPenalty));
+    return html`
+        <h2>Skills ${note}</h2>
+        <div class="list two">${rows}</div>
+        <div class="ln" role="group" aria-label="Passive Perception">
+            <span class="g">Passive Perception</span>
+            <span class="v" title="${passiveWhy}">${passive}</span>
+        </div>`;
 }
 
 // One skill. stealthPenalty says which armor gives Stealth Disadvantage, or is '' for none.
@@ -118,17 +128,19 @@ function skillRow(sheet, view, skill, ability, stealthPenalty) {
         ? skillGrants(sheet, skill).filter(([, [, , value]]) => value === level).map(([feature]) => feature.n)
         : [];
     const description = PROF_LABEL[level] + (grantedBy.length ? ` (from ${grantedBy.join(', ')})` : '');
-    const disadvantage = skill === 'Stealth' && stealthPenalty;
+    const disadvantage = skill === 'Stealth' && stealthPenalty !== '';
     const advantage = advantageSources(skill);
     const total = abilityMod(score(sheet, ability)) + level * proficiency + checkBonus;
-
-    const disPill = disadvantage ? ` <span class="pill dis" title="${esc(stealthPenalty)}">Dis</span>` : '';
-    const advPill = advantage ? ` <span class="pill adv" title="${esc(advantage)}">Adv</span>` : '';
     const why = [skill === 'Stealth' ? stealthPenalty : '', advantage, checkBonusSources].filter(Boolean).join('. ');
-    const rollButton = `<button class="rb" data-a="roll" data-l="${skill}" data-b="${total}" `
-    + `aria-label="${skill} ${signed(total)}" ${disadvantage ? `data-dis="1"` : ''} ${advantage ? `data-adv="1"` : ''} `
-    + `title="${esc(why)}">${signed(total)}</button>`;
-    const mark = proficiencyMark({ action: 'sk', value: skill, label: skill, level, description, editing });
-    const label = `<span class="g">${skill} <span class="a">${ability}</span>${disPill}${advPill}</span>`;
-    return `<div class="ln">${mark}${label}${rollButton}</div>`;
+    const disPill = when(disadvantage, html` <span class="pill dis" title="${stealthPenalty}">Dis</span>`);
+    const advPill = when(advantage, html` <span class="pill adv" title="${advantage}">Adv</span>`);
+
+    return html`
+        <div class="ln">
+            ${proficiencyMark({ action: 'sk', value: skill, label: skill, level, description, editing })}
+            <span class="g">${skill} <span class="a">${ability}</span>${disPill}${advPill}</span>
+            <button class="rb" data-a="roll" data-l="${skill}" data-b="${total}" aria-label="${skill} ${signed(total)}"
+                ${when(disadvantage, html`data-dis="1"`)} ${when(advantage, html`data-adv="1"`)}
+                title="${why}">${signed(total)}</button>
+        </div>`;
 }
