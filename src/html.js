@@ -1,25 +1,4 @@
-// Writing HTML for the page, and small pieces of it that several sections use.
-//
-// Sections write their HTML with the html`…` tag, laid out like the HTML itself:
-//
-//     return html`
-//         <div class="add">
-//             <input class="n" id="spn" aria-label="New spell name">
-//             <button class="pri" data-a="addsp">Add</button>
-//         </div>`;
-//
-// What the tag does:
-//   - A line break and the indentation around it is removed between two tags, and next to a ${…} at the
-//     start or end of a line, so the page gets compact markup. Anywhere else (inside a tag, or in text)
-//     it becomes one space, as in plain HTML. So a long tag can be split across lines, but a space you
-//     mean before an inline element (" <span…") has to stay on the line.
-//   - Every value put in with ${…} is escaped, so text from the sheet or the Library can't become markup.
-//     The exceptions are HTML made by html`…` itself (nested templates, input(), field()) and raw(…),
-//     for HTML that's already safe, such as md()'s output.
-//   - A list puts its items in one after another; false, null and undefined put in nothing. So
-//     ${editing && removeButton} works, as long as the condition is a true boolean: a 0 would show "0".
-//     For an attribute that needs the words true or false (aria-pressed), write them out:
-//     ${pressed ? 'true' : 'false'}.
+// The html`…` tag for writing the page's markup, and small pieces of HTML several sections share.
 import { esc } from './text.js';
 import { signed } from './rules.js';
 
@@ -37,7 +16,6 @@ class SafeHtml {
 // Marks markup as safe without escaping it. Only for HTML that's already escaped or made by the app.
 export const raw = markup => new SafeHtml(String(markup ?? ''));
 
-// A value as it goes into the page: nothing, a list's items, safe HTML as it is, anything else escaped.
 function asMarkup(value) {
     if (value === false || value === null || value === undefined) return '';
     if (Array.isArray(value)) return value.map(asMarkup).join('');
@@ -45,7 +23,11 @@ function asMarkup(value) {
     return esc(value);
 }
 
-// The html`…` tag (see the top of this file).
+// Builds markup from a template laid out like HTML:
+//   - every ${value} is escaped, unless it's html`…` itself or raw(…)
+//   - lists are joined, and false, null and undefined add nothing
+//   - so write 'true' or 'false' out for attributes like aria-pressed
+//   - line breaks between tags are dropped; anywhere else they become one space
 export function html(strings, ...values) {
     let markup = '';
     strings.forEach((text, index) => {
