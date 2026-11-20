@@ -8,11 +8,11 @@ export const fieldId = key => 'f-' + key.split('.').join('-');
 
 // An input bound to a path in the sheet through data-k, such as 'hp.max' or 'ab.str'.
 export const input = (key, value, type = 'text', extra = '') =>
-  `<input id="${fieldId(key)}" data-k="${key}" type="${type}" value="${esc(value)}" ${extra}>`;
+    `<input id="${fieldId(key)}" data-k="${key}" type="${type}" value="${esc(value)}" ${extra}>`;
 
 // An input with a visible label above it.
 export const field = (label, key, value, type, extra) =>
-  `<div><label class="lab" for="${fieldId(key)}">${label}</label>${input(key, value, type, extra)}</div>`;
+    `<div><label class="lab" for="${fieldId(key)}">${label}</label>${input(key, value, type, extra)}</div>`;
 
 // Proficiency marks by level (0 none, 1 proficient, 2 Expertise): an empty ring, the same ring with
 // a dot inside, and a diamond. The labels say the same in words.

@@ -8,12 +8,12 @@ export const SK = [['Acrobatics', 'dex'], ['Animal Handling', 'wis'], ['Arcana',
 // The twelve classes of the 2024 Player's Handbook (SRD 5.2): saving throw proficiencies, spellcasting
 // ability ('' for classes that only cast through a subclass) and hit die. The sheet still accepts any class name.
 export const CLS = {
-  Barbarian: { sv: ['str', 'con'], ca: '', hd: 12 }, Bard: { sv: ['dex', 'cha'], ca: 'cha', hd: 8 },
-  Cleric: { sv: ['wis', 'cha'], ca: 'wis', hd: 8 }, Druid: { sv: ['int', 'wis'], ca: 'wis', hd: 8 },
-  Fighter: { sv: ['str', 'con'], ca: '', hd: 10 }, Monk: { sv: ['str', 'dex'], ca: '', hd: 8 },
-  Paladin: { sv: ['wis', 'cha'], ca: 'cha', hd: 10 }, Ranger: { sv: ['str', 'dex'], ca: 'wis', hd: 10 },
-  Rogue: { sv: ['dex', 'int'], ca: '', hd: 8 }, Sorcerer: { sv: ['con', 'cha'], ca: 'cha', hd: 6 },
-  Warlock: { sv: ['wis', 'cha'], ca: 'cha', hd: 8 }, Wizard: { sv: ['int', 'wis'], ca: 'int', hd: 6 },
+    Barbarian: { sv: ['str', 'con'], ca: '', hd: 12 }, Bard: { sv: ['dex', 'cha'], ca: 'cha', hd: 8 },
+    Cleric: { sv: ['wis', 'cha'], ca: 'wis', hd: 8 }, Druid: { sv: ['int', 'wis'], ca: 'wis', hd: 8 },
+    Fighter: { sv: ['str', 'con'], ca: '', hd: 10 }, Monk: { sv: ['str', 'dex'], ca: '', hd: 8 },
+    Paladin: { sv: ['wis', 'cha'], ca: 'cha', hd: 10 }, Ranger: { sv: ['str', 'dex'], ca: 'wis', hd: 10 },
+    Rogue: { sv: ['dex', 'int'], ca: '', hd: 8 }, Sorcerer: { sv: ['con', 'cha'], ca: 'cha', hd: 6 },
+    Warlock: { sv: ['wis', 'cha'], ca: 'cha', hd: 8 }, Wizard: { sv: ['int', 'wis'], ca: 'int', hd: 6 },
 };
 export const CLASSES = Object.keys(CLS);
 export const DEF = () => ({ name: 'New Hero', cls: '', sub: '', species: '', bg: '', level: 1, mode: 'play', ab: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }, sv: {}, sk: {}, hp: { cur: 10, max: 10, temp: 0 }, ac: 10, speed: 30, init: 0, cast: '', slots: Array.from({ length: 9 }, () => ({ m: 0, u: 0 })), spells: [], items: [], notes: '', insp: false, feats: [], race: [], vtt: 'foundry', spc: false, inc: false, acAuto: true, acb: 0, hd: 0, hdie: 0 });
@@ -26,20 +26,20 @@ const bool = v => v === true;
 const pick = (v, list, dflt) => (list.includes(v) ? v : dflt);
 
 const cleanRoll = r => {
-  r = obj(r);
-  return {
-    a: bool(r.a), s: pick(r.s, AB, ''), d: str(r.d, 40), b: str(r.b, 40), t: str(r.t, 40), h: bool(r.h), m: bool(r.m),
-    by: pick(r.by, ['char', 'slot'], 'slot'),
-    up: arr(r.up, 20).filter(Array.isArray).map(u => [int(u[0], 0, 20, 0), str(u[1], 40), int(u[2], 0, 20, 0)]),
-  };
+    r = obj(r);
+    return {
+        a: bool(r.a), s: pick(r.s, AB, ''), d: str(r.d, 40), b: str(r.b, 40), t: str(r.t, 40), h: bool(r.h), m: bool(r.m),
+        by: pick(r.by, ['char', 'slot'], 'slot'),
+        up: arr(r.up, 20).filter(Array.isArray).map(u => [int(u[0], 0, 20, 0), str(u[1], 40), int(u[2], 0, 20, 0)]),
+    };
 };
 const cleanWeapon = w => {
-  w = obj(w);
-  return { d: str(w.d, 40), t: str(w.t, 40), v: str(w.v, 40), b: int(w.b, -10, 10, 0), ab: pick(w.ab, ['str', 'dex', 'fin'], 'str') };
+    w = obj(w);
+    return { d: str(w.d, 40), t: str(w.t, 40), v: str(w.v, 40), b: int(w.b, -10, 10, 0), ab: pick(w.ab, ['str', 'dex', 'fin'], 'str') };
 };
 const cleanArmor = a => {
-  a = obj(a);
-  return { k: pick(a.k, ['light', 'medium', 'heavy', 'shield', 'bonus', 'unarm'], ''), ac: int(a.ac, -10, 30, 0), str: int(a.str, 0, 30, 0), nu: bool(a.nu), sb: int(a.sb, -5, 10, 0), stl: bool(a.stl) };
+    a = obj(a);
+    return { k: pick(a.k, ['light', 'medium', 'heavy', 'shield', 'bonus', 'unarm'], ''), ac: int(a.ac, -10, 30, 0), str: int(a.str, 0, 30, 0), nu: bool(a.nu), sb: int(a.sb, -5, 10, 0), stl: bool(a.stl) };
 };
 // Item and trait effects: [type, target, value]. See effectsOf() and traitEffects() in library.js.
 const FX = ["set", "chk", "sv", "sa", "dc", "adv", "hp", "ab", "sk"];
@@ -47,46 +47,46 @@ const SKN = SK.map(([n]) => n);
 // A skill effect's target: one skill, '?' (any skill), or '?A|B|C' (one of these); anything else is dropped.
 const skTarget = a => { a = String(a ?? ''); if (SKN.includes(a) || a === '?') return a; const l = a.startsWith('?') ? a.slice(1).split('|').filter(s => SKN.includes(s)) : []; return l.length ? '?' + l.join('|') : ''; };
 export const cleanFx = l => arr(l, 12).filter(Array.isArray).map(([t, a, v]) => {
-  t = pick(t, FX, "");
-  a = t === "set" || t === "ab" ? pick(a, AB, "") : t === "adv" ? pick(a, ["init", ...SKN], "") : t === "sk" ? skTarget(a) : "";
-  return [t, a, int(v, t === "set" ? 1 : t === "sk" ? 1 : -10, t === "sk" ? 2 : 30, t === "sk" ? 1 : 0)];
+    t = pick(t, FX, "");
+    a = t === "set" || t === "ab" ? pick(a, AB, "") : t === "adv" ? pick(a, ["init", ...SKN], "") : t === "sk" ? skTarget(a) : "";
+    return [t, a, int(v, t === "set" ? 1 : t === "sk" ? 1 : -10, t === "sk" ? 2 : 30, t === "sk" ? 1 : 0)];
 }).filter(([t, a]) => t && (a || !["set", "adv", "ab", "sk"].includes(t)));
 // A feature keeps its effects (custom packs can give them) and its skill picks, one per skill choice it offers.
 const cleanFeat = f => {
-  f = obj(f); const fx = cleanFx(f.fx), ch = arr(f.ch, 12).map(c => (SKN.includes(c) ? c : ''));
-  return { n: str(f.n), t: str(f.t, 60), d: str(f.d, 20000), ...(fx.length ? { fx } : {}), ...(ch.some(Boolean) ? { ch } : {}) };
+    f = obj(f); const fx = cleanFx(f.fx), ch = arr(f.ch, 12).map(c => (SKN.includes(c) ? c : ''));
+    return { n: str(f.n), t: str(f.t, 60), d: str(f.d, 20000), ...(fx.length ? { fx } : {}), ...(ch.some(Boolean) ? { ch } : {}) };
 };
 
 export function cleanSheet(o) {
-  o = obj(o);
-  const d = DEF(), ab = obj(o.ab), sv = obj(o.sv), sk = obj(o.sk), hp = obj(o.hp), slots = arr(o.slots, 9);
-  const hpMax = int(hp.max, 1, 9999, d.hp.max);
-  return {
-    name: str(o.name, 120, d.name), cls: str(o.cls, 120), sub: str(o.sub, 120), species: str(o.species, 120), bg: str(o.bg, 120),
-    level: int(o.level, 1, 20, 1), mode: pick(o.mode, ['play', 'edit'], 'play'),
-    ab: Object.fromEntries(AB.map(a => [a, int(ab[a], 1, 30, 10)])),
-    sv: Object.fromEntries(AB.filter(a => bool(sv[a])).map(a => [a, true])),
-    sk: Object.fromEntries(SK.map(([n]) => [n, int(sk[n], 0, 2, 0)]).filter(([, v]) => v)),
-    hp: { cur: int(hp.cur, 0, hpMax, hpMax), max: hpMax, temp: int(hp.temp, 0, 9999, 0) },
-    ac: int(o.ac, 0, 50, d.ac), speed: int(o.speed, 0, 999, d.speed), init: int(o.init, -20, 20, 0),
-    cast: pick(o.cast, AB, ''),
-    slots: d.slots.map((_, i) => { const s = obj(slots[i]), m = int(s.m, 0, 9, 0); return { m, u: int(s.u, 0, m, 0) }; }),
-    spells: arr(o.spells, 500).map(obj).filter(x => x.n).map(x => ({ n: str(x.n), l: int(x.l, 0, 9, 0), p: bool(x.p), d: str(x.d, 20000), r: cleanRoll(x.r) })),
-    items: arr(o.items, 500).map(obj).filter(x => x.n).map(x => ({
-      n: str(x.n), q: int(x.q, 0, 99999, 1), d: str(x.d, 20000),
-      ...(x.eq === undefined ? {} : { eq: bool(x.eq) }), on: bool(x.on),
-      ...(x.w ? { w: cleanWeapon(x.w) } : {}),
-      ...(x.ar ? { ar: cleanArmor(x.ar) } : {}),
-      ...(x.v ? { v: int(x.v, 0, 99, 0) } : {}),
-      ...(x.rr ? { rr: int(x.rr, 0, 6, 0) } : {}),
-      ...(x.at ? { at: true, ...(x.att === undefined ? {} : { att: bool(x.att) }) } : {}), ...(x.fx ? { fx: cleanFx(x.fx) } : {}),
-    })),
-    notes: str(o.notes, 100000), insp: bool(o.insp),
-    feats: arr(o.feats, 500).map(cleanFeat).filter(f => f.n), race: arr(o.race, 200).map(cleanFeat).filter(f => f.n),
-    vtt: pick(o.vtt, ['foundry', 'roll20', 'roll20t'], 'foundry'), spc: bool(o.spc), inc: bool(o.inc),
-    // Sheets from before AC was calculated keep a hand-typed AC unless it was still the default.
-    acAuto: o.acAuto === undefined ? (o.ac === undefined || Number(o.ac) === 10) : bool(o.acAuto), acb: int(o.acb, -10, 20, 0),
-    // Hit dice spent (one die per level) and, for a custom class, its hit die size (0 = not set).
-    hd: int(o.hd, 0, int(o.level, 1, 20, 1), 0), hdie: [6, 8, 10, 12].includes(Number(o.hdie)) ? Number(o.hdie) : 0,
-  };
+    o = obj(o);
+    const d = DEF(), ab = obj(o.ab), sv = obj(o.sv), sk = obj(o.sk), hp = obj(o.hp), slots = arr(o.slots, 9);
+    const hpMax = int(hp.max, 1, 9999, d.hp.max);
+    return {
+        name: str(o.name, 120, d.name), cls: str(o.cls, 120), sub: str(o.sub, 120), species: str(o.species, 120), bg: str(o.bg, 120),
+        level: int(o.level, 1, 20, 1), mode: pick(o.mode, ['play', 'edit'], 'play'),
+        ab: Object.fromEntries(AB.map(a => [a, int(ab[a], 1, 30, 10)])),
+        sv: Object.fromEntries(AB.filter(a => bool(sv[a])).map(a => [a, true])),
+        sk: Object.fromEntries(SK.map(([n]) => [n, int(sk[n], 0, 2, 0)]).filter(([, v]) => v)),
+        hp: { cur: int(hp.cur, 0, hpMax, hpMax), max: hpMax, temp: int(hp.temp, 0, 9999, 0) },
+        ac: int(o.ac, 0, 50, d.ac), speed: int(o.speed, 0, 999, d.speed), init: int(o.init, -20, 20, 0),
+        cast: pick(o.cast, AB, ''),
+        slots: d.slots.map((_, i) => { const s = obj(slots[i]), m = int(s.m, 0, 9, 0); return { m, u: int(s.u, 0, m, 0) }; }),
+        spells: arr(o.spells, 500).map(obj).filter(x => x.n).map(x => ({ n: str(x.n), l: int(x.l, 0, 9, 0), p: bool(x.p), d: str(x.d, 20000), r: cleanRoll(x.r) })),
+        items: arr(o.items, 500).map(obj).filter(x => x.n).map(x => ({
+            n: str(x.n), q: int(x.q, 0, 99999, 1), d: str(x.d, 20000),
+            ...(x.eq === undefined ? {} : { eq: bool(x.eq) }), on: bool(x.on),
+            ...(x.w ? { w: cleanWeapon(x.w) } : {}),
+            ...(x.ar ? { ar: cleanArmor(x.ar) } : {}),
+            ...(x.v ? { v: int(x.v, 0, 99, 0) } : {}),
+            ...(x.rr ? { rr: int(x.rr, 0, 6, 0) } : {}),
+            ...(x.at ? { at: true, ...(x.att === undefined ? {} : { att: bool(x.att) }) } : {}), ...(x.fx ? { fx: cleanFx(x.fx) } : {}),
+        })),
+        notes: str(o.notes, 100000), insp: bool(o.insp),
+        feats: arr(o.feats, 500).map(cleanFeat).filter(f => f.n), race: arr(o.race, 200).map(cleanFeat).filter(f => f.n),
+        vtt: pick(o.vtt, ['foundry', 'roll20', 'roll20t'], 'foundry'), spc: bool(o.spc), inc: bool(o.inc),
+        // Sheets from before AC was calculated keep a hand-typed AC unless it was still the default.
+        acAuto: o.acAuto === undefined ? (o.ac === undefined || Number(o.ac) === 10) : bool(o.acAuto), acb: int(o.acb, -10, 20, 0),
+        // Hit dice spent (one die per level) and, for a custom class, its hit die size (0 = not set).
+        hd: int(o.hd, 0, int(o.level, 1, 20, 1), 0), hdie: [6, 8, 10, 12].includes(Number(o.hdie)) ? Number(o.hdie) : 0,
+    };
 }
