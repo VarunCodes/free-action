@@ -7,8 +7,8 @@
 // files join that list as the main.js refactor (#45) rewrites them; until then they'd fail on almost
 // every line.
 //
-// The Playwright tests are TypeScript, which ESLint can't read without typescript-eslint, so they
-// aren't linted yet.
+// The unit tests (tests/unit/) are linted like the readable modules. The Playwright tests are
+// TypeScript, which ESLint can't read without typescript-eslint, so they aren't linted yet.
 import js from '@eslint/js';
 import stylistic from '@stylistic/eslint-plugin';
 
@@ -21,6 +21,7 @@ const browser = Object.fromEntries([
 
 // Readable code: short lines, one statement per line, and small functions.
 const READABLE = [
+    'tests/unit/**/*.js',
     'src/storage.js',
     'src/rules.js',
     'src/rolls.js',
@@ -32,7 +33,7 @@ const READABLE = [
 export default [
     { ignores: ['dist/', 'node_modules/', 'test-results/', 'playwright-report/', '.claude/'] },
     {
-        files: ['src/**/*.js', 'eslint.config.js'],
+        files: ['src/**/*.js', 'tests/unit/**/*.js', 'eslint.config.js'],
         ...js.configs.recommended,
         plugins: { '@stylistic': stylistic },
         languageOptions: { ecmaVersion: 2023, sourceType: 'module', globals: browser },

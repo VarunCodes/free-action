@@ -18,6 +18,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      # Unit tests need no browser and take well under a second, so they run first.
+      - run: npm run test:unit
       # Not cached on purpose: measured in #35, a browser cache saved nothing (40s without, 41s
       # with), because the time goes on the system libraries, which every fresh runner needs.
       - run: npx playwright install --with-deps chromium webkit
