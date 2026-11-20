@@ -41,6 +41,16 @@ const cleanArmor = a => {
     a = obj(a);
     return { k: pick(a.k, ['light', 'medium', 'heavy', 'shield', 'bonus', 'unarm'], ''), ac: int(a.ac, -10, 30, 0), str: int(a.str, 0, 30, 0), nu: bool(a.nu), sb: int(a.sb, -5, 10, 0), stl: bool(a.stl) };
 };
+// Gear saved before equipping and attuning were separate choices. Weapons start out equippable, gear
+// that can't be equipped isn't equipped, equippable gear gets an empty armor entry for its AC setting,
+// and anything that was equipped stays attuned.
+function upgradeItem(item) {
+    if (item.eq === undefined) item.eq = Boolean(item.w);
+    if (!item.eq) item.on = false;
+    if (item.eq && !item.ar) item.ar = cleanArmor({});
+    if (item.at && item.att === undefined) item.att = item.on;
+    return item;
+}
 // Item and trait effects: [type, target, value]. See effectsOf() and traitEffects() in library.js.
 const FX = ["set", "chk", "sv", "sa", "dc", "adv", "hp", "ab", "sk"];
 const SKN = SK.map(([n]) => n);
@@ -80,7 +90,7 @@ export function cleanSheet(o) {
             ...(x.v ? { v: int(x.v, 0, 99, 0) } : {}),
             ...(x.rr ? { rr: int(x.rr, 0, 6, 0) } : {}),
             ...(x.at ? { at: true, ...(x.att === undefined ? {} : { att: bool(x.att) }) } : {}), ...(x.fx ? { fx: cleanFx(x.fx) } : {}),
-        })),
+        })).map(upgradeItem),
         notes: str(o.notes, 100000), insp: bool(o.insp),
         feats: arr(o.feats, 500).map(cleanFeat).filter(f => f.n), race: arr(o.race, 200).map(cleanFeat).filter(f => f.n),
         vtt: pick(o.vtt, ['foundry', 'roll20', 'roll20t'], 'foundry'), spc: bool(o.spc), inc: bool(o.inc),

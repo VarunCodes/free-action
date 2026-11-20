@@ -1,8 +1,7 @@
 import { test, expect, loadSheet, switchMode } from '../fixtures';
 
 // Sheets saved by older versions of the app, or edited by hand, must still open, with impossible
-// values brought back within the rules. Most upgrades happen in cleanSheet() (src/sheet.js) on
-// load; the gear flags are filled in by render() in src/main.js.
+// values brought back within the rules. Upgrades happen in cleanSheet() (src/sheet.js) on load.
 
 test('a sheet from before AC was calculated keeps its hand-typed AC', async ({ page, seedSheet }) => {
   // Older sheets have no acAuto. A typed AC other than the old default (10) means the player set it.
@@ -46,4 +45,17 @@ test('gear from before Equipped and Attuned were separate keeps working', async 
 
   await expect(page.getByRole('checkbox', { name: 'Longsword equipped' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Attune Ring of Protection' })).toHaveAttribute('aria-pressed', 'true');
+});
+
+test("an old sheet's equipped magic item counts from the moment the sheet opens", async ({ page, seedSheet }) => {
+  // An older sheet has no Attuned flag, so the equipped Luckstone counts as attuned. SRD 5.2, Stone of
+  // Good Luck: +1 to ability checks and saving throws. Brakka's Strength save: Str 16 (+3), proficient
+  // as a Fighter (+3 at level 5), plus the Luckstone (+1) = +7.
+  await seedSheet({
+    ...loadSheet('fighter-5'),
+    items: [{ n: 'Stone of Good Luck', q: 1, eq: true, on: true, at: true, fx: [['chk', '', 1], ['sv', '', 1]] }],
+  });
+  await page.goto('/');
+
+  await expect(page.getByRole('button', { name: 'Strength save +7' })).toBeVisible();
 });

@@ -1,8 +1,8 @@
 import './style.css';
 import { openLibrary, swapSpecies } from './libraryui.js';
 import { cachedItems, cachedSpecies, loadLibrary } from './library.js';
-import { esc, md, rarityTag, magicMark } from './text.js';
-import { AB, ABN, SK, DEF, CLS, CLASSES, cleanSheet } from './sheet.js';
+import { esc, md } from './text.js';
+import { ABN, SK, DEF, CLS, CLASSES, cleanSheet } from './sheet.js';
 import {
     abilityMod, signed, profBonus, knownClass, hitDie, hitDiceLeft, averageHP, activeGear, featureEffects,
     effectsOf, effectTotal, advantageFrom, score, skillGranted, skillProf, unmetStrength, currentSpeed,
@@ -12,6 +12,8 @@ import { rollMode, rollD20, rollDice, customRollError, chatCommand, spellDice, w
 import { input, field, sourcesText } from './html.js';
 import { abilitiesSection, savesSection, skillsSection } from './sections/stats.js';
 import { spellsSection } from './sections/spells.js';
+import { inventorySection } from './sections/inventory.js';
+import { effectLabel } from './effects.js';
 import { readKey, writeKey, loadSaved, saveSheet, snapshots, snapshot, lastBackup, markBackedUp, downloadSheet, readBackup } from './storage.js';
 let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null,RERR='',IOMSG=null,ATTMSG=-1,CC=false,CS=false,CMSG='',SPC=[];const UP={};
 const SR=()=>({a:false,s:'',d:'',b:'',t:'',h:false,m:false,by:'slot',up:[]});
@@ -88,8 +90,6 @@ function setClass(c){const o=CLS[knownClass(S.cls)],n=CLS[c],n0=ABN[S.cast];S.cl
     CMSG=`${c}: proficient in ${n.sv.map(a=>ABN[a]).join(' and ')} saving throws${ca?', '+ca:''}. You can change these below.`}
 
 function copyText(t){try{navigator.clipboard.writeText(t).catch(()=>{});return true}catch(e){}try{const x=document.createElement('textarea');x.value=t;document.body.appendChild(x);x.select();const ok=document.execCommand('copy');x.remove();return ok}catch(e){return false}}
-const fxLabel=([t,a,v,o])=>t==='set'?`${ABN[a]} becomes ${v}`:t==='chk'?`${signed(v)} ability checks`:t==='sv'?`${signed(v)} saving throws`:t==='sa'?`${signed(v)} spell attacks`:t==='dc'?`${signed(v)} spell save DC`:t==='hp'?`${signed(v)} HP per level`:t==='ab'?`${signed(v)} ${ABN[a]}`:t==='sk'?(a?`${a} ${v>1?'expertise':'proficiency'}`:`Choose a skill${o&&o!=='?'?` (${o.slice(1).split('|').join(', ')})`:''} in Edit`):`Advantage on ${a==='init'?'Initiative':a}`;
-const FXO=[...AB.map(a=>[`set|${a}`,`Set ${ABN[a]} to (value)`]),['chk|','Bonus to ability checks'],['sv|','Bonus to saving throws'],['sa|','Bonus to spell attacks'],['dc|','Bonus to spell save DC'],['adv|init','Advantage on Initiative'],...SK.map(([n])=>[`adv|${n}`,`Advantage on ${n}`])].map(([v,t])=>`<option value="${v}">${t}</option>`).join('');
 // A d20 roll (checks, saves, attacks). dis/adv are this roll's own Disadvantage or Advantage; the
 // mode picked on the roll bar is added to them.
 function doRoll(label,b,dis,adv){
@@ -119,7 +119,7 @@ function renderRoll(){const L=LAST,sg=(v,t)=>`<button data-a="rm" data-v="${v}" 
     // The page leaves room at the bottom for however tall the bar is now.
     document.documentElement.style.setProperty('--rollh',document.getElementById('roll').firstChild.offsetHeight+'px')}
 // A feature that changes numbers says so under its name; a skill choice gets a drop-down in Edit (Play says to pick one).
-const fxPicks=(x,id,ed)=>{const N=esc(x.n);let c=0;const l=featureEffects(x),ch=l.filter(f=>f[0]==='sk'&&f[3]).length;return l.map(f=>{if(!(ed&&f[0]==='sk'&&f[3]))return `<span class="a">${esc(fxLabel(f))}</span>`;const j=c++,o=f[3]==='?'?SK.map(([n])=>n):f[3].slice(1).split('|');return `<select data-ch="${id}.${j}" aria-label="${N} skill${ch>1?' '+(j+1):''}"><option value="">Choose a skill</option>${o.map(s=>`<option ${f[1]===s?'selected':''}>${s}</option>`).join('')}</select>`}).join(' ')};
+const fxPicks=(x,id,ed)=>{const N=esc(x.n);let c=0;const l=featureEffects(x),ch=l.filter(f=>f[0]==='sk'&&f[3]).length;return l.map(f=>{if(!(ed&&f[0]==='sk'&&f[3]))return `<span class="a">${esc(effectLabel(f))}</span>`;const j=c++,o=f[3]==='?'?SK.map(([n])=>n):f[3].slice(1).split('|');return `<select data-ch="${id}.${j}" aria-label="${N} skill${ch>1?' '+(j+1):''}"><option value="">Choose a skill</option>${o.map(s=>`<option ${f[1]===s?'selected':''}>${s}</option>`).join('')}</select>`}).join(' ')};
 const featSec=(t,k,typed,ed)=>{const L=S[k];let h=`<h2>${t}</h2>`;h+=L.length?L.map((x,i)=>{const id=k+'.'+i,fp=fxPicks(x,id,ed);return `<details class="ft" data-id="${id}" ${ed||OPEN.has(id)?'open':''}><summary><span class="g">${esc(x.n)}</span>${x.t?`<span class="pill">${esc(x.t)}</span>`:''}${ed?`<button class="x" data-a="delft" data-v="${id}" aria-label="Remove ${esc(x.n)}">\u2715</button>`:''}${!ed&&fp?` ${fp}`:''}</summary>${ed&&fp?`<div class="srl fxl">${fp}</div>`:''}${ed?`<textarea data-k="${id}.d" placeholder="Description" aria-label="${esc(x.n)} description">${esc(x.d)}</textarea>`:`<p>${md(x.d)||'No description.'}</p>`}</details>`}).join(''):'<div class="empty">None yet.</div>';if(ed)h+=`<div class="add"><input class="n" id="ftn-${k}" placeholder="Name" aria-label="New ${k==='race'?'racial feature':'feature'} name">${typed?`<select id="ftt-${k}" aria-label="New feature type"><option>Class feature</option><option>Feat</option></select>`:''}<button class="pri" data-a="addft" data-v="${k}">Add</button></div>`;return h};
 // Values several sections use, worked out once per render:
 //   editing             true in Edit mode, false in Play
@@ -249,25 +249,6 @@ function racialSection({editing}){
     return h;
 }
 
-// Inventory, with equipping, attunement, the AC breakdown and weapon rolls.
-function inventorySection({editing,proficiency}){
-    let h='';
-    // Only gear you wear or wield gets an Equipped box; it works like Prepared for spells.
-    // Sheets from before attuning was a separate choice: whatever was equipped stays attuned.
-    S.items.forEach(x=>{if(x.eq===undefined)x.eq=!!x.w;if(!x.eq)x.on=false;if(x.eq&&!x.ar)x.ar={k:'',ac:0,str:0,nu:false};if(x.at&&x.att===undefined)x.att=!!x.on;if(!x.at)delete x.att});
-    const eqs=S.items.filter(x=>x.eq),ne=eqs.filter(x=>x.on).length,AC=armorClass(S),G=activeGear(S);
-    // Collapsed, Inventory keeps only what's equipped (with its roll buttons), plus the AC and attunement lines.
-    h+=`<h2><button class="hd" data-a="inc" aria-expanded="${!S.inc}">Inventory</button>${S.inc?`<small>${S.items.length} item${S.items.length===1?'':'s'}, ${ne} equipped</small>`:''}</h2>`;
-    if(eqs.length&&!S.inc)h+=`<p class="sub prep">Equipped <b>${ne}</b> of ${eqs.length} equippable item${eqs.length===1?'':'s'}. Tick the box next to gear you are wearing or wielding.</p>`;
-    if(S.items.some(x=>x.at)&&!S.inc)h+=`<p class="sub prep">Attuned <b>${Math.min(3,G.attuned)}</b> of 3${G.over.length?` <span class="reqm">${G.over.length} more than you can attune to</span>`:''}. A magic item that needs attunement only works while equipped and attuned.</p>`;
-    if(S.acAuto&&eqs.length&&!S.inc)h+=`<p class="sub prep">Armor class <b>${AC.ac}</b>: ${esc(AC.parts.map(([n,v])=>`${n} ${v<0?v:'+'+v}`).join(', ').replace(/^(.*?) \+(\d+)/,'$1 $2'))}.</p>`;
-    const AK=[['','No AC effect'],['light','Light armor (+ Dex)'],['medium','Medium armor (+ Dex, max 2)'],['heavy','Heavy armor'],['shield','Shield (adds AC)'],['bonus','AC bonus (adds AC)'],['unarm','Unarmored base (+ Dex)']];
-    const shownIt=S.items.map((x,i)=>[x,i]).filter(([x])=>!S.inc||(x.eq&&x.on));
-    h+=shownIt.length?shownIt.map(([x,i])=>{const w=x.w,m=w?weaponMod(S,x):0,dim=!editing&&ne&&x.eq&&!x.on,bad=x.eq&&x.on&&x.ar&&x.ar.str>score(S,'str'),spare=x.on&&x.ar&&['light','medium','heavy','shield'].includes(x.ar.k)&&!AC.used.has(x),over=G.over.includes(x),dup=G.dup.includes(x),N=esc(x.n);return `<div class="spi${dim?' unp':''}${bad||over||dup?' req':x.rr?` rs r${x.rr}`:''}"><div class="ln">${x.eq?`<input type="checkbox" data-k="items.${i}.on" ${x.on?'checked':''} aria-label="${N} equipped" title="Equipped">`:'<span class="pk"></span>'}<span class="g">${magicMark(x.rr)}${x.d?`<button class="lk" data-a="itd" data-v="${i}" aria-expanded="${OPEN.has('it'+i)}">${esc(x.n)}</button>`:esc(x.n)}${rarityTag(x.rr)}${bad?` <span class="reqm">Needs Str ${x.ar.str} (you have ${score(S,'str')}): Speed &minus;10 ft</span>`:''}${x.at?` <button class="pill att${x.att?' on':''}" data-a="att" data-v="${i}" aria-label="Attune ${N}" aria-pressed="${!!x.att}" title="${x.att?'Attuned. Click to end attunement':'Needs attunement. Click to attune'}">${x.att?'Attuned':'Attune'}</button>`:''}${over?' <span class="reqm">Over the 3-item attunement limit</span>':''}${dup?' <span class="reqm">Already attuned to another copy, no effect</span>':''}${x.at&&x.on&&!x.att?' <span class="a">not attuned, no effect</span>':''}${spare&&S.acAuto?' <span class="a">not counted, a better one is equipped</span>':''}</span>${editing?input(`items.${i}.q`,x.q,'number',`min=0 style="width:64px" aria-label="${N} quantity"`):`<span class="v">&times;${x.q}</span>`}${editing?`<button class="x" data-a="delit" data-v="${i}" aria-label="Remove ${N}">\u2715</button>`:''}</div>${ATTMSG===i?'<p class="reqn srl" role="alert">Already attuned to 3 items. End attunement to one first.</p>':''}${!editing&&x.fx&&x.fx.length?`<div class="srl fxl">${esc(x.fx.map(fxLabel).join(' \u00b7 '))}</div>`:''}${editing&&x.eq?`<div class="srl"><label class="row"><input type="checkbox" data-k="items.${i}.at" ${x.at?'checked':''} aria-label="${N} needs attunement"> Needs attunement</label>${(x.fx||[]).map((f,j)=>`<span class="pill">${esc(fxLabel(f))} <button class="x" data-a="delfx" data-v="${i}.${j}" aria-label="Remove ${esc(fxLabel(f))} from ${N}">\u2715</button></span>`).join('')}<select id="fxt-${i}" aria-label="${N} effect">${FXO}</select><input id="fxv-${i}" type="number" value="1" style="width:64px" aria-label="${N} effect value"><button data-a="addfx" data-v="${i}" aria-label="Add effect to ${N}">Add effect</button></div>`:''}${editing?`<div class="srl"><label class="row"><input type="checkbox" data-k="items.${i}.eq" ${x.eq?'checked':''} aria-label="${N} equippable"> Equippable</label>${x.eq?`<select data-k="items.${i}.ar.k" aria-label="${N} armor class effect">${AK.map(([v,t])=>`<option value="${v}" ${x.ar.k===v?'selected':''}>${t}</option>`).join('')}</select>${x.ar.k?`<label class="row">AC ${input(`items.${i}.ar.ac`,x.ar.ac,'number',`min=-10 max=30 style="width:64px" aria-label="${N} AC value"`)}</label><label class="row">Str needed ${input(`items.${i}.ar.str`,x.ar.str,'number',`min=0 max=30 style="width:64px" aria-label="${N} strength needed"`)}</label><label class="row">Save bonus ${input(`items.${i}.ar.sb`,x.ar.sb||0,'number',`min=-5 max=10 style="width:64px" aria-label="${N} saving throw bonus"`)}</label><label class="row"><input type="checkbox" data-k="items.${i}.ar.stl" ${x.ar.stl?'checked':''} aria-label="${N} Stealth Disadvantage"> Stealth Disadvantage</label>`:''}`:''}</div>`:''}${w&&!editing?`<div class="srl"><button class="rb" data-a="iatk" data-v="${i}">Hit ${signed(proficiency+m)}</button><button class="rb" data-a="idmg" data-v="${i}">${esc(withMod(w.d,m))} ${esc(w.t)}</button>${w.v?`<button class="rb" data-a="idmg" data-v="${i}" data-t="v">${esc(withMod(w.v,m))} two-handed</button>`:''}</div>`:''}${x.d&&OPEN.has('it'+i)?`<p class="sd">${md(x.d)}</p>`:''}</div>`}).join(''):(S.inc&&S.items.length?'<div class="empty">Nothing equipped.</div>':'<div class="empty">Nothing carried.</div>');
-    if(editing&&!S.inc)h+=`<div class="add"><input class="n" id="itn" placeholder="Item name" aria-label="New item name"><input class="q" id="itq" type="number" value="1" min="0" aria-label="New item quantity"><button class="pri" data-a="addit">Add</button></div>`;
-    return h;
-}
-
 // Notes.
 function notesSection(){
     let h='';
@@ -295,11 +276,9 @@ function backupSection(){
 function render(){
     const v=sheetView();
     S.spells.forEach(x=>{x.r=Object.assign(SR(),x.r)});
-    // Built in reading order (the Inventory section upgrades old sheets' items before Inventory and
-    // everything after it is drawn), then placed in the columns.
     const header=headerSection(v);
     const html={};
-    for(const [k,f] of [['vit',vitalsSection],['abil',v=>abilitiesSection(S,v)],['save',v=>savesSection(S,v)],['skill',v=>skillsSection(S,v)],['feat',featuresSection],['race',racialSection],['spell',v=>spellsSection(S,v,{isOpen:id=>OPEN.has(id),slotFor:index=>UP[index]})],['inv',inventorySection],['notes',notesSection],['backup',backupSection]])html[k]=f(v);
+    for(const [k,f] of [['vit',vitalsSection],['abil',v=>abilitiesSection(S,v)],['save',v=>savesSection(S,v)],['skill',v=>skillsSection(S,v)],['feat',featuresSection],['race',racialSection],['spell',v=>spellsSection(S,v,{isOpen:id=>OPEN.has(id),slotFor:index=>UP[index]})],['inv',v=>inventorySection(S,v,{isOpen:id=>OPEN.has(id),attunementRefused:ATTMSG})],['notes',notesSection],['backup',backupSection]])html[k]=f(v);
     const sec=(k,order)=>`<section class="c" style="order:${order}">${html[k]}</section>`;
     const columns=[
         [['vit',1],['abil',2],['save',3],['skill',4]],

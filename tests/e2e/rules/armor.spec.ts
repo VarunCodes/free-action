@@ -123,3 +123,13 @@ test('a hand-typed AC is shown instead of the calculated one until the calculati
     await expect.poll(savedSheet).toMatchObject({ acAuto: true, ac: 13 }); // the typed AC is kept for later
   });
 });
+
+test("the AC breakdown keeps a magic armor's name as it is", async ({ page, seedSheet }) => {
+  // PHB 2024: Breastplate is medium armor, AC 14 + Dex modifier (max 2); a +1 Breastplate is 15.
+  // Dex 12 adds +1, so the armor gives 16, and a Shield adds 2: 18.
+  await seedSheet(brakka(12, [{ n: 'Breastplate +1', ar: { k: 'medium', ac: 15 } }, shield]));
+  await page.goto('/');
+
+  await expectAC(page, 18);
+  await expect(page.getByText('Armor class 18: Breastplate +1 16, Shield +2.')).toBeVisible();
+});

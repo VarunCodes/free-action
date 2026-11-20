@@ -27,6 +27,7 @@ const READABLE = [
     'src/rolls.js',
     'src/text.js',
     'src/html.js',
+    'src/effects.js',
     'src/sections/*.js',
 ];
 
