@@ -1,10 +1,10 @@
 import './style.css';
 import { openLibrary, swapSpecies } from './libraryui.js';
 import { cachedItems, cachedSpecies, loadLibrary } from './library.js';
-import { esc, md } from './text.js';
-import { ABN, SK, DEF, CLS, CLASSES, cleanSheet } from './sheet.js';
+import { esc } from './text.js';
+import { ABN, DEF, CLS, CLASSES, cleanSheet } from './sheet.js';
 import {
-    abilityMod, signed, profBonus, knownClass, hitDie, hitDiceLeft, averageHP, activeGear, featureEffects,
+    abilityMod, signed, profBonus, knownClass, hitDie, hitDiceLeft, averageHP, activeGear,
     effectsOf, effectTotal, advantageFrom, score, skillGranted, skillProf, unmetStrength, currentSpeed,
     armorClass, currentAC,
 } from './rules.js';
@@ -13,7 +13,7 @@ import { input, field, sourcesText } from './html.js';
 import { abilitiesSection, savesSection, skillsSection } from './sections/stats.js';
 import { spellsSection } from './sections/spells.js';
 import { inventorySection } from './sections/inventory.js';
-import { effectLabel } from './effects.js';
+import { featuresSection, racialFeaturesSection } from './sections/features.js';
 import { readKey, writeKey, loadSaved, saveSheet, snapshots, snapshot, lastBackup, markBackedUp, downloadSheet, readBackup } from './storage.js';
 let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null,RERR='',IOMSG=null,ATTMSG=-1,CC=false,CS=false,CMSG='',SPC=[];const UP={};
 const SR=()=>({a:false,s:'',d:'',b:'',t:'',h:false,m:false,by:'slot',up:[]});
@@ -118,9 +118,6 @@ function renderRoll(){const L=LAST,sg=(v,t)=>`<button data-a="rm" data-v="${v}" 
     document.getElementById('roll').innerHTML=`<div class="rp${RMIN?' min':''}"><div class="rpi"><button class="hd rt" data-a="rmin" aria-expanded="${!RMIN}" aria-label="${RMIN?'Show roll options':'Hide roll options'}" title="${RMIN?'Show roll options':'Hide roll options'}"></button><div class="rr">${L?`<output class="tot" aria-label="Roll total">${L.total}</output><span>${esc(L.label)} ${esc(L.detail)}</span>${L.crit?`<span class="crit">${L.crit}</span>`:''}`:RERR?`<span class="reqn" role="alert">${esc(RERR)}</span>`:'<span class="sub">Tap any modifier to roll</span>'}</div>${RMIN?'':`<div class="rc"><div class="seg" role="group" aria-label="Roll mode">${sg('','Normal')}${sg('adv','Adv')}${sg('dis','Dis')}</div><input id="cmd" readonly value="${esc(chatCommand(LAST,S.vtt))}" placeholder="Chat command" aria-label="Chat command"><button class="pri" data-a="cp" ${L?'':'disabled'}>${COP?'Copied':'Copy'}</button></div><details data-id="more" ${OPEN.has('more')?'open':''}><summary>VTT format and custom roll</summary><div class="rc"><select data-k="vtt" aria-label="Chat format">${op('foundry','Foundry (/r)')}${op('roll20','Roll20 (/roll)')}${op('roll20t','Roll20 template')}</select><input id="cx" placeholder="2d6+3" value="${esc(CX)}" aria-label="Custom dice"><button data-a="cx">Roll</button></div></details>`}</div></div>`;
     // The page leaves room at the bottom for however tall the bar is now.
     document.documentElement.style.setProperty('--rollh',document.getElementById('roll').firstChild.offsetHeight+'px')}
-// A feature that changes numbers says so under its name; a skill choice gets a drop-down in Edit (Play says to pick one).
-const fxPicks=(x,id,ed)=>{const N=esc(x.n);let c=0;const l=featureEffects(x),ch=l.filter(f=>f[0]==='sk'&&f[3]).length;return l.map(f=>{if(!(ed&&f[0]==='sk'&&f[3]))return `<span class="a">${esc(effectLabel(f))}</span>`;const j=c++,o=f[3]==='?'?SK.map(([n])=>n):f[3].slice(1).split('|');return `<select data-ch="${id}.${j}" aria-label="${N} skill${ch>1?' '+(j+1):''}"><option value="">Choose a skill</option>${o.map(s=>`<option ${f[1]===s?'selected':''}>${s}</option>`).join('')}</select>`}).join(' ')};
-const featSec=(t,k,typed,ed)=>{const L=S[k];let h=`<h2>${t}</h2>`;h+=L.length?L.map((x,i)=>{const id=k+'.'+i,fp=fxPicks(x,id,ed);return `<details class="ft" data-id="${id}" ${ed||OPEN.has(id)?'open':''}><summary><span class="g">${esc(x.n)}</span>${x.t?`<span class="pill">${esc(x.t)}</span>`:''}${ed?`<button class="x" data-a="delft" data-v="${id}" aria-label="Remove ${esc(x.n)}">\u2715</button>`:''}${!ed&&fp?` ${fp}`:''}</summary>${ed&&fp?`<div class="srl fxl">${fp}</div>`:''}${ed?`<textarea data-k="${id}.d" placeholder="Description" aria-label="${esc(x.n)} description">${esc(x.d)}</textarea>`:`<p>${md(x.d)||'No description.'}</p>`}</details>`}).join(''):'<div class="empty">None yet.</div>';if(ed)h+=`<div class="add"><input class="n" id="ftn-${k}" placeholder="Name" aria-label="New ${k==='race'?'racial feature':'feature'} name">${typed?`<select id="ftt-${k}" aria-label="New feature type"><option>Class feature</option><option>Feat</option></select>`:''}<button class="pri" data-a="addft" data-v="${k}">Add</button></div>`;return h};
 // Values several sections use, worked out once per render:
 //   editing             true in Edit mode, false in Play
 //   proficiency         the proficiency bonus for the character's level
@@ -235,20 +232,6 @@ function acSettings(){
     return `<div class="row acset"><label class="row"><input type="checkbox" data-k="acAuto" ${S.acAuto?'checked':''}> Calculate AC from equipped gear</label>${bonus}</div>`;
 }
 
-// Features and feats.
-function featuresSection({editing}){
-    let h='';
-    h+=featSec('Features and feats','feats',true,editing);
-    return h;
-}
-
-// Racial features.
-function racialSection({editing}){
-    let h='';
-    h+=featSec('Racial features','race',false,editing);
-    return h;
-}
-
 // Notes.
 function notesSection(){
     let h='';
@@ -278,7 +261,7 @@ function render(){
     S.spells.forEach(x=>{x.r=Object.assign(SR(),x.r)});
     const header=headerSection(v);
     const html={};
-    for(const [k,f] of [['vit',vitalsSection],['abil',v=>abilitiesSection(S,v)],['save',v=>savesSection(S,v)],['skill',v=>skillsSection(S,v)],['feat',featuresSection],['race',racialSection],['spell',v=>spellsSection(S,v,{isOpen:id=>OPEN.has(id),slotFor:index=>UP[index]})],['inv',v=>inventorySection(S,v,{isOpen:id=>OPEN.has(id),attunementRefused:ATTMSG})],['notes',notesSection],['backup',backupSection]])html[k]=f(v);
+    for(const [k,f] of [['vit',vitalsSection],['abil',v=>abilitiesSection(S,v)],['save',v=>savesSection(S,v)],['skill',v=>skillsSection(S,v)],['feat',v=>featuresSection(S,v,{isOpen:id=>OPEN.has(id)})],['race',v=>racialFeaturesSection(S,v,{isOpen:id=>OPEN.has(id)})],['spell',v=>spellsSection(S,v,{isOpen:id=>OPEN.has(id),slotFor:index=>UP[index]})],['inv',v=>inventorySection(S,v,{isOpen:id=>OPEN.has(id),attunementRefused:ATTMSG})],['notes',notesSection],['backup',backupSection]])html[k]=f(v);
     const sec=(k,order)=>`<section class="c" style="order:${order}">${html[k]}</section>`;
     const columns=[
         [['vit',1],['abil',2],['save',3],['skill',4]],
