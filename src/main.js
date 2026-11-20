@@ -11,6 +11,7 @@ import {
 import { rollMode, rollD20, rollDice, customRollError, chatCommand, spellDice, weaponMod, withMod } from './rolls.js';
 import { input, field, sourcesText } from './html.js';
 import { abilitiesSection, savesSection, skillsSection } from './sections/stats.js';
+import { spellsSection } from './sections/spells.js';
 import { readKey, writeKey, loadSaved, saveSheet, snapshots, snapshot, lastBackup, markBackedUp, downloadSheet, readBackup } from './storage.js';
 let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null,RERR='',IOMSG=null,ATTMSG=-1,CC=false,CS=false,CMSG='',SPC=[];const UP={};
 const SR=()=>({a:false,s:'',d:'',b:'',t:'',h:false,m:false,by:'slot',up:[]});
@@ -120,10 +121,6 @@ function renderRoll(){const L=LAST,sg=(v,t)=>`<button data-a="rm" data-v="${v}" 
 // A feature that changes numbers says so under its name; a skill choice gets a drop-down in Edit (Play says to pick one).
 const fxPicks=(x,id,ed)=>{const N=esc(x.n);let c=0;const l=featureEffects(x),ch=l.filter(f=>f[0]==='sk'&&f[3]).length;return l.map(f=>{if(!(ed&&f[0]==='sk'&&f[3]))return `<span class="a">${esc(fxLabel(f))}</span>`;const j=c++,o=f[3]==='?'?SK.map(([n])=>n):f[3].slice(1).split('|');return `<select data-ch="${id}.${j}" aria-label="${N} skill${ch>1?' '+(j+1):''}"><option value="">Choose a skill</option>${o.map(s=>`<option ${f[1]===s?'selected':''}>${s}</option>`).join('')}</select>`}).join(' ')};
 const featSec=(t,k,typed,ed)=>{const L=S[k];let h=`<h2>${t}</h2>`;h+=L.length?L.map((x,i)=>{const id=k+'.'+i,fp=fxPicks(x,id,ed);return `<details class="ft" data-id="${id}" ${ed||OPEN.has(id)?'open':''}><summary><span class="g">${esc(x.n)}</span>${x.t?`<span class="pill">${esc(x.t)}</span>`:''}${ed?`<button class="x" data-a="delft" data-v="${id}" aria-label="Remove ${esc(x.n)}">\u2715</button>`:''}${!ed&&fp?` ${fp}`:''}</summary>${ed&&fp?`<div class="srl fxl">${fp}</div>`:''}${ed?`<textarea data-k="${id}.d" placeholder="Description" aria-label="${esc(x.n)} description">${esc(x.d)}</textarea>`:`<p>${md(x.d)||'No description.'}</p>`}</details>`}).join(''):'<div class="empty">None yet.</div>';if(ed)h+=`<div class="add"><input class="n" id="ftn-${k}" placeholder="Name" aria-label="New ${k==='race'?'racial feature':'feature'} name">${typed?`<select id="ftt-${k}" aria-label="New feature type"><option>Class feature</option><option>Feat</option></select>`:''}<button class="pri" data-a="addft" data-v="${k}">Add</button></div>`;return h};
-function spRow(x,i,editing,proficiency,castingModifier){const r=x.r,k=`spells.${i}.r.`,N=esc(x.n);
-    if(editing)return `<div class="srl"><label class="row"><input type="checkbox" data-k="${k}a" ${r.a?'checked':''} aria-label="${N} attack"> Attack</label><select data-k="${k}s" aria-label="${N} saving throw"><option value="">No save</option>${AB.map(a=>`<option value="${a}" ${r.s===a?'selected':''}>${ABN[a].slice(0,3)} save</option>`).join('')}</select>${input(k+'d',r.d,'text',`class="dmg" placeholder="Dice, e.g. 1d10" aria-label="${N} damage dice"`)}${input(k+'t',r.t,'text',`class="dmt" placeholder="Type" aria-label="${N} damage type"`)}<label class="row"><input type="checkbox" data-k="${k}m" ${r.m?'checked':''} aria-label="${N} adds modifier"> + modifier</label></div>`;
-    const sl=UP[i]??x.l,{dice:d,attacks:n}=spellDice(S,x,sl);if(!r.a&&!ABN[r.s]&&!d)return'';
-    return `<div class="srl">${r.a?`<button class="rb" data-a="satk" data-v="${i}">Hit ${signed(proficiency+castingModifier+effectTotal(S,'sa'))}</button>`:''}${ABN[r.s]?`<span class="pill">DC ${8+proficiency+castingModifier+effectTotal(S,'dc')} ${ABN[r.s].slice(0,3)}</span>`:''}${d?`<button class="rb" data-a="sdmg" data-v="${i}">${esc(d)}${r.h||r.t?' '+esc(r.h?'healing':r.t):''}</button>`:''}${n>1?`<span class="a">&times;${n}</span>`:''}${r.by==='slot'&&r.up.length&&x.l>0?`<select data-up="${i}" aria-label="${N} slot level">${[1,2,3,4,5,6,7,8,9].filter(l=>l>=x.l).map(l=>`<option value="${l}" ${l===sl?'selected':''}>Slot ${l}</option>`).join('')}</select>`:''}</div>`}
 // Values several sections use, worked out once per render:
 //   editing             true in Edit mode, false in Play
 //   proficiency         the proficiency bonus for the character's level
@@ -252,27 +249,6 @@ function racialSection({editing}){
     return h;
 }
 
-// Spellcasting: save DC and attack, slots, and the spell list. Collapsed, only the heading.
-function spellsSection({editing,proficiency,castingAbility,castingModifier,spellAttackBonus,spellDcBonus}){
-    let h='';
-    h+=`<h2><button class="hd" data-a="spc" aria-expanded="${!S.spc}">Spellcasting</button>${S.spc?`<small>${S.spells.length} spell${S.spells.length===1?'':'s'}${castingAbility?`, save DC ${8+proficiency+castingModifier+spellDcBonus}`:''}</small>`:''}</h2>`;const sp0=h.length;
-    if(editing)h+=`<div class="row" style="margin-bottom:8px"><div style="flex:1"><label class="lab" for="f-cast">Spellcasting ability</label><select id="f-cast" data-k="cast"><option value="">None</option>${AB.map(a=>`<option value="${a}" ${castingAbility===a?'selected':''}>${ABN[a]}</option>`).join('')}</select></div></div>`;
-    if(!editing&&!castingAbility)h+=`<p class="sub prep">No spellcasting ability set. Choose one in Edit to see your save DC and spell attack.</p>`;
-    if(castingAbility)h+=`<div class="cast"><span>Save DC <b>${8+proficiency+castingModifier+spellDcBonus}</b></span><span>Attack <button class="rb" data-a="roll" data-l="Spell attack" data-b="${proficiency+castingModifier+spellAttackBonus}">${signed(proficiency+castingModifier+spellAttackBonus)}</button></span>${spellAttackBonus||spellDcBonus?`<span class="a">${esc(sourcesText([...effectsOf(S,'sa'),...effectsOf(S,'dc')].map(([x,f])=>[`${x.n} (${f[0]==='sa'?'attack':'DC'})`,f[2]])))}</span>`:''}<span>Modifier <b>${signed(castingModifier)}</b></span></div>`;
-    const sl=S.slots.map((s,i)=>({s,i})).filter(o=>editing||o.s.m>0);
-    h+=`<div class="slots">${sl.length?sl.map(({s,i})=>`<div class="sl"><span class="lv">Lvl ${i+1}</span><div class="pips">${Array.from({length:s.m},(_,j)=>`<button class="pip ${j<s.u?'used':''}" data-a="slot" data-v="${i}.${j}" aria-label="Level ${i+1} slot ${j+1}"></button>`).join('')}</div>${editing?input(`slots.${i}.m`,s.m,'number',`min=0 max=9 aria-label="Level ${i+1} max slots"`):''}</div>`).join(''):'<div class="empty">No spell slots. Switch to Edit to set them.</div>'}</div>`;
-    const sp=S.spells.map((x,i)=>({x,i})).sort((a,b)=>a.x.l-b.x.l||a.x.n.localeCompare(b.x.n));
-    let last=-1;
-    // Cantrips are always ready, so only leveled spells get a Prepared box. Once anything is
-    // prepared, Play mode dims the rest; a caster who never ticks boxes sees nothing dimmed.
-    const lv=S.spells.filter(x=>x.l>0),np=lv.filter(x=>x.p).length;
-    if(lv.length)h+=`<p class="sub prep">Prepared <b>${np}</b> of ${lv.length} leveled spells. Tick the box next to a spell to prepare it.</p>`;
-    h+=sp.length?sp.map(({x,i})=>{let g='';if(x.l!==last){last=x.l;g=`<div class="grp">${x.l?'Level '+x.l:'Cantrips'}</div>`}const dim=!editing&&np&&x.l>0&&!x.p;return g+`<div class="spi${dim?' unp':''}"><div class="ln">${x.l>0?`<input type="checkbox" data-k="spells.${i}.p" ${x.p?'checked':''} aria-label="${esc(x.n)} prepared" title="Prepared">`:'<span class="pk"></span>'}<span class="g">${x.d?`<button class="lk" data-a="spd" data-v="${i}" aria-expanded="${OPEN.has('sp'+i)}">${esc(x.n)}</button>`:esc(x.n)}</span>${editing?`<button class="x" data-a="delsp" data-v="${i}" aria-label="Remove ${esc(x.n)}">\u2715</button>`:''}</div>${spRow(x,i,editing,proficiency,castingModifier)}${x.d&&OPEN.has('sp'+i)?`<p class="sd">${md(x.d)}</p>`:''}</div>`}).join(''):'<div class="empty">No spells yet.</div>';
-    if(editing)h+=`<div class="add"><input class="n" id="spn" placeholder="Spell name" aria-label="New spell name"><select id="spl" aria-label="New spell level">${[0,1,2,3,4,5,6,7,8,9].map(n=>`<option value="${n}">${n?'Lvl '+n:'Cantrip'}</option>`).join('')}</select><button class="pri" data-a="addsp">Add</button></div>`;
-    if(S.spc)h=h.slice(0,sp0);
-    return h;
-}
-
 // Inventory, with equipping, attunement, the AC breakdown and weapon rolls.
 function inventorySection({editing,proficiency}){
     let h='';
@@ -323,7 +299,7 @@ function render(){
     // everything after it is drawn), then placed in the columns.
     const header=headerSection(v);
     const html={};
-    for(const [k,f] of [['vit',vitalsSection],['abil',v=>abilitiesSection(S,v)],['save',v=>savesSection(S,v)],['skill',v=>skillsSection(S,v)],['feat',featuresSection],['race',racialSection],['spell',spellsSection],['inv',inventorySection],['notes',notesSection],['backup',backupSection]])html[k]=f(v);
+    for(const [k,f] of [['vit',vitalsSection],['abil',v=>abilitiesSection(S,v)],['save',v=>savesSection(S,v)],['skill',v=>skillsSection(S,v)],['feat',featuresSection],['race',racialSection],['spell',v=>spellsSection(S,v,{isOpen:id=>OPEN.has(id),slotFor:index=>UP[index]})],['inv',inventorySection],['notes',notesSection],['backup',backupSection]])html[k]=f(v);
     const sec=(k,order)=>`<section class="c" style="order:${order}">${html[k]}</section>`;
     const columns=[
         [['vit',1],['abil',2],['save',3],['skill',4]],
