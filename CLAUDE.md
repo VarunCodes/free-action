@@ -8,6 +8,7 @@ A D&D 5.5e (2024 rules) character sheet in plain HTML, CSS and JS. Vite builds i
 - Build (CI runs this, so it must pass): `npm run build`
 - Serve the build: `npm run serve` (http://localhost:4173/)
 - Lint: `npm run lint` (ESLint, `eslint.config.js`). Files listed in `READABLE` there also get the readability rules; add a file once it's rewritten.
+- Unit tests (functions that need no browser, such as `src/html.js`): `npm run test:unit`. They use Node's built-in `node:test`.
 - All e2e tests: `npx playwright test`. They reuse a running dev server; `CI=1` tests the build instead, as CI does.
 - One file: `npx playwright test tests/e2e/smoke.spec.ts`. One browser: `--project=chromium` (also `webkit`, `phone`).
 - Only what changed vs main: `npx playwright test --only-changed=main`
