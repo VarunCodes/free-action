@@ -57,6 +57,9 @@ export default [
       'prefer-const': 'error',
       'no-var': 'error',
       eqeqeq: ['error', 'always'],
+      // Names say what they hold: no one-letter names except the loop counters i and j.
+      // (Object keys are left alone, since the saved sheet uses short ones.)
+      'id-length': ['error', { min: 2, properties: 'never', exceptions: ['i', 'j'] }],
     },
   },
 ];
