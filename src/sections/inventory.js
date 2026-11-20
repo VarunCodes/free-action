@@ -235,6 +235,6 @@ function addItemRow() {
         <div class="add">
             <input class="n" id="itn" placeholder="Item name" aria-label="New item name">
             <input class="q" id="itq" type="number" value="1" min="0" aria-label="New item quantity">
-            <button class="pri" data-a="addit">Add</button>
+            <button class="pri" data-a="addit" aria-label="Add item">Add</button>
         </div>`;
 }
