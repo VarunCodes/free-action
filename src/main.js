@@ -1,14 +1,16 @@
 import './style.css';
 import { openLibrary, swapSpecies } from './libraryui.js';
 import { cachedItems, cachedSpecies, loadLibrary } from './library.js';
-import { md, rarityTag, magicMark } from './text.js';
+import { esc, md, rarityTag, magicMark } from './text.js';
 import { AB, ABN, SK, DEF, CLS, CLASSES, cleanSheet } from './sheet.js';
 import {
-  abilityMod as mod, signed as fmt, profBonus, knownClass as knownCls, hitDie, hitDiceLeft, averageHP, activeGear,
-  featureEffects as featFx, effectsOf, effectTotal, advantageFrom, scoreBonuses, baseScore, scoreSetBy, score,
-  skillGrants, skillGranted, skillProf, unmetStrength, currentSpeed, wornWith, armorClass, currentAC, saveBonuses, saveBonus as totalSaveBonus,
+  abilityMod, signed, profBonus, knownClass, hitDie, hitDiceLeft, averageHP, activeGear, featureEffects,
+  effectsOf, effectTotal, advantageFrom, score, skillGranted, skillProf, unmetStrength, currentSpeed,
+  armorClass, currentAC,
 } from './rules.js';
 import { rollMode, rollD20, rollDice, customRollError, chatCommand, spellDice, weaponMod, withMod } from './rolls.js';
+import { input, field, sourcesText } from './html.js';
+import { abilitiesSection, savesSection, skillsSection } from './sections/stats.js';
 import { readKey, writeKey, loadSaved, saveSheet, snapshots, snapshot, lastBackup, markBackedUp, downloadSheet, readBackup } from './storage.js';
 let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null,RERR='',IOMSG=null,ATTMSG=-1,CC=false,CS=false,CMSG='',SPC=[];const UP={};
 const SR=()=>({a:false,s:'',d:'',b:'',t:'',h:false,m:false,by:'slot',up:[]});
@@ -49,46 +51,16 @@ function importText(t){
 }
 // Dates spell out the month, so 03/04 can't be read two ways; the order still follows the browser's language.
 const when=t=>new Date(t).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'});
-const esc=v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-// The rules (src/rules.js) applied to the character on screen, under the short names the templates below use.
-const prof=()=>profBonus(S);
-const hdOf=()=>hitDie(S);
-const hdLeft=()=>hitDiceLeft(S);
-const avgHP=()=>averageHP(S);
-const gear=()=>activeGear(S);
-const fxOf=t=>effectsOf(S,t);
-const fxSum=t=>effectTotal(S,t);
-const fxAdv=k=>advantageFrom(S,k);
-const abFx=a=>scoreBonuses(S,a);
-const scBase=a=>baseScore(S,a);
-const scBy=a=>scoreSetBy(S,a);
-const sc=a=>score(S,a);
-const skBy=n=>skillGrants(S,n);
-const skG=n=>skillGranted(S,n);
-const prS=n=>skillProf(S,n);
-const unmet=()=>unmetStrength(S);
-const speedNow=()=>currentSpeed(S);
-const worn=f=>wornWith(S,f);
-const acCalc=()=>armorClass(S);
-const acNow=()=>currentAC(S);
-const saveSrc=()=>saveBonuses(S);
-const saveBonus=()=>totalSaveBonus(S);
-// Proficiency marks: an empty ring, the same ring with a dot inside, and a diamond for Expertise.
-const PM=['<i class="pm"></i>','<i class="pm on"></i>','\u25C6'],PL=['Not proficient','Proficient','Expertise'];
 function setPath(k,v){const p=k.split('.');let o=S;while(p.length>1)o=o[p.shift()];o[p[0]]=v}
-// Every bound field gets an id from its key (f-hp-max), so a visible label can point at it with for=.
-const fid=k=>'f-'+k.split('.').join('-');
-const inp=(k,v,t='text',x='')=>`<input id="${fid(k)}" data-k="${k}" type="${t}" value="${esc(v)}" ${x}>`;
-const fld=(l,k,v,t,x)=>`<div><label class="lab" for="${fid(k)}">${l}</label>${inp(k,v,t,x)}</div>`;
 // Class is a drop-down of the standard classes, so other parts of the sheet can rely on the name. Custom (or any
 // name that isn't one of them, like a homebrew class or an older sheet's "Bard 3") opens a text box instead.
-const clsFld=()=>{const k=knownCls(S.cls),cu=CC||(!k&&!!S.cls.trim());return `<div><label class="lab" for="f-clsp">Class</label><select id="f-clsp"><option value="">Choose a class</option>${CLASSES.map(c=>`<option ${k===c?'selected':''}>${c}</option>`).join('')}<option value="*" ${cu?'selected':''}>Custom…</option></select>${cu?inp('cls',S.cls,'text','class="clsx" placeholder="Class name" aria-label="Custom class"')+`<select class="clsx" data-k="hdie" aria-label="Custom class hit die"><option value="0">Hit die: not set</option>${[6,8,10,12].map(d=>`<option value="${d}" ${S.hdie===d?'selected':''}>Hit die: d${d}</option>`).join('')}</select>`:''}</div>`};
+const clsFld=()=>{const k=knownClass(S.cls),cu=CC||(!k&&!!S.cls.trim());return `<div><label class="lab" for="f-clsp">Class</label><select id="f-clsp"><option value="">Choose a class</option>${CLASSES.map(c=>`<option ${k===c?'selected':''}>${c}</option>`).join('')}<option value="*" ${cu?'selected':''}>Custom…</option></select>${cu?input('cls',S.cls,'text','class="clsx" placeholder="Class name" aria-label="Custom class"')+`<select class="clsx" data-k="hdie" aria-label="Custom class hit die"><option value="0">Hit die: not set</option>${[6,8,10,12].map(d=>`<option value="${d}" ${S.hdie===d?'selected':''}>Hit die: d${d}</option>`).join('')}</select>`:''}</div>`};
 // Species works like Class: the Library's species (SRD 5.2 and any custom packs), or Custom for anything else.
 // Before the Library has been downloaded once, the drop-down still lists the SRD names; picking one fetches the traits.
 const SPN=['Dragonborn','Dwarf','Elf','Gnome','Goliath','Halfling','Human','Orc','Tiefling'];
 const spNames=()=>SPC.length?[...new Set(SPC.map(x=>x.name))].sort():SPN;
 const knownSp=v=>spNames().find(c=>c.toLowerCase()===String(v).trim().toLowerCase());
-const spFld=()=>{const k=knownSp(S.species),cu=CS||(!k&&!!S.species.trim());return `<div><label class="lab" for="f-spp">Species</label><select id="f-spp"><option value="">Choose a species</option>${spNames().map(c=>`<option value="${esc(c)}" ${k===c?'selected':''}>${esc(c)}</option>`).join('')}<option value="*" ${cu?'selected':''}>Custom…</option></select>${cu?inp('species',S.species,'text','class="clsx" placeholder="Species name" aria-label="Custom species"'):''}</div>`};
+const spFld=()=>{const k=knownSp(S.species),cu=CS||(!k&&!!S.species.trim());return `<div><label class="lab" for="f-spp">Species</label><select id="f-spp"><option value="">Choose a species</option>${spNames().map(c=>`<option value="${esc(c)}" ${k===c?'selected':''}>${esc(c)}</option>`).join('')}<option value="*" ${cu?'selected':''}>Custom…</option></select>${cu?input('species',S.species,'text','class="clsx" placeholder="Species name" aria-label="Custom species"'):''}</div>`};
 // A species' walking speed, read from its Speed trait ("Your Speed is 35 feet."); 0 if it has none.
 const spSpeed=it=>{const t=it&&(it.traits||[]).find(x=>/^speed$/i.test(x.n));const m=t&&/(\d+)\s*(feet|ft)/i.exec(t.d);return m?+m[1]:0};
 // Picking a species swaps the old species' racial traits for the new one's ('' or Custom only removes them).
@@ -108,17 +80,15 @@ function setSpecies(n){const go=()=>{const it=n?SPC.find(x=>x.kind==='race'&&x.n
 // Picking a standard class swaps the old class's save proficiencies and spellcasting ability for the new one's.
 // Other saves, and an ability you chose by hand, stay; the sheet can't tell a hand-ticked save from one the old
 // class gave, so those go with the old class. The Spellcasting drop-down can always override what was picked.
-function setClass(c){const o=CLS[knownCls(S.cls)],n=CLS[c],n0=ABN[S.cast];S.cls=c;if(!n)return;
+function setClass(c){const o=CLS[knownClass(S.cls)],n=CLS[c],n0=ABN[S.cast];S.cls=c;if(!n)return;
  if(o)o.sv.forEach(a=>{if(!n.sv.includes(a))delete S.sv[a]});n.sv.forEach(a=>S.sv[a]=true);
  if(!S.cast||(o&&S.cast===o.ca))S.cast=n.ca;
  const ca=S.cast===n.ca?(n.ca?`${ABN[n.ca]} for spellcasting`:n0?'no spellcasting ability (pick one below if your subclass casts spells)':''):`spellcasting stays ${ABN[S.cast]}${n.ca?` (${c}s usually use ${ABN[n.ca]})`:''}`;
  CMSG=`${c}: proficient in ${n.sv.map(a=>ABN[a]).join(' and ')} saving throws${ca?', '+ca:''}. You can change these below.`}
 
-const cmdFor=()=>chatCommand(LAST,S.vtt);
 function copyText(t){try{navigator.clipboard.writeText(t).catch(()=>{});return true}catch(e){}try{const x=document.createElement('textarea');x.value=t;document.body.appendChild(x);x.select();const ok=document.execCommand('copy');x.remove();return ok}catch(e){return false}}
-const fxLabel=([t,a,v,o])=>t==='set'?`${ABN[a]} becomes ${v}`:t==='chk'?`${fmt(v)} ability checks`:t==='sv'?`${fmt(v)} saving throws`:t==='sa'?`${fmt(v)} spell attacks`:t==='dc'?`${fmt(v)} spell save DC`:t==='hp'?`${fmt(v)} HP per level`:t==='ab'?`${fmt(v)} ${ABN[a]}`:t==='sk'?(a?`${a} ${v>1?'expertise':'proficiency'}`:`Choose a skill${o&&o!=='?'?` (${o.slice(1).split('|').join(', ')})`:''} in Edit`):`Advantage on ${a==='init'?'Initiative':a}`;
+const fxLabel=([t,a,v,o])=>t==='set'?`${ABN[a]} becomes ${v}`:t==='chk'?`${signed(v)} ability checks`:t==='sv'?`${signed(v)} saving throws`:t==='sa'?`${signed(v)} spell attacks`:t==='dc'?`${signed(v)} spell save DC`:t==='hp'?`${signed(v)} HP per level`:t==='ab'?`${signed(v)} ${ABN[a]}`:t==='sk'?(a?`${a} ${v>1?'expertise':'proficiency'}`:`Choose a skill${o&&o!=='?'?` (${o.slice(1).split('|').join(', ')})`:''} in Edit`):`Advantage on ${a==='init'?'Initiative':a}`;
 const FXO=[...AB.map(a=>[`set|${a}`,`Set ${ABN[a]} to (value)`]),['chk|','Bonus to ability checks'],['sv|','Bonus to saving throws'],['sa|','Bonus to spell attacks'],['dc|','Bonus to spell save DC'],['adv|init','Advantage on Initiative'],...SK.map(([n])=>[`adv|${n}`,`Advantage on ${n}`])].map(([v,t])=>`<option value="${v}">${t}</option>`).join('');
-const srcText=l=>l.map(([n,v])=>`${n} ${fmt(v)}`).join(', ');
 // A d20 roll (checks, saves, attacks). dis/adv are this roll's own Disadvantage or Advantage; the
 // mode picked on the roll bar is added to them.
 function doRoll(label,b,dis,adv){
@@ -141,34 +111,54 @@ function rollExpr(label,e,crit,raw){
   LAST=result;
   return true;
 }
-const spDice=(x,slot)=>spellDice(S,x,slot);
-const wMod=x=>weaponMod(S,x);
 // The roll bar can shrink to just the last result; the choice is kept per device, not in the sheet.
 let RMIN=readKey('roll-min')==='1';
 function renderRoll(){const L=LAST,sg=(v,t)=>`<button data-a="rm" data-v="${v}" class="${RM===v?'on':''}" aria-pressed="${RM===v}">${t}</button>`,op=(v,t)=>`<option value="${v}" ${S.vtt===v?'selected':''}>${t}</option>`;
-document.getElementById('roll').innerHTML=`<div class="rp${RMIN?' min':''}"><div class="rpi"><button class="hd rt" data-a="rmin" aria-expanded="${!RMIN}" aria-label="${RMIN?'Show roll options':'Hide roll options'}" title="${RMIN?'Show roll options':'Hide roll options'}"></button><div class="rr">${L?`<output class="tot" aria-label="Roll total">${L.total}</output><span>${esc(L.label)} ${esc(L.detail)}</span>${L.crit?`<span class="crit">${L.crit}</span>`:''}`:RERR?`<span class="reqn" role="alert">${esc(RERR)}</span>`:'<span class="sub">Tap any modifier to roll</span>'}</div>${RMIN?'':`<div class="rc"><div class="seg" role="group" aria-label="Roll mode">${sg('','Normal')}${sg('adv','Adv')}${sg('dis','Dis')}</div><input id="cmd" readonly value="${esc(cmdFor())}" placeholder="Chat command" aria-label="Chat command"><button class="pri" data-a="cp" ${L?'':'disabled'}>${COP?'Copied':'Copy'}</button></div><details data-id="more" ${OPEN.has('more')?'open':''}><summary>VTT format and custom roll</summary><div class="rc"><select data-k="vtt" aria-label="Chat format">${op('foundry','Foundry (/r)')}${op('roll20','Roll20 (/roll)')}${op('roll20t','Roll20 template')}</select><input id="cx" placeholder="2d6+3" value="${esc(CX)}" aria-label="Custom dice"><button data-a="cx">Roll</button></div></details>`}</div></div>`;
+document.getElementById('roll').innerHTML=`<div class="rp${RMIN?' min':''}"><div class="rpi"><button class="hd rt" data-a="rmin" aria-expanded="${!RMIN}" aria-label="${RMIN?'Show roll options':'Hide roll options'}" title="${RMIN?'Show roll options':'Hide roll options'}"></button><div class="rr">${L?`<output class="tot" aria-label="Roll total">${L.total}</output><span>${esc(L.label)} ${esc(L.detail)}</span>${L.crit?`<span class="crit">${L.crit}</span>`:''}`:RERR?`<span class="reqn" role="alert">${esc(RERR)}</span>`:'<span class="sub">Tap any modifier to roll</span>'}</div>${RMIN?'':`<div class="rc"><div class="seg" role="group" aria-label="Roll mode">${sg('','Normal')}${sg('adv','Adv')}${sg('dis','Dis')}</div><input id="cmd" readonly value="${esc(chatCommand(LAST,S.vtt))}" placeholder="Chat command" aria-label="Chat command"><button class="pri" data-a="cp" ${L?'':'disabled'}>${COP?'Copied':'Copy'}</button></div><details data-id="more" ${OPEN.has('more')?'open':''}><summary>VTT format and custom roll</summary><div class="rc"><select data-k="vtt" aria-label="Chat format">${op('foundry','Foundry (/r)')}${op('roll20','Roll20 (/roll)')}${op('roll20t','Roll20 template')}</select><input id="cx" placeholder="2d6+3" value="${esc(CX)}" aria-label="Custom dice"><button data-a="cx">Roll</button></div></details>`}</div></div>`;
  // The page leaves room at the bottom for however tall the bar is now.
  document.documentElement.style.setProperty('--rollh',document.getElementById('roll').firstChild.offsetHeight+'px')}
 // A feature that changes numbers says so under its name; a skill choice gets a drop-down in Edit (Play says to pick one).
-const fxPicks=(x,id,ed)=>{const N=esc(x.n);let c=0;const l=featFx(x),ch=l.filter(f=>f[0]==='sk'&&f[3]).length;return l.map(f=>{if(!(ed&&f[0]==='sk'&&f[3]))return `<span class="a">${esc(fxLabel(f))}</span>`;const j=c++,o=f[3]==='?'?SK.map(([n])=>n):f[3].slice(1).split('|');return `<select data-ch="${id}.${j}" aria-label="${N} skill${ch>1?' '+(j+1):''}"><option value="">Choose a skill</option>${o.map(s=>`<option ${f[1]===s?'selected':''}>${s}</option>`).join('')}</select>`}).join(' ')};
+const fxPicks=(x,id,ed)=>{const N=esc(x.n);let c=0;const l=featureEffects(x),ch=l.filter(f=>f[0]==='sk'&&f[3]).length;return l.map(f=>{if(!(ed&&f[0]==='sk'&&f[3]))return `<span class="a">${esc(fxLabel(f))}</span>`;const j=c++,o=f[3]==='?'?SK.map(([n])=>n):f[3].slice(1).split('|');return `<select data-ch="${id}.${j}" aria-label="${N} skill${ch>1?' '+(j+1):''}"><option value="">Choose a skill</option>${o.map(s=>`<option ${f[1]===s?'selected':''}>${s}</option>`).join('')}</select>`}).join(' ')};
 const featSec=(t,k,typed,ed)=>{const L=S[k];let h=`<h2>${t}</h2>`;h+=L.length?L.map((x,i)=>{const id=k+'.'+i,fp=fxPicks(x,id,ed);return `<details class="ft" data-id="${id}" ${ed||OPEN.has(id)?'open':''}><summary><span class="g">${esc(x.n)}</span>${x.t?`<span class="pill">${esc(x.t)}</span>`:''}${ed?`<button class="x" data-a="delft" data-v="${id}" aria-label="Remove ${esc(x.n)}">\u2715</button>`:''}${!ed&&fp?` ${fp}`:''}</summary>${ed&&fp?`<div class="srl fxl">${fp}</div>`:''}${ed?`<textarea data-k="${id}.d" placeholder="Description" aria-label="${esc(x.n)} description">${esc(x.d)}</textarea>`:`<p>${md(x.d)||'No description.'}</p>`}</details>`}).join(''):'<div class="empty">None yet.</div>';if(ed)h+=`<div class="add"><input class="n" id="ftn-${k}" placeholder="Name" aria-label="New ${k==='race'?'racial feature':'feature'} name">${typed?`<select id="ftt-${k}" aria-label="New feature type"><option>Class feature</option><option>Feat</option></select>`:''}<button class="pri" data-a="addft" data-v="${k}">Add</button></div>`;return h};
-function spRow(x,i,ed,p,cm){const r=x.r,k=`spells.${i}.r.`,N=esc(x.n);
- if(ed)return `<div class="srl"><label class="row"><input type="checkbox" data-k="${k}a" ${r.a?'checked':''} aria-label="${N} attack"> Attack</label><select data-k="${k}s" aria-label="${N} saving throw"><option value="">No save</option>${AB.map(a=>`<option value="${a}" ${r.s===a?'selected':''}>${ABN[a].slice(0,3)} save</option>`).join('')}</select>${inp(k+'d',r.d,'text',`class="dmg" placeholder="Dice, e.g. 1d10" aria-label="${N} damage dice"`)}${inp(k+'t',r.t,'text',`class="dmt" placeholder="Type" aria-label="${N} damage type"`)}<label class="row"><input type="checkbox" data-k="${k}m" ${r.m?'checked':''} aria-label="${N} adds modifier"> + modifier</label></div>`;
- const sl=UP[i]??x.l,{d,n}=spDice(x,sl);if(!r.a&&!ABN[r.s]&&!d)return'';
- return `<div class="srl">${r.a?`<button class="rb" data-a="satk" data-v="${i}">Hit ${fmt(p+cm+fxSum('sa'))}</button>`:''}${ABN[r.s]?`<span class="pill">DC ${8+p+cm+fxSum('dc')} ${ABN[r.s].slice(0,3)}</span>`:''}${d?`<button class="rb" data-a="sdmg" data-v="${i}">${esc(d)}${r.h||r.t?' '+esc(r.h?'healing':r.t):''}</button>`:''}${n>1?`<span class="a">&times;${n}</span>`:''}${r.by==='slot'&&r.up.length&&x.l>0?`<select data-up="${i}" aria-label="${N} slot level">${[1,2,3,4,5,6,7,8,9].filter(l=>l>=x.l).map(l=>`<option value="${l}" ${l===sl?'selected':''}>Slot ${l}</option>`).join('')}</select>`:''}</div>`}
-// Numbers and labels several sections share, worked out once per render.
+function spRow(x,i,editing,proficiency,castingModifier){const r=x.r,k=`spells.${i}.r.`,N=esc(x.n);
+ if(editing)return `<div class="srl"><label class="row"><input type="checkbox" data-k="${k}a" ${r.a?'checked':''} aria-label="${N} attack"> Attack</label><select data-k="${k}s" aria-label="${N} saving throw"><option value="">No save</option>${AB.map(a=>`<option value="${a}" ${r.s===a?'selected':''}>${ABN[a].slice(0,3)} save</option>`).join('')}</select>${input(k+'d',r.d,'text',`class="dmg" placeholder="Dice, e.g. 1d10" aria-label="${N} damage dice"`)}${input(k+'t',r.t,'text',`class="dmt" placeholder="Type" aria-label="${N} damage type"`)}<label class="row"><input type="checkbox" data-k="${k}m" ${r.m?'checked':''} aria-label="${N} adds modifier"> + modifier</label></div>`;
+ const sl=UP[i]??x.l,{d,n}=spellDice(S,x,sl);if(!r.a&&!ABN[r.s]&&!d)return'';
+ return `<div class="srl">${r.a?`<button class="rb" data-a="satk" data-v="${i}">Hit ${signed(proficiency+castingModifier+effectTotal(S,'sa'))}</button>`:''}${ABN[r.s]?`<span class="pill">DC ${8+proficiency+castingModifier+effectTotal(S,'dc')} ${ABN[r.s].slice(0,3)}</span>`:''}${d?`<button class="rb" data-a="sdmg" data-v="${i}">${esc(d)}${r.h||r.t?' '+esc(r.h?'healing':r.t):''}</button>`:''}${n>1?`<span class="a">&times;${n}</span>`:''}${r.by==='slot'&&r.up.length&&x.l>0?`<select data-up="${i}" aria-label="${N} slot level">${[1,2,3,4,5,6,7,8,9].filter(l=>l>=x.l).map(l=>`<option value="${l}" ${l===sl?'selected':''}>Slot ${l}</option>`).join('')}</select>`:''}</div>`}
+// Values several sections use, worked out once per render:
+//   editing             true in Edit mode, false in Play
+//   proficiency         the proficiency bonus for the character's level
+//   castingAbility      the spellcasting ability ('int', 'wis', 'cha') or '' for none
+//   castingModifier     that ability's modifier (0 without one)
+//   checkBonus          bonuses to every ability check, from items and features
+//   spellAttackBonus    bonuses to spell attacks
+//   spellDcBonus        bonuses to spell save DCs
+//   checkBonusSources   "Includes Stone of Good Luck +1", or '' with no check bonus
+//   advantageSources    a function: what gives Advantage on a roll ('init' or a skill name), as text
 function sheetView(){
- const ed=S.mode==='edit',p=prof(),ca=S.cast,cm=ca?mod(sc(ca)):0;
- const CK=fxSum('chk'),SA=fxSum('sa'),DCB=fxSum('dc'),ckT=CK?`Includes ${srcText(fxOf('chk').map(([x,f])=>[x.n,f[2]]))}`:'';
- const advT=k=>{const l=fxAdv(k);return l.length?`Advantage from ${l.map(x=>x.n).join(', ')}`:''};
- return{ed,p,ca,cm,CK,SA,DCB,ckT,advT};
+    const castingAbility = S.cast;
+    const checkBonus = effectTotal(S, 'chk');
+    const checkSources = effectsOf(S, 'chk').map(([source, [, , value]]) => [source.n, value]);
+    return {
+        editing: S.mode === 'edit',
+        proficiency: profBonus(S),
+        castingAbility,
+        castingModifier: castingAbility ? abilityMod(score(S, castingAbility)) : 0,
+        checkBonus,
+        spellAttackBonus: effectTotal(S, 'sa'),
+        spellDcBonus: effectTotal(S, 'dc'),
+        checkBonusSources: checkBonus ? `Includes ${sourcesText(checkSources)}` : '',
+        advantageSources: roll => {
+            const sources = advantageFrom(S, roll);
+            return sources.length ? `Advantage from ${sources.map(source => source.n).join(', ')}` : '';
+        },
+    };
 }
 
 // The name, the Play/Edit switch and the Library button; in Edit, the identity fields.
-function headerSection({ed}){
+function headerSection({editing}){
   let h=`<div class="top"><div><h1>${esc(S.name)||'Unnamed'}</h1><p class="sub">${esc([S.species,S.cls&&(S.cls+(S.sub?' ('+S.sub+')':'')),'Level '+S.level].filter(Boolean).join(', '))}</p></div>
- <div class="seg"><button data-a="mode" data-v="play" class="${ed?'':'on'}">Play</button><button data-a="mode" data-v="edit" class="${ed?'on':''}">Edit</button></div><button data-a="lib">Library</button></div>`;
- if(ed)h+=`<div class="id">${fld('Name','name',S.name)}${fld('Level','level',S.level,'number','min=1 max=20')}${clsFld()}${fld('Subclass','sub',S.sub)}${spFld()}${fld('Background','bg',S.bg)}${CMSG?`<p class="sub w clsm" role="status">${esc(CMSG)}</p>`:''}</div>`;
+ <div class="seg"><button data-a="mode" data-v="play" class="${editing?'':'on'}">Play</button><button data-a="mode" data-v="edit" class="${editing?'on':''}">Edit</button></div><button data-a="lib">Library</button></div>`;
+ if(editing)h+=`<div class="id">${field('Name','name',S.name)}${field('Level','level',S.level,'number','min=1 max=20')}${clsFld()}${field('Subclass','sub',S.sub)}${spFld()}${field('Background','bg',S.bg)}${CMSG?`<p class="sub w clsm" role="status">${esc(CMSG)}</p>`:''}</div>`;
  return h;
 }
 
@@ -178,142 +168,118 @@ function vitalsSection(v){
  ${acBox(v)}
  ${initiativeBox(v)}
  ${speedBox(v)}
- <div class="vit" role="group" aria-label="Proficiency"><b>${fmt(v.p)}</b><span class="lab">Proficiency</span></div></div>
+ <div class="vit" role="group" aria-label="Proficiency"><b>${signed(v.proficiency)}</b><span class="lab">Proficiency</span></div></div>
  ${hitPointsBox(v)}`;
- if(v.ed)h+=acSettings();
+ if(v.editing)h+=acSettings();
  return h;
 }
 
 // The tooltip lists what a calculated AC is made of, one part per line ("Chain Mail +16").
-function acBox({ed}){
- const parts=S.acAuto?acCalc().parts.map(([n,v])=>n+' '+(v<0?v:'+'+v)).join('\n'):'Typed in by hand';
- const inside=ed&&!S.acAuto?fld('AC','ac',S.ac,'number'):`<b>${acNow()}</b><span class="lab">Armor class</span>`;
+function acBox({editing}){
+ const parts=S.acAuto?armorClass(S).parts.map(([name,value])=>name+' '+(value<0?value:'+'+value)).join('\n'):'Typed in by hand';
+ const inside=editing&&!S.acAuto?field('AC','ac',S.ac,'number'):`<b>${currentAC(S)}</b><span class="lab">Armor class</span>`;
  return `<div class="vit" role="group" aria-label="Armor class" title="${esc(parts)}">${inside}</div>`;
 }
 
 // Initiative: Dex modifier, plus the bonus typed in Edit, plus bonuses to ability checks. Tapping it rolls.
-function initiativeBox({ed,CK,ckT,advT}){
- if(ed)return `<div class="vit">${fld('Init bonus','init',S.init,'number','min=-20 max=20')}</div>`;
- const bonus=mod(sc('dex'))+S.init+CK;
- const adv=advT('init');
- const why=[ckT,adv].filter(Boolean).join('. ');
- const pill=adv?' <span class="pill adv">Adv</span>':'';
- return `<div class="vit"><button class="bigb" data-a="roll" data-l="Initiative" data-b="${bonus}" aria-label="Initiative ${fmt(bonus)}" ${adv?`data-adv="1"`:''} title="${esc(why)}">${fmt(bonus)}</button><span class="lab">Initiative${pill}</span></div>`;
+function initiativeBox({editing,checkBonus,checkBonusSources,advantageSources}){
+ if(editing)return `<div class="vit">${field('Init bonus','init',S.init,'number','min=-20 max=20')}</div>`;
+ const bonus=abilityMod(score(S,'dex'))+S.init+checkBonus;
+ const advantage=advantageSources('init');
+ const why=[checkBonusSources,advantage].filter(Boolean).join('. ');
+ const pill=advantage?' <span class="pill adv">Adv</span>':'';
+ return `<div class="vit"><button class="bigb" data-a="roll" data-l="Initiative" data-b="${bonus}" aria-label="Initiative ${signed(bonus)}" ${advantage?`data-adv="1"`:''} title="${esc(why)}">${signed(bonus)}</button><span class="lab">Initiative${pill}</span></div>`;
 }
 
 // Speed, 10 ft slower while wearing armor you're not strong enough for (the tooltip says which).
-function speedBox({ed}){
- if(ed)return `<div class="vit" role="group" aria-label="Speed">${fld('Speed','speed',S.speed,'number','min=0 max=999')}</div>`;
- const now=speedNow();
+function speedBox({editing}){
+ if(editing)return `<div class="vit" role="group" aria-label="Speed">${field('Speed','speed',S.speed,'number','min=0 max=999')}</div>`;
+ const now=currentSpeed(S);
  const slowed=now<S.speed;
- const why=`${S.speed} ft, minus 10 ft: ${unmet().map(x=>`${x.n} needs Str ${x.ar.str}`).join(', ')}`;
+ const why=`${S.speed} ft, minus 10 ft: ${unmetStrength(S).map(x=>`${x.n} needs Str ${x.ar.str}`).join(', ')}`;
  const pill=slowed?' <span class="pill dis">&minus;10 ft</span>':'';
  return `<div class="vit" role="group" aria-label="Speed"><b class="${slowed?'slow':''}" ${slowed?`title="${esc(why)}"`:''}>${now}</b><span class="lab">Speed${pill}</span></div>`;
 }
 
 // Current and max HP with a bar, Damage/Heal/Set temp, hit dice, Long rest and Heroic Inspiration.
 // In Edit, also the HP fields and the fixed-average max HP for the class.
-function hitPointsBox({ed}){
+function hitPointsBox({editing}){
  const pct=Math.max(0,Math.min(100,S.hp.max?S.hp.cur/S.hp.max*100:0));
  const temp=S.hp.temp?`<span class="pill">+${S.hp.temp} temp</span>`:'';
  return `<div class="hp"><div class="hpn" role="group" aria-label="Hit points"><b>${S.hp.cur}</b><span>/ ${S.hp.max} HP</span>${temp}</div>
  <div class="bar ${pct<25?'low':''}"><i style="width:${pct}%"></i></div>
  <div class="row"><input id="amt" type="number" min="0" value="${amt}" aria-label="Amount"><button class="bad" data-a="dmg">Damage</button><button class="pri" data-a="heal">Heal</button><button data-a="temp">Set temp</button></div>
- ${ed?hpFields():''}
- ${hdOf()?hitDiceRow():''}
+ ${editing?hpFields():''}
+ ${hitDie(S)?hitDiceRow():''}
  <div class="row" style="margin-top:8px"><button data-a="long">Long rest</button>
  <label class="row" style="margin-left:auto"><input type="checkbox" data-k="insp" ${S.insp?'checked':''}> Heroic Inspiration</label></div></div>`;
 }
 
 function hpFields(){
- const fields=`<div class="row" style="margin-top:8px">${fld('Max HP','hp.max',S.hp.max,'number','min=1 max=9999')}${fld('Current HP','hp.cur',S.hp.cur,'number',`min=0 max=${S.hp.max}`)}</div>`;
- if(!hdOf())return fields;
+ const fields=`<div class="row" style="margin-top:8px">${field('Max HP','hp.max',S.hp.max,'number','min=1 max=9999')}${field('Current HP','hp.cur',S.hp.cur,'number',`min=0 max=${S.hp.max}`)}</div>`;
+ if(!hitDie(S))return fields;
  // "Average max HP for level 5 (d10, Con +2, Dwarven Toughness +1/level): 49"
- const avg=avgHP();
- const from=`d${hdOf()}, Con ${fmt(mod(sc('con')))}${fxOf('hp').map(([x,f])=>`, ${esc(x.n)} ${fmt(f[2])}/level`).join('')}`;
+ const avg=averageHP(S);
+ const from=`d${hitDie(S)}, Con ${signed(abilityMod(score(S,'con')))}${effectsOf(S,'hp').map(([x,f])=>`, ${esc(x.n)} ${signed(f[2])}/level`).join('')}`;
  return fields+`<p class="sub hds">Average max HP for level ${S.level} (${from}): <b>${avg}</b> <button data-a="avghp" ${avg===S.hp.max?'disabled':''}>Use ${avg}</button></p>`;
 }
 
 // A short rest spends one hit die at a time; the button says why it can't when it's disabled.
 function hitDiceRow(){
- const left=hdLeft();
+ const left=hitDiceLeft(S);
  const hurt=S.hp.cur<S.hp.max;
- const why=!left?'No hit dice left. A long rest gives them all back.':hurt?`Short rest: roll d${hdOf()} ${fmt(mod(sc('con')))} and heal that much`:'Already at full HP';
- return `<div class="row hds" style="margin-top:8px"><span>Hit dice <b>${left}</b> of ${S.level} (d${hdOf()})</span><button data-a="hd" ${left&&hurt?'':'disabled'} title="${why}">Spend a hit die</button></div>`;
+ const why=!left?'No hit dice left. A long rest gives them all back.':hurt?`Short rest: roll d${hitDie(S)} ${signed(abilityMod(score(S,'con')))} and heal that much`:'Already at full HP';
+ return `<div class="row hds" style="margin-top:8px"><span>Hit dice <b>${left}</b> of ${S.level} (d${hitDie(S)})</span><button data-a="hd" ${left&&hurt?'':'disabled'} title="${why}">Spend a hit die</button></div>`;
 }
 
 // Edit only: whether AC comes from gear, and a bonus of your own on top.
 function acSettings(){
- const bonus=S.acAuto?`<label class="row">Other AC bonus ${inp('acb',S.acb,'number','min=-10 max=20 style="width:72px" aria-label="Other AC bonus"')}</label>`:'';
+ const bonus=S.acAuto?`<label class="row">Other AC bonus ${input('acb',S.acb,'number','min=-10 max=20 style="width:72px" aria-label="Other AC bonus"')}</label>`:'';
  return `<div class="row acset"><label class="row"><input type="checkbox" data-k="acAuto" ${S.acAuto?'checked':''}> Calculate AC from equipped gear</label>${bonus}</div>`;
 }
 
-// The six ability scores, with their modifiers and checks.
-function abilitiesSection({ed,CK,ckT}){
- let h='';
- h+=`<h2>Abilities ${!ed&&CK?`<small>${esc(ckT)} on checks</small>`:''}</h2><div class="abs">${AB.map(a=>{const by=scBy(a),bb=abFx(a);return `<div class="ab${by||bb.length?' boost':''}" ${by?`title="${esc(`${by[0].n} sets ${ABN[a]} to ${by[1][2]} (yours: ${scBase(a)})`)}"`:bb.length?`title="${esc(`${S.ab[a]}, plus ${srcText(bb.map(([x,f])=>[x.n,f[2]]))}`)}"`:''}><div class="n">${ABN[a].slice(0,3)}</div><button class="rb m" data-a="roll" data-l="${ABN[a]} check" data-b="${mod(sc(a))+CK}" aria-label="${ABN[a]} check ${fmt(mod(sc(a))+CK)}">${fmt(mod(sc(a))+CK)}</button>${ed?inp('ab.'+a,S.ab[a],'number',`min=1 max=30 aria-label="${ABN[a]} score"`):`<div class="s">${sc(a)}${by?` <span class="up">${esc(by[0].n)}</span>`:''}</div>`}</div>`}).join('')}</div>`;
- return h;
-}
-
-// Saving throws.
-function savesSection({ed,p}){
- let h='';
- const sb=saveBonus(),sbT=sb?`Includes ${srcText(saveSrc())}`:'';
- h+=`<h2>Saving throws ${ed?'<small>tap circles to set proficiency</small>':sb?`<small>${esc(sbT)}</small>`:''}</h2><div class="list two">${AB.map(a=>{const pr=S.sv[a]?1:0,v=mod(sc(a))+pr*p+sb;return `<div class="ln"><button class="pr" data-a="sv" data-v="${a}" aria-label="${ABN[a]} save proficiency" aria-pressed="${!!pr}" aria-description="${PL[pr]}" title="${PL[pr]}" ${ed?'':'disabled'}>${PM[pr]}</button><span class="g">${ABN[a]}</span><button class="rb" data-a="roll" data-l="${ABN[a]} save" data-b="${v}" aria-label="${ABN[a]} save ${fmt(v)}" title="${esc(sbT)}">${fmt(v)}</button></div>`}).join('')}</div>`;
- return h;
-}
-
-// Skills and Passive Perception.
-function skillsSection({ed,p,CK,ckT,advT}){
- let h='';
- const sd=worn(a=>a.stl),sdT=sd.length?`Disadvantage from ${sd.map(x=>x.n).join(', ')}`:'';
- h+=`<h2>Skills ${ed?'<small>tap to cycle: none, proficient, expertise</small>':CK?`<small>${esc(ckT)}</small>`:''}</h2><div class="list two">${SK.map(([n,a])=>{const pr=prS(n),gb=pr&&skG(n)===pr?skBy(n).filter(([,f])=>f[2]===pr).map(([x])=>x.n):[],pT=PL[pr]+(gb.length?` (from ${gb.join(', ')})`:'');return `<div class="ln"><button class="pr" data-a="sk" data-v="${n}" aria-label="${n} proficiency" aria-pressed="${!!pr}" aria-description="${esc(pT)}" title="${esc(pT)}" ${ed?'':'disabled'}>${PM[pr]}</button><span class="g">${n} <span class="a">${a}</span>${n==='Stealth'&&sd.length?` <span class="pill dis" title="${esc(sdT)}">Dis</span>`:''}${advT(n)?` <span class="pill adv" title="${esc(advT(n))}">Adv</span>`:''}</span><button class="rb" data-a="roll" data-l="${n}" data-b="${mod(sc(a))+pr*p+CK}" aria-label="${n} ${fmt(mod(sc(a))+pr*p+CK)}" ${n==='Stealth'&&sd.length?`data-dis="1"`:''} ${advT(n)?`data-adv="1"`:''} title="${esc([n==='Stealth'?sdT:'',advT(n),ckT].filter(Boolean).join('. '))}">${fmt(mod(sc(a))+pr*p+CK)}</button></div>`}).join('')}</div>
- <div class="ln" role="group" aria-label="Passive Perception"><span class="g">Passive Perception</span><span class="v" title="${esc([ckT,advT('Perception')?'+5 for Advantage':''].filter(Boolean).join('. '))}">${10+mod(sc('wis'))+prS('Perception')*p+CK+(advT('Perception')?5:0)}</span></div>`;
- return h;
-}
-
 // Features and feats.
-function featuresSection({ed}){
+function featuresSection({editing}){
  let h='';
- h+=featSec('Features and feats','feats',true,ed);
+ h+=featSec('Features and feats','feats',true,editing);
  return h;
 }
 
 // Racial features.
-function racialSection({ed}){
+function racialSection({editing}){
  let h='';
- h+=featSec('Racial features','race',false,ed);
+ h+=featSec('Racial features','race',false,editing);
  return h;
 }
 
 // Spellcasting: save DC and attack, slots, and the spell list. Collapsed, only the heading.
-function spellsSection({ed,p,ca,cm,SA,DCB}){
+function spellsSection({editing,proficiency,castingAbility,castingModifier,spellAttackBonus,spellDcBonus}){
  let h='';
- h+=`<h2><button class="hd" data-a="spc" aria-expanded="${!S.spc}">Spellcasting</button>${S.spc?`<small>${S.spells.length} spell${S.spells.length===1?'':'s'}${ca?`, save DC ${8+p+cm+DCB}`:''}</small>`:''}</h2>`;const sp0=h.length;
- if(ed)h+=`<div class="row" style="margin-bottom:8px"><div style="flex:1"><label class="lab" for="f-cast">Spellcasting ability</label><select id="f-cast" data-k="cast"><option value="">None</option>${AB.map(a=>`<option value="${a}" ${ca===a?'selected':''}>${ABN[a]}</option>`).join('')}</select></div></div>`;
- if(!ed&&!ca)h+=`<p class="sub prep">No spellcasting ability set. Choose one in Edit to see your save DC and spell attack.</p>`;
- if(ca)h+=`<div class="cast"><span>Save DC <b>${8+p+cm+DCB}</b></span><span>Attack <button class="rb" data-a="roll" data-l="Spell attack" data-b="${p+cm+SA}">${fmt(p+cm+SA)}</button></span>${SA||DCB?`<span class="a">${esc(srcText([...fxOf('sa'),...fxOf('dc')].map(([x,f])=>[`${x.n} (${f[0]==='sa'?'attack':'DC'})`,f[2]])))}</span>`:''}<span>Modifier <b>${fmt(cm)}</b></span></div>`;
- const sl=S.slots.map((s,i)=>({s,i})).filter(o=>ed||o.s.m>0);
- h+=`<div class="slots">${sl.length?sl.map(({s,i})=>`<div class="sl"><span class="lv">Lvl ${i+1}</span><div class="pips">${Array.from({length:s.m},(_,j)=>`<button class="pip ${j<s.u?'used':''}" data-a="slot" data-v="${i}.${j}" aria-label="Level ${i+1} slot ${j+1}"></button>`).join('')}</div>${ed?inp(`slots.${i}.m`,s.m,'number',`min=0 max=9 aria-label="Level ${i+1} max slots"`):''}</div>`).join(''):'<div class="empty">No spell slots. Switch to Edit to set them.</div>'}</div>`;
+ h+=`<h2><button class="hd" data-a="spc" aria-expanded="${!S.spc}">Spellcasting</button>${S.spc?`<small>${S.spells.length} spell${S.spells.length===1?'':'s'}${castingAbility?`, save DC ${8+proficiency+castingModifier+spellDcBonus}`:''}</small>`:''}</h2>`;const sp0=h.length;
+ if(editing)h+=`<div class="row" style="margin-bottom:8px"><div style="flex:1"><label class="lab" for="f-cast">Spellcasting ability</label><select id="f-cast" data-k="cast"><option value="">None</option>${AB.map(a=>`<option value="${a}" ${castingAbility===a?'selected':''}>${ABN[a]}</option>`).join('')}</select></div></div>`;
+ if(!editing&&!castingAbility)h+=`<p class="sub prep">No spellcasting ability set. Choose one in Edit to see your save DC and spell attack.</p>`;
+ if(castingAbility)h+=`<div class="cast"><span>Save DC <b>${8+proficiency+castingModifier+spellDcBonus}</b></span><span>Attack <button class="rb" data-a="roll" data-l="Spell attack" data-b="${proficiency+castingModifier+spellAttackBonus}">${signed(proficiency+castingModifier+spellAttackBonus)}</button></span>${spellAttackBonus||spellDcBonus?`<span class="a">${esc(sourcesText([...effectsOf(S,'sa'),...effectsOf(S,'dc')].map(([x,f])=>[`${x.n} (${f[0]==='sa'?'attack':'DC'})`,f[2]])))}</span>`:''}<span>Modifier <b>${signed(castingModifier)}</b></span></div>`;
+ const sl=S.slots.map((s,i)=>({s,i})).filter(o=>editing||o.s.m>0);
+ h+=`<div class="slots">${sl.length?sl.map(({s,i})=>`<div class="sl"><span class="lv">Lvl ${i+1}</span><div class="pips">${Array.from({length:s.m},(_,j)=>`<button class="pip ${j<s.u?'used':''}" data-a="slot" data-v="${i}.${j}" aria-label="Level ${i+1} slot ${j+1}"></button>`).join('')}</div>${editing?input(`slots.${i}.m`,s.m,'number',`min=0 max=9 aria-label="Level ${i+1} max slots"`):''}</div>`).join(''):'<div class="empty">No spell slots. Switch to Edit to set them.</div>'}</div>`;
  const sp=S.spells.map((x,i)=>({x,i})).sort((a,b)=>a.x.l-b.x.l||a.x.n.localeCompare(b.x.n));
  let last=-1;
  // Cantrips are always ready, so only leveled spells get a Prepared box. Once anything is
  // prepared, Play mode dims the rest; a caster who never ticks boxes sees nothing dimmed.
  const lv=S.spells.filter(x=>x.l>0),np=lv.filter(x=>x.p).length;
  if(lv.length)h+=`<p class="sub prep">Prepared <b>${np}</b> of ${lv.length} leveled spells. Tick the box next to a spell to prepare it.</p>`;
- h+=sp.length?sp.map(({x,i})=>{let g='';if(x.l!==last){last=x.l;g=`<div class="grp">${x.l?'Level '+x.l:'Cantrips'}</div>`}const dim=!ed&&np&&x.l>0&&!x.p;return g+`<div class="spi${dim?' unp':''}"><div class="ln">${x.l>0?`<input type="checkbox" data-k="spells.${i}.p" ${x.p?'checked':''} aria-label="${esc(x.n)} prepared" title="Prepared">`:'<span class="pk"></span>'}<span class="g">${x.d?`<button class="lk" data-a="spd" data-v="${i}" aria-expanded="${OPEN.has('sp'+i)}">${esc(x.n)}</button>`:esc(x.n)}</span>${ed?`<button class="x" data-a="delsp" data-v="${i}" aria-label="Remove ${esc(x.n)}">\u2715</button>`:''}</div>${spRow(x,i,ed,p,cm)}${x.d&&OPEN.has('sp'+i)?`<p class="sd">${md(x.d)}</p>`:''}</div>`}).join(''):'<div class="empty">No spells yet.</div>';
- if(ed)h+=`<div class="add"><input class="n" id="spn" placeholder="Spell name" aria-label="New spell name"><select id="spl" aria-label="New spell level">${[0,1,2,3,4,5,6,7,8,9].map(n=>`<option value="${n}">${n?'Lvl '+n:'Cantrip'}</option>`).join('')}</select><button class="pri" data-a="addsp">Add</button></div>`;
+ h+=sp.length?sp.map(({x,i})=>{let g='';if(x.l!==last){last=x.l;g=`<div class="grp">${x.l?'Level '+x.l:'Cantrips'}</div>`}const dim=!editing&&np&&x.l>0&&!x.p;return g+`<div class="spi${dim?' unp':''}"><div class="ln">${x.l>0?`<input type="checkbox" data-k="spells.${i}.p" ${x.p?'checked':''} aria-label="${esc(x.n)} prepared" title="Prepared">`:'<span class="pk"></span>'}<span class="g">${x.d?`<button class="lk" data-a="spd" data-v="${i}" aria-expanded="${OPEN.has('sp'+i)}">${esc(x.n)}</button>`:esc(x.n)}</span>${editing?`<button class="x" data-a="delsp" data-v="${i}" aria-label="Remove ${esc(x.n)}">\u2715</button>`:''}</div>${spRow(x,i,editing,proficiency,castingModifier)}${x.d&&OPEN.has('sp'+i)?`<p class="sd">${md(x.d)}</p>`:''}</div>`}).join(''):'<div class="empty">No spells yet.</div>';
+ if(editing)h+=`<div class="add"><input class="n" id="spn" placeholder="Spell name" aria-label="New spell name"><select id="spl" aria-label="New spell level">${[0,1,2,3,4,5,6,7,8,9].map(n=>`<option value="${n}">${n?'Lvl '+n:'Cantrip'}</option>`).join('')}</select><button class="pri" data-a="addsp">Add</button></div>`;
  if(S.spc)h=h.slice(0,sp0);
  return h;
 }
 
 // Inventory, with equipping, attunement, the AC breakdown and weapon rolls.
-function inventorySection({ed,p}){
+function inventorySection({editing,proficiency}){
  let h='';
  // Only gear you wear or wield gets an Equipped box; it works like Prepared for spells.
  // Sheets from before attuning was a separate choice: whatever was equipped stays attuned.
  S.items.forEach(x=>{if(x.eq===undefined)x.eq=!!x.w;if(!x.eq)x.on=false;if(x.eq&&!x.ar)x.ar={k:'',ac:0,str:0,nu:false};if(x.at&&x.att===undefined)x.att=!!x.on;if(!x.at)delete x.att});
- const eqs=S.items.filter(x=>x.eq),ne=eqs.filter(x=>x.on).length,AC=acCalc(),G=gear();
+ const eqs=S.items.filter(x=>x.eq),ne=eqs.filter(x=>x.on).length,AC=armorClass(S),G=activeGear(S);
  // Collapsed, Inventory keeps only what's equipped (with its roll buttons), plus the AC and attunement lines.
  h+=`<h2><button class="hd" data-a="inc" aria-expanded="${!S.inc}">Inventory</button>${S.inc?`<small>${S.items.length} item${S.items.length===1?'':'s'}, ${ne} equipped</small>`:''}</h2>`;
  if(eqs.length&&!S.inc)h+=`<p class="sub prep">Equipped <b>${ne}</b> of ${eqs.length} equippable item${eqs.length===1?'':'s'}. Tick the box next to gear you are wearing or wielding.</p>`;
@@ -321,8 +287,8 @@ function inventorySection({ed,p}){
  if(S.acAuto&&eqs.length&&!S.inc)h+=`<p class="sub prep">Armor class <b>${AC.ac}</b>: ${esc(AC.parts.map(([n,v])=>`${n} ${v<0?v:'+'+v}`).join(', ').replace(/^(.*?) \+(\d+)/,'$1 $2'))}.</p>`;
  const AK=[['','No AC effect'],['light','Light armor (+ Dex)'],['medium','Medium armor (+ Dex, max 2)'],['heavy','Heavy armor'],['shield','Shield (adds AC)'],['bonus','AC bonus (adds AC)'],['unarm','Unarmored base (+ Dex)']];
  const shownIt=S.items.map((x,i)=>[x,i]).filter(([x])=>!S.inc||(x.eq&&x.on));
- h+=shownIt.length?shownIt.map(([x,i])=>{const w=x.w,m=w?wMod(x):0,dim=!ed&&ne&&x.eq&&!x.on,bad=x.eq&&x.on&&x.ar&&x.ar.str>sc('str'),spare=x.on&&x.ar&&['light','medium','heavy','shield'].includes(x.ar.k)&&!AC.used.has(x),over=G.over.includes(x),dup=G.dup.includes(x),N=esc(x.n);return `<div class="spi${dim?' unp':''}${bad||over||dup?' req':x.rr?` rs r${x.rr}`:''}"><div class="ln">${x.eq?`<input type="checkbox" data-k="items.${i}.on" ${x.on?'checked':''} aria-label="${N} equipped" title="Equipped">`:'<span class="pk"></span>'}<span class="g">${magicMark(x.rr)}${x.d?`<button class="lk" data-a="itd" data-v="${i}" aria-expanded="${OPEN.has('it'+i)}">${esc(x.n)}</button>`:esc(x.n)}${rarityTag(x.rr)}${bad?` <span class="reqm">Needs Str ${x.ar.str} (you have ${sc('str')}): Speed &minus;10 ft</span>`:''}${x.at?` <button class="pill att${x.att?' on':''}" data-a="att" data-v="${i}" aria-label="Attune ${N}" aria-pressed="${!!x.att}" title="${x.att?'Attuned. Click to end attunement':'Needs attunement. Click to attune'}">${x.att?'Attuned':'Attune'}</button>`:''}${over?' <span class="reqm">Over the 3-item attunement limit</span>':''}${dup?' <span class="reqm">Already attuned to another copy, no effect</span>':''}${x.at&&x.on&&!x.att?' <span class="a">not attuned, no effect</span>':''}${spare&&S.acAuto?' <span class="a">not counted, a better one is equipped</span>':''}</span>${ed?inp(`items.${i}.q`,x.q,'number',`min=0 style="width:64px" aria-label="${N} quantity"`):`<span class="v">&times;${x.q}</span>`}${ed?`<button class="x" data-a="delit" data-v="${i}" aria-label="Remove ${N}">\u2715</button>`:''}</div>${ATTMSG===i?'<p class="reqn srl" role="alert">Already attuned to 3 items. End attunement to one first.</p>':''}${!ed&&x.fx&&x.fx.length?`<div class="srl fxl">${esc(x.fx.map(fxLabel).join(' \u00b7 '))}</div>`:''}${ed&&x.eq?`<div class="srl"><label class="row"><input type="checkbox" data-k="items.${i}.at" ${x.at?'checked':''} aria-label="${N} needs attunement"> Needs attunement</label>${(x.fx||[]).map((f,j)=>`<span class="pill">${esc(fxLabel(f))} <button class="x" data-a="delfx" data-v="${i}.${j}" aria-label="Remove ${esc(fxLabel(f))} from ${N}">\u2715</button></span>`).join('')}<select id="fxt-${i}" aria-label="${N} effect">${FXO}</select><input id="fxv-${i}" type="number" value="1" style="width:64px" aria-label="${N} effect value"><button data-a="addfx" data-v="${i}" aria-label="Add effect to ${N}">Add effect</button></div>`:''}${ed?`<div class="srl"><label class="row"><input type="checkbox" data-k="items.${i}.eq" ${x.eq?'checked':''} aria-label="${N} equippable"> Equippable</label>${x.eq?`<select data-k="items.${i}.ar.k" aria-label="${N} armor class effect">${AK.map(([v,t])=>`<option value="${v}" ${x.ar.k===v?'selected':''}>${t}</option>`).join('')}</select>${x.ar.k?`<label class="row">AC ${inp(`items.${i}.ar.ac`,x.ar.ac,'number',`min=-10 max=30 style="width:64px" aria-label="${N} AC value"`)}</label><label class="row">Str needed ${inp(`items.${i}.ar.str`,x.ar.str,'number',`min=0 max=30 style="width:64px" aria-label="${N} strength needed"`)}</label><label class="row">Save bonus ${inp(`items.${i}.ar.sb`,x.ar.sb||0,'number',`min=-5 max=10 style="width:64px" aria-label="${N} saving throw bonus"`)}</label><label class="row"><input type="checkbox" data-k="items.${i}.ar.stl" ${x.ar.stl?'checked':''} aria-label="${N} Stealth Disadvantage"> Stealth Disadvantage</label>`:''}`:''}</div>`:''}${w&&!ed?`<div class="srl"><button class="rb" data-a="iatk" data-v="${i}">Hit ${fmt(p+m)}</button><button class="rb" data-a="idmg" data-v="${i}">${esc(withMod(w.d,m))} ${esc(w.t)}</button>${w.v?`<button class="rb" data-a="idmg" data-v="${i}" data-t="v">${esc(withMod(w.v,m))} two-handed</button>`:''}</div>`:''}${x.d&&OPEN.has('it'+i)?`<p class="sd">${md(x.d)}</p>`:''}</div>`}).join(''):(S.inc&&S.items.length?'<div class="empty">Nothing equipped.</div>':'<div class="empty">Nothing carried.</div>');
- if(ed&&!S.inc)h+=`<div class="add"><input class="n" id="itn" placeholder="Item name" aria-label="New item name"><input class="q" id="itq" type="number" value="1" min="0" aria-label="New item quantity"><button class="pri" data-a="addit">Add</button></div>`;
+ h+=shownIt.length?shownIt.map(([x,i])=>{const w=x.w,m=w?weaponMod(S,x):0,dim=!editing&&ne&&x.eq&&!x.on,bad=x.eq&&x.on&&x.ar&&x.ar.str>score(S,'str'),spare=x.on&&x.ar&&['light','medium','heavy','shield'].includes(x.ar.k)&&!AC.used.has(x),over=G.over.includes(x),dup=G.dup.includes(x),N=esc(x.n);return `<div class="spi${dim?' unp':''}${bad||over||dup?' req':x.rr?` rs r${x.rr}`:''}"><div class="ln">${x.eq?`<input type="checkbox" data-k="items.${i}.on" ${x.on?'checked':''} aria-label="${N} equipped" title="Equipped">`:'<span class="pk"></span>'}<span class="g">${magicMark(x.rr)}${x.d?`<button class="lk" data-a="itd" data-v="${i}" aria-expanded="${OPEN.has('it'+i)}">${esc(x.n)}</button>`:esc(x.n)}${rarityTag(x.rr)}${bad?` <span class="reqm">Needs Str ${x.ar.str} (you have ${score(S,'str')}): Speed &minus;10 ft</span>`:''}${x.at?` <button class="pill att${x.att?' on':''}" data-a="att" data-v="${i}" aria-label="Attune ${N}" aria-pressed="${!!x.att}" title="${x.att?'Attuned. Click to end attunement':'Needs attunement. Click to attune'}">${x.att?'Attuned':'Attune'}</button>`:''}${over?' <span class="reqm">Over the 3-item attunement limit</span>':''}${dup?' <span class="reqm">Already attuned to another copy, no effect</span>':''}${x.at&&x.on&&!x.att?' <span class="a">not attuned, no effect</span>':''}${spare&&S.acAuto?' <span class="a">not counted, a better one is equipped</span>':''}</span>${editing?input(`items.${i}.q`,x.q,'number',`min=0 style="width:64px" aria-label="${N} quantity"`):`<span class="v">&times;${x.q}</span>`}${editing?`<button class="x" data-a="delit" data-v="${i}" aria-label="Remove ${N}">\u2715</button>`:''}</div>${ATTMSG===i?'<p class="reqn srl" role="alert">Already attuned to 3 items. End attunement to one first.</p>':''}${!editing&&x.fx&&x.fx.length?`<div class="srl fxl">${esc(x.fx.map(fxLabel).join(' \u00b7 '))}</div>`:''}${editing&&x.eq?`<div class="srl"><label class="row"><input type="checkbox" data-k="items.${i}.at" ${x.at?'checked':''} aria-label="${N} needs attunement"> Needs attunement</label>${(x.fx||[]).map((f,j)=>`<span class="pill">${esc(fxLabel(f))} <button class="x" data-a="delfx" data-v="${i}.${j}" aria-label="Remove ${esc(fxLabel(f))} from ${N}">\u2715</button></span>`).join('')}<select id="fxt-${i}" aria-label="${N} effect">${FXO}</select><input id="fxv-${i}" type="number" value="1" style="width:64px" aria-label="${N} effect value"><button data-a="addfx" data-v="${i}" aria-label="Add effect to ${N}">Add effect</button></div>`:''}${editing?`<div class="srl"><label class="row"><input type="checkbox" data-k="items.${i}.eq" ${x.eq?'checked':''} aria-label="${N} equippable"> Equippable</label>${x.eq?`<select data-k="items.${i}.ar.k" aria-label="${N} armor class effect">${AK.map(([v,t])=>`<option value="${v}" ${x.ar.k===v?'selected':''}>${t}</option>`).join('')}</select>${x.ar.k?`<label class="row">AC ${input(`items.${i}.ar.ac`,x.ar.ac,'number',`min=-10 max=30 style="width:64px" aria-label="${N} AC value"`)}</label><label class="row">Str needed ${input(`items.${i}.ar.str`,x.ar.str,'number',`min=0 max=30 style="width:64px" aria-label="${N} strength needed"`)}</label><label class="row">Save bonus ${input(`items.${i}.ar.sb`,x.ar.sb||0,'number',`min=-5 max=10 style="width:64px" aria-label="${N} saving throw bonus"`)}</label><label class="row"><input type="checkbox" data-k="items.${i}.ar.stl" ${x.ar.stl?'checked':''} aria-label="${N} Stealth Disadvantage"> Stealth Disadvantage</label>`:''}`:''}</div>`:''}${w&&!editing?`<div class="srl"><button class="rb" data-a="iatk" data-v="${i}">Hit ${signed(proficiency+m)}</button><button class="rb" data-a="idmg" data-v="${i}">${esc(withMod(w.d,m))} ${esc(w.t)}</button>${w.v?`<button class="rb" data-a="idmg" data-v="${i}" data-t="v">${esc(withMod(w.v,m))} two-handed</button>`:''}</div>`:''}${x.d&&OPEN.has('it'+i)?`<p class="sd">${md(x.d)}</p>`:''}</div>`}).join(''):(S.inc&&S.items.length?'<div class="empty">Nothing equipped.</div>':'<div class="empty">Nothing carried.</div>');
+ if(editing&&!S.inc)h+=`<div class="add"><input class="n" id="itn" placeholder="Item name" aria-label="New item name"><input class="q" id="itq" type="number" value="1" min="0" aria-label="New item quantity"><button class="pri" data-a="addit">Add</button></div>`;
  return h;
 }
 
@@ -357,7 +323,7 @@ function render(){
  // everything after it is drawn), then placed in the columns.
  const header=headerSection(v);
  const html={};
- for(const [k,f] of [['vit',vitalsSection],['abil',abilitiesSection],['save',savesSection],['skill',skillsSection],['feat',featuresSection],['race',racialSection],['spell',spellsSection],['inv',inventorySection],['notes',notesSection],['backup',backupSection]])html[k]=f(v);
+ for(const [k,f] of [['vit',vitalsSection],['abil',v=>abilitiesSection(S,v)],['save',v=>savesSection(S,v)],['skill',v=>skillsSection(S,v)],['feat',featuresSection],['race',racialSection],['spell',spellsSection],['inv',inventorySection],['notes',notesSection],['backup',backupSection]])html[k]=f(v);
  const sec=(k,order)=>`<section class="c" style="order:${order}">${html[k]}</section>`;
  const columns=[
   [['vit',1],['abil',2],['save',3],['skill',4]],
@@ -377,8 +343,8 @@ document.addEventListener('change',e=>{
  if(t.dataset.ch){const[k,i,j]=t.dataset.ch.split('.'),x=S[k]?.[+i];if(x){x.ch=x.ch||[];x.ch[+j]=t.value}CMSG='';save();render();return}
  // Picking Custom clears a standard class so the box starts empty; a typed name that is a standard class snaps to it.
  // The note on what a class set stays until the next change anywhere on the sheet.
- if(t.id==='f-clsp'){CMSG='';CC=t.value==='*';if(!CC)setClass(t.value);else if(knownCls(S.cls))S.cls='';save();render();if(CC)document.getElementById('f-cls')?.focus();return}
- if(t.dataset.k==='cls'&&knownCls(t.value)){CMSG='';setClass(knownCls(t.value));CC=false;save();render();return}
+ if(t.id==='f-clsp'){CMSG='';CC=t.value==='*';if(!CC)setClass(t.value);else if(knownClass(S.cls))S.cls='';save();render();if(CC)document.getElementById('f-cls')?.focus();return}
+ if(t.dataset.k==='cls'&&knownClass(t.value)){CMSG='';setClass(knownClass(t.value));CC=false;save();render();return}
  if(t.id==='f-spp'){CMSG='';CS=t.value==='*';setSpecies(CS?'':t.value);save();render();if(CS)document.getElementById('f-species')?.focus();return}
  if(t.dataset.k==='species'&&knownSp(t.value)){CMSG='';CS=false;setSpecies(knownSp(t.value));save();render();return}
  if(!t.dataset.k)return;
@@ -400,26 +366,26 @@ document.addEventListener('click',e=>{
  else if(a==='heal')S.hp.cur=Math.min(S.hp.max,S.hp.cur+n);
  else if(a==='temp')S.hp.temp=Math.max(S.hp.temp,n);
  else if(a==='long'){S.hp.cur=S.hp.max;S.hp.temp=0;S.hd=0;S.slots.forEach(s=>s.u=0)}
- else if(a==='hd'){const d=hdOf(),c=mod(sc('con'));if(d&&hdLeft()&&rollExpr(`Hit die (d${d})`,`1d${d}${fmt(c)}`,false,true)){const g=Math.max(1,LAST.total);LAST.total=g;LAST.detail+=` · healed ${Math.min(g,S.hp.max-S.hp.cur)}`;S.hp.cur=Math.min(S.hp.max,S.hp.cur+g);S.hd++;CRIT=null;COP=copyText(cmdFor())}}
+ else if(a==='hd'){const d=hitDie(S),c=abilityMod(score(S,'con'));if(d&&hitDiceLeft(S)&&rollExpr(`Hit die (d${d})`,`1d${d}${signed(c)}`,false,true)){const g=Math.max(1,LAST.total);LAST.total=g;LAST.detail+=` · healed ${Math.min(g,S.hp.max-S.hp.cur)}`;S.hp.cur=Math.min(S.hp.max,S.hp.cur+g);S.hd++;CRIT=null;COP=copyText(chatCommand(LAST,S.vtt))}}
  // Leveling up: the new max comes with the HP gained, so current HP rises by the same amount.
- else if(a==='avghp'){const m=avgHP();if(m>S.hp.max)S.hp.cur+=m-S.hp.max;S.hp.max=m}
+ else if(a==='avghp'){const m=averageHP(S);if(m>S.hp.max)S.hp.cur+=m-S.hp.max;S.hp.max=m}
  else if(a==='sv')S.sv[v]=!S.sv[v];
  // A trait-granted skill cycles between its granted level and Expertise; only what you add on top is stored,
  // so changing species never leaves a proficiency behind that you didn't pick.
- else if(a==='sk'){const g=skG(v),nx=(prS(v)+1)%3;S.sk[v]=nx>g?nx:0}
+ else if(a==='sk'){const g=skillGranted(S,v),nx=(skillProf(S,v)+1)%3;S.sk[v]=nx>g?nx:0}
  else if(a==='slot'){const[i,j]=v.split('.').map(Number),s=S.slots[i];s.u=(j<s.u)?j:j+1}
  else if(a==='addsp'){const nm=g('spn').value.trim();if(!nm)return;S.spells.push({n:nm,l:+g('spl').value,p:false})}
  else if(a==='delsp'){S.spells.splice(+v,1);[...OPEN].filter(k=>k.startsWith('sp')).forEach(k=>OPEN.delete(k));Object.keys(UP).forEach(k=>delete UP[k]);CRIT=null}
- else if(a==='satk'){const x=S.spells[+v],cm=S.cast?mod(sc(S.cast)):0;doRoll(x.n+' attack',prof()+cm+fxSum('sa'));CRIT=LAST.crit==='Natural 20'?'s'+v:null;COP=copyText(cmdFor())}
- else if(a==='sdmg'){const x=S.spells[+v],{d}=spDice(x,UP[v]??x.l);if(!rollExpr(x.n+(x.r.h?' healing':' damage'),d,CRIT==='s'+v))rollErr(`${x.n} has no valid dice. Use dice like 1d10 or 2d6+3; fix them in Edit.`);else COP=copyText(cmdFor());CRIT=null}
- else if(a==='iatk'){const x=S.items[+v];doRoll(x.n+' attack',prof()+wMod(x));CRIT=LAST.crit==='Natural 20'?'i'+v:null;COP=copyText(cmdFor())}
- else if(a==='idmg'){const x=S.items[+v],tw=b.dataset.t==='v';if(!rollExpr(x.n+' damage'+(tw?' (two-handed)':''),withMod(tw?x.w.v:x.w.d,wMod(x)),CRIT==='i'+v))rollErr(`${x.n} has no valid damage dice.`);else COP=copyText(cmdFor());CRIT=null}
+ else if(a==='satk'){const x=S.spells[+v],cm=S.cast?abilityMod(score(S,S.cast)):0;doRoll(x.n+' attack',profBonus(S)+cm+effectTotal(S,'sa'));CRIT=LAST.crit==='Natural 20'?'s'+v:null;COP=copyText(chatCommand(LAST,S.vtt))}
+ else if(a==='sdmg'){const x=S.spells[+v],{d}=spellDice(S,x,UP[v]??x.l);if(!rollExpr(x.n+(x.r.h?' healing':' damage'),d,CRIT==='s'+v))rollErr(`${x.n} has no valid dice. Use dice like 1d10 or 2d6+3; fix them in Edit.`);else COP=copyText(chatCommand(LAST,S.vtt));CRIT=null}
+ else if(a==='iatk'){const x=S.items[+v];doRoll(x.n+' attack',profBonus(S)+weaponMod(S,x));CRIT=LAST.crit==='Natural 20'?'i'+v:null;COP=copyText(chatCommand(LAST,S.vtt))}
+ else if(a==='idmg'){const x=S.items[+v],tw=b.dataset.t==='v';if(!rollExpr(x.n+' damage'+(tw?' (two-handed)':''),withMod(tw?x.w.v:x.w.d,weaponMod(S,x)),CRIT==='i'+v))rollErr(`${x.n} has no valid damage dice.`);else COP=copyText(chatCommand(LAST,S.vtt));CRIT=null}
  else if(a==='addfx'){const x=S.items[+v],[t,k]=g('fxt-'+v).value.split('|');let n=parseInt(g('fxv-'+v).value)||0;if(t==='set')n=Math.min(30,Math.max(1,n||19));if(t==='adv')n=0;x.fx=[...(x.fx||[]).filter(f=>!(f[0]===t&&f[1]===k)),[t,k,n]]}
  else if(a==='delfx'){const[i,j]=v.split('.').map(Number);S.items[i].fx.splice(j,1)}
  else if(a==='itd'){const k='it'+v;OPEN.has(k)?OPEN.delete(k):OPEN.add(k)}
  else if(a==='spc')S.spc=!S.spc;
  else if(a==='inc')S.inc=!S.inc;
- else if(a==='att'){const x=S.items[+v];if(!x.att&&gear().attuned>=3){ATTMSG=+v;render();return}x.att=!x.att}
+ else if(a==='att'){const x=S.items[+v];if(!x.att&&activeGear(S).attuned>=3){ATTMSG=+v;render();return}x.att=!x.att}
  else if(a==='spd'){const k='sp'+v;OPEN.has(k)?OPEN.delete(k):OPEN.add(k)}
  // The Library may have just downloaded (or imported) species, so the drop-down re-reads them afterwards.
  else if(a==='lib'){openLibrary(()=>S,removed=>{if(removed){OPEN.clear();Object.keys(UP).forEach(k=>delete UP[k]);CRIT=null}save();render();cachedSpecies().then(l=>{SPC=l;render()}).catch(()=>{})});return}
@@ -427,11 +393,11 @@ document.addEventListener('click',e=>{
  else if(a==='delit'){S.items.splice(+v,1);[...OPEN].filter(k=>k.startsWith('it')).forEach(k=>OPEN.delete(k));CRIT=null}
  else if(a==='addft'){const nm=g('ftn-'+v).value.trim();if(!nm)return;const t=g('ftt-'+v);S[v].push({n:nm,t:t?t.value:'',d:''})}
  else if(a==='delft'){const[k,i]=v.split('.');S[k].splice(+i,1);OPEN.clear()}
- else if(a==='roll'){doRoll(b.dataset.l,+b.dataset.b,b.dataset.dis==='1',b.dataset.adv==='1');CRIT=null;COP=copyText(cmdFor())}
+ else if(a==='roll'){doRoll(b.dataset.l,+b.dataset.b,b.dataset.dis==='1',b.dataset.adv==='1');CRIT=null;COP=copyText(chatCommand(LAST,S.vtt))}
  else if(a==='rm')RM=v;
  else if(a==='rmin'){RMIN=!RMIN;writeKey('roll-min',RMIN?'1':'0');renderRoll();return}
- else if(a==='cx'){CX=g('cx').value;doCustom(CX);CRIT=null;if(LAST)COP=copyText(cmdFor())}
- else if(a==='cp'){if(LAST)COP=copyText(cmdFor())}
+ else if(a==='cx'){CX=g('cx').value;doCustom(CX);CRIT=null;if(LAST)COP=copyText(chatCommand(LAST,S.vtt))}
+ else if(a==='cp'){if(LAST)COP=copyText(chatCommand(LAST,S.vtt))}
  else if(a==='exp'){IOMSG=null;io=JSON.stringify(S,null,1);markBackedUp();save();render();const ta=g('io');ta.select();try{navigator.clipboard.writeText(io).catch(()=>{})}catch(x){}return}
  else if(a==='dl'){IOMSG=null;downloadSheet(S)}
  else if(a==='imp'){io=g('io').value;IOMSG=null;if(!importText(io)){render();return}}

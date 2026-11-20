@@ -23,6 +23,8 @@ const READABLE = [
   'src/rules.js',
   'src/rolls.js',
   'src/text.js',
+  'src/html.js',
+  'src/sections/*.js',
 ];
 
 export default [
