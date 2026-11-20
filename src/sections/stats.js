@@ -12,14 +12,14 @@ import {
     abilityMod, signed, score, scoreSetBy, scoreBonuses, baseScore,
     skillProf, skillGranted, skillGrants, saveBonus, saveBonuses, wornWith,
 } from '../rules.js';
-import { html, input, PROF_MARK, PROF_LABEL, sourcesText } from '../html.js';
+import { html, when, input, PROF_MARK, PROF_LABEL, sourcesText } from '../html.js';
 
 // Abilities. In Play, a note on top lists bonuses to every ability check; each ability shows its
 // check bonus (tap to roll) and its score. In Edit, the score becomes a field.
 export function abilitiesSection(sheet, { editing, checkBonus, checkBonusSources }) {
     const showNote = !editing && checkBonus !== 0;
     return html`
-        <h2>Abilities ${showNote && html`<small>${checkBonusSources} on checks</small>`}</h2>
+        <h2>Abilities ${when(showNote, html`<small>${checkBonusSources} on checks</small>`)}</h2>
         <div class="abs">${AB.map(ability => abilityBox(sheet, ability, editing, checkBonus))}</div>`;
 }
 
@@ -40,12 +40,13 @@ function abilityBox(sheet, ability, editing, checkBonus) {
     }
 
     const check = abilityMod(score(sheet, ability)) + checkBonus;
+    const raisedBy = when(setBy, () => html` <span class="up">${setBy[0].n}</span>`);
     const scoreShown = editing
         ? input('ab.' + ability, sheet.ab[ability], 'number', `min=1 max=30 aria-label="${name} score"`)
-        : html`<div class="s">${score(sheet, ability)}${setBy && html` <span class="up">${setBy[0].n}</span>`}</div>`;
+        : html`<div class="s">${score(sheet, ability)}${raisedBy}</div>`;
 
     return html`
-        <div class="ab${raised && ' boost'}" ${why !== '' && html`title="${why}"`}>
+        <div class="ab${when(raised, ' boost')}" ${when(why, html`title="${why}"`)}>
             <div class="n">${name.slice(0, 3)}</div>
             <button class="rb m" data-a="roll" data-l="${name} check" data-b="${check}"
                 aria-label="${name} check ${signed(check)}">${signed(check)}</button>
@@ -58,8 +59,8 @@ function abilityBox(sheet, ability, editing, checkBonus) {
 function proficiencyMark({ action, value, label, level, description, editing }) {
     return html`
         <button class="pr" data-a="${action}" data-v="${value}" aria-label="${label} proficiency"
-            aria-pressed="${level > 0 ? 'true' : 'false'}" aria-description="${description}"
-            title="${description}" ${!editing && 'disabled'}>${PROF_MARK[level]}</button>`;
+            aria-pressed="${level > 0}" aria-description="${description}"
+            title="${description}" ${when(!editing, 'disabled')}>${PROF_MARK[level]}</button>`;
 }
 
 // Saving throws: ability modifier, plus proficiency if proficient, plus bonuses to every save
@@ -131,15 +132,15 @@ function skillRow(sheet, view, skill, ability, stealthPenalty) {
     const advantage = advantageSources(skill);
     const total = abilityMod(score(sheet, ability)) + level * proficiency + checkBonus;
     const why = [skill === 'Stealth' ? stealthPenalty : '', advantage, checkBonusSources].filter(Boolean).join('. ');
-    const disPill = disadvantage && html` <span class="pill dis" title="${stealthPenalty}">Dis</span>`;
-    const advPill = advantage !== '' && html` <span class="pill adv" title="${advantage}">Adv</span>`;
+    const disPill = when(disadvantage, html` <span class="pill dis" title="${stealthPenalty}">Dis</span>`);
+    const advPill = when(advantage, html` <span class="pill adv" title="${advantage}">Adv</span>`);
 
     return html`
         <div class="ln">
             ${proficiencyMark({ action: 'sk', value: skill, label: skill, level, description, editing })}
             <span class="g">${skill} <span class="a">${ability}</span>${disPill}${advPill}</span>
             <button class="rb" data-a="roll" data-l="${skill}" data-b="${total}" aria-label="${skill} ${signed(total)}"
-                ${disadvantage && html`data-dis="1"`} ${advantage !== '' && html`data-adv="1"`}
+                ${when(disadvantage, html`data-dis="1"`)} ${when(advantage, html`data-adv="1"`)}
                 title="${why}">${signed(total)}</button>
         </div>`;
 }

@@ -2,7 +2,6 @@
 import { esc } from './text.js';
 import { signed } from './rules.js';
 
-// HTML that's safe to put in the page as it is. Turns into its markup wherever a string is expected.
 class SafeHtml {
     constructor(markup) {
         this.markup = markup;
@@ -13,25 +12,37 @@ class SafeHtml {
     }
 }
 
-// Marks markup as safe without escaping it. Only for HTML that's already escaped or made by the app.
+/** Marks markup as safe to put in the page unescaped. Only for HTML that's already safe, such as md()'s. */
 export const raw = markup => new SafeHtml(String(markup ?? ''));
 
+/**
+ * The markup if the condition holds, otherwise nothing: ${when(editing, removeButton)}.
+ * Pass a function when the markup can only be built if the condition holds: when(item, () => item.n).
+ */
+export function when(condition, markup) {
+    if (!condition) return '';
+    return typeof markup === 'function' ? markup() : markup;
+}
+
 function asMarkup(value) {
-    if (value === false || value === null || value === undefined) return '';
+    if (value === null || value === undefined) return '';
     if (Array.isArray(value)) return value.map(asMarkup).join('');
     if (value instanceof SafeHtml) return value.markup;
     return esc(value);
 }
 
-// Builds markup from a template laid out like HTML:
-//   - every ${value} is escaped, unless it's html`…` itself or raw(…)
-//   - lists are joined, and false, null and undefined add nothing
-//   - so write 'true' or 'false' out for attributes like aria-pressed
-//   - line breaks between tags are dropped; anywhere else they become one space
+// HTML laid out across lines for reading becomes compact markup, as the browser would read it.
+const dropLineBreaksBetweenTags = text => text.replace(/(^|>)\s*\n\s*(?=<|$)/g, '$1');
+const lineBreaksToSpaces = text => text.replace(/\s*\n\s*/g, ' ');
+
+/**
+ * Markup from a template written like HTML. Every ${value} is escaped unless it's html`…` itself or raw(…);
+ * lists are joined; null and undefined add nothing (use when() for optional parts).
+ */
 export function html(strings, ...values) {
     let markup = '';
     strings.forEach((text, index) => {
-        markup += text.replace(/(^|>)\s*\n\s*(?=<|$)/g, '$1').replace(/\s*\n\s*/g, ' ');
+        markup += lineBreaksToSpaces(dropLineBreaksBetweenTags(text));
         if (index < values.length) markup += asMarkup(values[index]);
     });
     return new SafeHtml(markup);

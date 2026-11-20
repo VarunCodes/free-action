@@ -13,7 +13,7 @@ import { AB, ABN } from '../sheet.js';
 import { esc, md } from '../text.js';
 import { signed, effectsOf } from '../rules.js';
 import { spellDice } from '../rolls.js';
-import { html, raw, input, sourcesText } from '../html.js';
+import { html, raw, when, input, sourcesText } from '../html.js';
 
 const SLOT_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 const SPELL_LEVELS = [0, ...SLOT_LEVELS];
@@ -27,25 +27,26 @@ export function spellsSection(sheet, view, ui) {
 
     return html`
         ${heading}
-        ${editing && castingAbilityField(castingAbility)}
-        ${!editing && !castingAbility && html`
+        ${when(editing, castingAbilityField(castingAbility))}
+        ${when(!editing && !castingAbility, html`
             <p class="sub prep">No spellcasting ability set.
-                Choose one in Edit to see your save DC and spell attack.</p>`}
-        ${castingAbility && castingSummary(sheet, view)}
+                Choose one in Edit to see your save DC and spell attack.</p>`)}
+        ${when(castingAbility, () => castingSummary(sheet, view))}
         ${spellSlots(sheet, editing)}
         ${spellList(sheet, view, ui)}
-        ${editing && addSpellForm()}`;
+        ${when(editing, addSpellForm())}`;
 }
 
 // The heading toggles the section. Collapsed, it says how many spells there are and the save DC.
 function spellsHeading(sheet, { proficiency, castingAbility, castingModifier, spellDcBonus }) {
     const count = sheet.spells.length;
     const dc = 8 + proficiency + castingModifier + spellDcBonus;
-    const summary = html`<small>${count} spell${count !== 1 && 's'}${castingAbility && `, save DC ${dc}`}</small>`;
+    const spells = count === 1 ? '1 spell' : `${count} spells`;
+    const summary = html`<small>${spells}${when(castingAbility, `, save DC ${dc}`)}</small>`;
     return html`
         <h2>
-            <button class="hd" data-a="spc" aria-expanded="${sheet.spc ? 'false' : 'true'}">Spellcasting</button>
-            ${sheet.spc && summary}
+            <button class="hd" data-a="spc" aria-expanded="${!sheet.spc}">Spellcasting</button>
+            ${when(sheet.spc, summary)}
         </h2>`;
 }
 
@@ -58,7 +59,7 @@ function castingAbilityField(castingAbility) {
                     <option value="">None</option>
                     ${AB.map(ability => html`
                         <option value="${ability}"
-                            ${castingAbility === ability && 'selected'}>${ABN[ability]}</option>`)}
+                            ${when(castingAbility === ability, 'selected')}>${ABN[ability]}</option>`)}
                 </select>
             </div>
         </div>`;
@@ -76,7 +77,7 @@ function castingSummary(sheet, view) {
             <span>Save DC <b>${dc}</b></span>
             <span>Attack <button class="rb" data-a="roll" data-l="Spell attack"
                 data-b="${attack}">${signed(attack)}</button></span>
-            ${(spellAttackBonus !== 0 || spellDcBonus !== 0) && html`<span class="a">${sourcesText(bonuses)}</span>`}
+            ${when(spellAttackBonus !== 0 || spellDcBonus !== 0, html`<span class="a">${sourcesText(bonuses)}</span>`)}
             <span>Modifier <b>${signed(castingModifier)}</b></span>
         </div>`;
 }
@@ -102,11 +103,11 @@ function slotRow(slots, level, editing) {
             <span class="lv">Lvl ${level}</span>
             <div class="pips">
                 ${[...Array(slots.m).keys()].map(pip => html`
-                    <button class="pip ${pip < slots.u && 'used'}" data-a="slot" data-v="${index}.${pip}"
+                    <button class="pip ${when(pip < slots.u, 'used')}" data-a="slot" data-v="${index}.${pip}"
                         aria-label="Level ${level} slot ${pip + 1}"></button>`)}
             </div>
-            ${editing && input(`slots.${index}.m`, slots.m, 'number',
-                `min=0 max=9 aria-label="Level ${level} max slots"`)}
+            ${when(editing, () => input(`slots.${index}.m`, slots.m, 'number',
+                `min=0 max=9 aria-label="Level ${level} max slots"`))}
         </div>`;
 }
 
@@ -131,9 +132,9 @@ function spellList(sheet, view, ui) {
     }
 
     return html`
-        ${leveled.length > 0 && html`
+        ${when(leveled.length > 0, html`
             <p class="sub prep">Prepared <b>${preparedCount}</b> of ${leveled.length} leveled spells.
-                Tick the box next to a spell to prepare it.</p>`}
+                Tick the box next to a spell to prepare it.</p>`)}
         ${entries.length > 0 ? entries : html`<div class="empty">No spells yet.</div>`}`;
 }
 
@@ -143,22 +144,22 @@ function spellEntry(sheet, view, ui, spell, index, anyPrepared) {
     const dimmed = !editing && anyPrepared && spell.l > 0 && !spell.p;
     const descriptionOpen = ui.isOpen('sp' + index);
     return html`
-        <div class="spi${dimmed && ' unp'}">
+        <div class="spi${when(dimmed, ' unp')}">
             <div class="ln">
                 ${preparedBox(spell, index)}
                 <span class="g">${spellTitle(spell, index, descriptionOpen)}</span>
-                ${editing && html`
-                    <button class="x" data-a="delsp" data-v="${index}" aria-label="Remove ${spell.n}">✕</button>`}
+                ${when(editing, html`
+                    <button class="x" data-a="delsp" data-v="${index}" aria-label="Remove ${spell.n}">✕</button>`)}
             </div>
             ${editing ? spellRollFields(spell, index) : spellRollButtons(sheet, view, ui, spell, index)}
-            ${spell.d && descriptionOpen && html`<p class="sd">${raw(md(spell.d))}</p>`}
+            ${when(spell.d && descriptionOpen, () => html`<p class="sd">${raw(md(spell.d))}</p>`)}
         </div>`;
 }
 
 // Cantrips are always ready, so they get an empty space where leveled spells have a Prepared box.
 function preparedBox(spell, index) {
     if (spell.l <= 0) return html`<span class="pk"></span>`;
-    return html`<input type="checkbox" data-k="spells.${index}.p" ${spell.p && 'checked'}
+    return html`<input type="checkbox" data-k="spells.${index}.p" ${when(spell.p, 'checked')}
         aria-label="${spell.n} prepared" title="Prepared">`;
 }
 
@@ -166,7 +167,7 @@ function preparedBox(spell, index) {
 function spellTitle(spell, index, descriptionOpen) {
     if (!spell.d) return spell.n;
     return html`<button class="lk" data-a="spd" data-v="${index}"
-        aria-expanded="${descriptionOpen ? 'true' : 'false'}">${spell.n}</button>`;
+        aria-expanded="${descriptionOpen}">${spell.n}</button>`;
 }
 
 // Edit: whether the spell makes an attack or forces a save, its dice and damage type, and whether
@@ -177,18 +178,18 @@ function spellRollFields(spell, index) {
     const name = spell.n;
     return html`
         <div class="srl">
-            <label class="row"><input type="checkbox" data-k="${key}a" ${roll.a && 'checked'}
+            <label class="row"><input type="checkbox" data-k="${key}a" ${when(roll.a, 'checked')}
                 aria-label="${name} attack"> Attack</label>
             <select data-k="${key}s" aria-label="${name} saving throw">
                 <option value="">No save</option>
                 ${AB.map(ability => html`
                     <option value="${ability}"
-                        ${roll.s === ability && 'selected'}>${ABN[ability].slice(0, 3)} save</option>`)}
+                        ${when(roll.s === ability, 'selected')}>${ABN[ability].slice(0, 3)} save</option>`)}
             </select>
             ${input(key + 'd', roll.d, 'text',
                 `class="dmg" placeholder="Dice, e.g. 1d10" aria-label="${esc(name)} damage dice"`)}
             ${input(key + 't', roll.t, 'text', `class="dmt" placeholder="Type" aria-label="${esc(name)} damage type"`)}
-            <label class="row"><input type="checkbox" data-k="${key}m" ${roll.m && 'checked'}
+            <label class="row"><input type="checkbox" data-k="${key}m" ${when(roll.m, 'checked')}
                 aria-label="${name} adds modifier"> + modifier</label>
         </div>`;
 }
@@ -208,10 +209,10 @@ function spellRollButtons(sheet, view, ui, spell, index) {
     const effect = roll.h || roll.t ? ` ${roll.h ? 'healing' : roll.t}` : '';
     return html`
         <div class="srl">
-            ${roll.a && html`<button class="rb" data-a="satk" data-v="${index}">Hit ${signed(attack)}</button>`}
-            ${saveName && html`<span class="pill">DC ${dc} ${saveName.slice(0, 3)}</span>`}
-            ${dice && html`<button class="rb" data-a="sdmg" data-v="${index}">${dice}${effect}</button>`}
-            ${attacks > 1 && html`<span class="a">&times;${attacks}</span>`}
+            ${when(roll.a, html`<button class="rb" data-a="satk" data-v="${index}">Hit ${signed(attack)}</button>`)}
+            ${when(saveName, () => html`<span class="pill">DC ${dc} ${saveName.slice(0, 3)}</span>`)}
+            ${when(dice, html`<button class="rb" data-a="sdmg" data-v="${index}">${dice}${effect}</button>`)}
+            ${when(attacks > 1, html`<span class="a">&times;${attacks}</span>`)}
             ${slotLevelPicker(spell, index, slot)}
         </div>`;
 }
@@ -223,7 +224,7 @@ function slotLevelPicker(spell, index, slot) {
     return html`
         <select data-up="${index}" aria-label="${spell.n} slot level">
             ${SLOT_LEVELS.filter(level => level >= spell.l).map(level => html`
-                <option value="${level}" ${level === slot && 'selected'}>Slot ${level}</option>`)}
+                <option value="${level}" ${when(level === slot, 'selected')}>Slot ${level}</option>`)}
         </select>`;
 }
 
