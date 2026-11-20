@@ -13,7 +13,7 @@ const AUTOSAVE_EVERY = 30 * 60 * 1000;
 export function readKey(key) {
   try {
     return localStorage.getItem(key);
-  } catch (e) {
+  } catch {
     return null;
   }
 }
@@ -23,7 +23,7 @@ export function writeKey(key, value) {
   try {
     localStorage.setItem(key, value);
     return true;
-  } catch (e) {
+  } catch {
     return false;
   }
 }
@@ -33,7 +33,7 @@ export function loadSaved() {
   try {
     const saved = readKey('sheet');
     return saved ? cleanSheet(JSON.parse(saved)) : null;
-  } catch (e) {
+  } catch {
     return null;
   }
 }
@@ -52,8 +52,8 @@ export function saveSheet(sheet) {
 export function snapshots() {
   try {
     const list = JSON.parse(readKey('sheet-history') || '[]');
-    return Array.isArray(list) ? list.filter(x => x && typeof x.s === 'string') : [];
-  } catch (e) {
+    return Array.isArray(list) ? list.filter(version => version && typeof version.s === 'string') : [];
+  } catch {
     return [];
   }
 }
@@ -101,7 +101,7 @@ export function readBackup(text) {
   try {
     const sheet = JSON.parse(text);
     return sheet && typeof sheet === 'object' && sheet.ab ? sheet : null;
-  } catch (e) {
+  } catch {
     return null;
   }
 }

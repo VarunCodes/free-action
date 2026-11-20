@@ -73,7 +73,7 @@ function rollTerm(term, crit, first) {
     const count = Math.min(200, (+dice[1] || 1) * (crit ? 2 : 1));
     const sides = +dice[2];
     const rolls = Array.from({ length: count }, () => rollDie(sides));
-    const sum = rolls.reduce((a, b) => a + b, 0);
+    const sum = rolls.reduce((total, roll) => total + roll, 0);
     const join = negative ? '- ' : first ? '' : '+ ';
     return {
       value: negative ? -sum : sum,
@@ -89,14 +89,17 @@ function rollTerm(term, crit, first) {
 
 // Why a typed custom roll can't be made, or '' if it can. Too many dice is refused, not trimmed.
 export function customRollError(text) {
-  const e = text.replace(/\s/g, '');
-  const dice = [...e.matchAll(/(\d*)d(\d+)/gi)];
-  if (!e) return 'Type a roll first, like 2d6+3.';
-  const wellFormed = /^[+-]?(\d*d\d+|\d+)([+-](\d*d\d+|\d+))*$/i.test(e);
-  if (!wellFormed || !dice.length || dice.some(m => (m[1] !== '' && +m[1] < 1) || +m[2] < 1)) {
+  const expression = text.replace(/\s/g, '');
+  if (!expression) return 'Type a roll first, like 2d6+3.';
+  // Each "2d6" as [count, sides]; a bare "d6" counts as one die.
+  const dice = [...expression.matchAll(/(\d*)d(\d+)/gi)].map(([, count, sides]) => [count, +sides]);
+  const wellFormed = /^[+-]?(\d*d\d+|\d+)([+-](\d*d\d+|\d+))*$/i.test(expression);
+  const hasZero = dice.some(([count, sides]) => (count !== '' && +count < 1) || sides < 1);
+  if (!wellFormed || !dice.length || hasZero) {
     return `"${text.trim().slice(0, 40)}" is not a roll. Use dice like 2d6+3 or 1d20+1d4.`;
   }
-  if (dice.reduce((n, m) => n + (+m[1] || 1), 0) > 100 || dice.some(m => +m[2] > 1000)) {
+  const totalDice = dice.reduce((total, [count]) => total + (+count || 1), 0);
+  if (totalDice > 100 || dice.some(([, sides]) => sides > 1000)) {
     return 'That roll is too big. Use up to 100 dice, each with up to 1000 sides.';
   }
   return '';
@@ -111,39 +114,42 @@ export function chatCommand(result, format) {
   return `/r ${expr} # ${label}`;
 }
 
-// Damage or healing dice for a spell (x.r holds the Library's roll data): cantrips scale with character
-// level, other spells with the slot used. Scaling only applies while the dice still match what the
-// Library gave (r.b), so hand edits win. Some spells add the spellcasting modifier (r.m).
-// Returns the dice (d) and, for spells that make several attacks, how many (n).
+// Damage or healing dice for a spell: cantrips scale with character level, other spells with the slot
+// used. The spell's roll data (spell.r) has d the dice now, b the dice the Library gave, by 'char' or
+// 'slot', up the scaling steps, and m true when the spellcasting modifier is added.
+// Scaling only applies while the dice still match what the Library gave, so hand edits win.
+// Returns the dice and, for spells that make several attacks, how many (0 otherwise).
 export function spellDice(sheet, spell, slot) {
-  const r = spell.r;
-  let d = String(r.d).replace(/\s+/g, '');
-  let n = 0;
-  if (d && d === r.b) ({ d, n } = scaledDice(r, r.by === 'char' ? sheet.level : slot));
-  const castMod = sheet.cast ? abilityMod(score(sheet, sheet.cast)) : 0;
-  if (d && r.m && castMod) d += signed(castMod);
-  return { d, n };
+  const roll = spell.r;
+  let dice = String(roll.d).replace(/\s+/g, '');
+  let attacks = 0;
+  if (dice && dice === roll.b) ({ dice, attacks } = scaledDice(roll, roll.by === 'char' ? sheet.level : slot));
+  const castingModifier = sheet.cast ? abilityMod(score(sheet, sheet.cast)) : 0;
+  if (dice && roll.m && castingModifier) dice += signed(castingModifier);
+  return { dice, attacks };
 }
 
-// The Library's scaling steps (r.up: [from level, dice, attacks]) that apply at this level; the last one wins.
-function scaledDice(r, level) {
-  let d = r.b;
-  let n = 0;
-  for (const [, dice, count] of r.up.filter(([at]) => at <= level)) {
-    if (dice) d = dice;
-    if (count) n = count;
+// The Library's scaling steps (roll.up: [from level, dice, attacks]) that apply at this level;
+// the last one wins.
+function scaledDice(roll, level) {
+  let dice = roll.b;
+  let attacks = 0;
+  for (const [, stepDice, stepAttacks] of roll.up.filter(([fromLevel]) => fromLevel <= level)) {
+    if (stepDice) dice = stepDice;
+    if (stepAttacks) attacks = stepAttacks;
   }
-  return { d, n };
+  return { dice, attacks };
 }
 
 // The modifier for a weapon's attack and damage: ranged weapons use Dex, Finesse the better of Str and
 // Dex, others Str. A magic weapon's +N adds to both, but only once attuned if it needs attunement.
+// The weapon data (item.w) has ab: 'str', 'dex' or 'fin' (Finesse), and b: the magic bonus.
 export function weaponMod(sheet, item) {
-  const w = item.w;
+  const weapon = item.w;
   const str = abilityMod(score(sheet, 'str'));
   const dex = abilityMod(score(sheet, 'dex'));
-  const ability = w.ab === 'dex' ? dex : w.ab === 'fin' ? Math.max(str, dex) : str;
-  const magic = item.at && !item.att ? 0 : (+w.b || 0);
+  const ability = weapon.ab === 'dex' ? dex : weapon.ab === 'fin' ? Math.max(str, dex) : str;
+  const magic = item.at && !item.att ? 0 : (+weapon.b || 0);
   return ability + magic;
 }
 
