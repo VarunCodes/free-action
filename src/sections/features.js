@@ -93,6 +93,6 @@ function addFeatureRow({ key, hasType }) {
                 <select id="ftt-${key}" aria-label="New feature type">
                     <option>Class feature</option><option>Feat</option>
                 </select>`)}
-            <button class="pri" data-a="addft" data-v="${key}">Add</button>
+            <button class="pri" data-a="addft" data-v="${key}" aria-label="Add ${what}">Add</button>
         </div>`;
 }
