@@ -38,19 +38,57 @@ function replaceSheet(o,why){
     CRIT=null;
 }
 
-// Import (pasted) and Open backup file. Problems and results show under the Backup buttons.
+// Import (pasted JSON) and Open backup file. The result shows under the Backup buttons.
 // Returns true if the sheet was replaced.
-function importText(t){
-    const o=readBackup(t);
-    if(!o){
-        IOMSG={isError:true,text:'That is not a valid exported sheet. Use a file from Download backup, or paste the full JSON from Export.'};
+function importBackup(text) {
+    const backup = readBackup(text);
+    if (!backup) {
+        IOMSG = {
+            isError: true,
+            text: 'That is not a valid exported sheet. '
+                + 'Use a file from Download backup, or paste the full JSON from Export.',
+        };
         return false;
     }
-    const nm=cleanSheet(o).name;
-    if(!confirm(`Replace "${S.name}" with "${nm}"? The current character can be brought back from "Restore an earlier version".`))return false;
-    replaceSheet(o,'before import');
-    IOMSG={text:`Imported "${nm}".`};
+    const name = cleanSheet(backup).name;
+    const question = `Replace "${S.name}" with "${name}"? `
+        + 'The current character can be brought back from "Restore an earlier version".';
+    if (!confirm(question)) return false;
+    replaceSheet(backup, 'before import');
+    IOMSG = { text: `Imported "${name}".` };
     return true;
+}
+
+// Restore the earlier version at this place in the list, after asking. Returns true if the sheet was replaced.
+function restoreVersion(index) {
+    const version = snapshots()[index];
+    if (!version) return false;
+    const savedAt = dateAndTime(version.at);
+    if (!confirm(`Restore "${version.name}" from ${savedAt}? The current version is kept in the list.`)) return false;
+    try {
+        replaceSheet(JSON.parse(version.s), 'before restore');
+    } catch {
+        IOMSG = { isError: true, text: 'That version could not be read.' };
+        render();
+        return false;
+    }
+    IOMSG = { text: `Restored "${version.name}" from ${savedAt}.` };
+    return true;
+}
+
+// Open backup file. The input is cleared afterwards, so picking the same file again still imports it.
+async function openBackupFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    IOMSG = null;
+    const reading = file.text();
+    input.value = '';
+    try {
+        if (importBackup(await reading)) save();
+    } catch {
+        IOMSG = { isError: true, text: 'Could not read that file.' };
+    }
+    render();
 }
 function setPath(k,v){const p=k.split('.');let o=S;while(p.length>1)o=o[p.shift()];o[p[0]]=v}
 // A species' walking speed, read from its Speed trait ("Your Speed is 35 feet."); 0 if it has none.
@@ -230,12 +268,14 @@ document.addEventListener('click',e=>{
     else if(a==='cp'){if(LAST)COP=copyText(chatCommand(LAST,S.vtt))}
     else if(a==='exp'){IOMSG=null;io=JSON.stringify(S,null,1);markBackedUp();save();render();const ta=g('io');ta.select();try{navigator.clipboard.writeText(io).catch(()=>{})}catch(x){}return}
     else if(a==='dl'){IOMSG=null;downloadSheet(S)}
-    else if(a==='imp'){io=g('io').value;IOMSG=null;if(!importText(io)){render();return}}
-    else if(a==='rst'){const x=snapshots()[+g('snp').value];if(!x||!confirm(`Restore "${x.name}" from ${dateAndTime(x.at)}? The current version is kept in the list.`))return;try{replaceSheet(JSON.parse(x.s),'before restore');IOMSG={text:`Restored "${x.name}" from ${dateAndTime(x.at)}.`}}catch(e){IOMSG={isError:true,text:'That version could not be read.'};render();return}}
+    else if(a==='imp'){io=g('io').value;IOMSG=null;if(!importBackup(io)){render();return}}
+    else if(a==='rst'){if(!restoreVersion(+g('snp').value))return}
     else if(a==='reset'){if(!confirm('Start a new character? The current one can be brought back from "Restore an earlier version".'))return;replaceSheet({},'before new character')}
     save();render();
 });
-document.addEventListener('change',e=>{const f=e.target.id==='imf'&&e.target.files[0];if(!f)return;IOMSG=null;f.text().then(t=>{if(importText(t))save();render()}).catch(()=>{IOMSG={isError:true,text:'Could not read that file.'};render()});e.target.value=''});
+document.addEventListener('change', event => {
+    if (event.target.id === 'imf') openBackupFile(event.target);
+});
 // Another tab saved: take its version, so this tab never writes a stale copy over it.
 window.addEventListener('storage',e=>{if(e.key!=='sheet'||!e.newValue)return;try{S=cleanSheet(JSON.parse(e.newValue));render()}catch(x){}});
 // Ask the browser not to clear this site's data under storage pressure (granted silently or not at all).
