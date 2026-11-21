@@ -155,3 +155,27 @@ test.describe('last backup', () => {
     await expect(page.getByText('Last backup today.')).toBeVisible();
   });
 });
+
+test.describe('how long ago the last backup was', () => {
+  const now = new Date('2026-11-21T12:00:00Z');
+  const HOUR = 60 * 60 * 1000;
+  // Whole days since the backup, rounded down: under one day is today, one day is yesterday.
+  const cases: [hoursAgo: number, expected: string][] = [
+    [23, 'Last backup today.'],
+    [25, 'Last backup yesterday.'],
+    [47, 'Last backup yesterday.'],
+    [12 * 24, 'Last backup 12 days ago.'],
+  ];
+
+  for (const [hoursAgo, expected] of cases) {
+    test(`a backup made ${hoursAgo} hours ago says "${expected}"`, async ({ page, seedSheet }) => {
+      const backedUpAt = now.getTime() - hoursAgo * HOUR;
+      await page.clock.setFixedTime(now);
+      await page.addInitScript(time => localStorage.setItem('sheet-exported', String(time)), backedUpAt);
+      await seedSheet(loadSheet('fighter-5'));
+      await page.goto('/');
+
+      await expect(page.getByText(expected, { exact: true })).toBeVisible();
+    });
+  }
+});

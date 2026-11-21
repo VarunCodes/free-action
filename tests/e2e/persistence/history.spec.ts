@@ -112,3 +112,24 @@ test('the list keeps the six newest versions and drops the oldest when a seventh
     /: Hero 1 \(before import\)$/,
   ]);
 });
+
+test.describe('version dates', () => {
+  // A known language and time zone, so the date has one expected form.
+  test.use({ locale: 'en-GB', timezoneId: 'UTC' });
+
+  test('a version shows its date, with the month spelled out, and its time', async ({ page, savedSheet }) => {
+    await page.clock.setFixedTime(new Date('2026-03-04T14:05:00Z'));
+    // An edit first, so the sheet New character keeps differs from the one saved when the page opened.
+    await page.getByLabel('Amount').fill('14');
+    await page.getByRole('button', { name: 'Damage' }).click();
+    await expect.poll(savedSheet).toMatchObject({ hp: { cur: 30 } });
+
+    answerConfirm(page, 'accept');
+    await page.getByRole('button', { name: 'New character' }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('New Hero');
+
+    // "4 Mar 2026, 14:05" (WebKit may write "at" in place of the comma). 03/04 could be read two ways.
+    const version = page.getByLabel('Earlier version').getByRole('option', { name: /before new character/ });
+    await expect(version).toHaveText(/^4 Mar 2026\D+14:05: Brakka \(before new character\)$/);
+  });
+});
