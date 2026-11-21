@@ -22,13 +22,20 @@ const pack = [
     ],
   },
 ];
-const stoneborn = pack[0].traits.map(t => ({ n: t.n, t: '', d: t.d, ...(t.fx ? { fx: t.fx } : {}) }));
+// Stoneborn's traits as the sheet saves them.
+const stoneborn = pack[0].traits.map(trait => {
+  const effects = trait.fx ? { fx: trait.fx } : {};
+  return { n: trait.n, t: '', d: trait.d, ...effects };
+});
 
 // Brakka (fighter-5): Con 14 (+2), proficient in Constitution saves (+3), Dex 12 (+1), Speed 30.
 const brakka = (more: Sheet = {}) => ({ ...loadSheet('fighter-5'), mode: 'edit', species: '', ...more });
 const speciesBox = (page: Page) => page.getByLabel('Species', { exact: true });
-const traitNames = async (savedSheet: () => Promise<Sheet | null>) =>
-  ((await savedSheet())!.race as { n: string }[]).map(x => x.n);
+const status = (page: Page) => page.getByRole('status');
+async function traitNames(savedSheet: () => Promise<Sheet | null>) {
+  const sheet = await savedSheet();
+  return (sheet!.race as { n: string }[]).map(trait => trait.n);
+}
 
 test.beforeEach(async ({ seedPacks }) => {
   await seedPacks(pack);
@@ -39,7 +46,7 @@ test('picking a species adds its traits, their effects and its Speed', { tag: '@
   await page.goto('/');
   await speciesBox(page).selectOption('Stoneborn');
 
-  await expect(page.getByRole('status')).toHaveText('Added 3 Stoneborn traits to Racial features. Speed set to 25 ft.');
+  await expect(status(page)).toHaveText('Added 3 Stoneborn traits to Racial features. Speed set to 25 ft.');
   await expect.poll(() => traitNames(savedSheet)).toEqual(['Speed', 'Darkvision', 'Stone Hide']);
   await expect.poll(savedSheet).toMatchObject({ species: 'Stoneborn', speed: 25 });
   // Stone Hide: Con 14 + 2 = 16 (+3); proficient +3, so the save is +6.
@@ -52,10 +59,13 @@ test("changing species swaps the old species' traits for the new one's", async (
   await expect(speciesBox(page)).toHaveValue('Stoneborn');
   await speciesBox(page).selectOption('Windkin');
 
-  await expect(page.getByRole('status')).toHaveText('Swapped 3 Stoneborn traits for 3 Windkin traits in Racial features. Speed set to 35 ft.');
+  const swapped = 'Swapped 3 Stoneborn traits for 3 Windkin traits in Racial features. Speed set to 35 ft.';
+  await expect(status(page)).toHaveText(swapped);
   await expect.poll(() => traitNames(savedSheet)).toEqual(['Speed', 'Darkvision', 'Light Step']);
   // The shared Darkvision now has Windkin's wording.
-  await expect.poll(savedSheet).toMatchObject({ species: 'Windkin', speed: 35, race: [{}, { d: 'You can see in dim light within 60 feet.' }, {}] });
+  await expect.poll(savedSheet).toMatchObject({
+    species: 'Windkin', speed: 35, race: [{}, { d: 'You can see in dim light within 60 feet.' }, {}],
+  });
   // Stone Hide's +2 Con is gone (save back to +5); Light Step's Stealth proficiency is on (+1, +3).
   await expect(page.getByRole('button', { name: 'Constitution save +5', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Stealth +4', exact: true })).toBeVisible();
@@ -76,7 +86,7 @@ test('a Speed typed by hand is kept when the species changes', async ({ page, se
   await seedSheet(brakka({ species: 'Stoneborn', speed: 40, race: stoneborn }));
   await page.goto('/');
   await speciesBox(page).selectOption('Windkin');
-  await expect(page.getByRole('status')).toHaveText('Swapped 3 Stoneborn traits for 3 Windkin traits in Racial features.');
+  await expect(status(page)).toHaveText('Swapped 3 Stoneborn traits for 3 Windkin traits in Racial features.');
   await expect.poll(savedSheet).toMatchObject({ species: 'Windkin', speed: 40 });
 });
 
@@ -89,7 +99,7 @@ test('clearing the species removes its traits and puts Speed back to 30', async 
   await expect(speciesBox(page)).toHaveValue('Stoneborn');
   await speciesBox(page).selectOption('Choose a species');
 
-  await expect(page.getByRole('status')).toHaveText('Removed 3 Stoneborn traits from Racial features. Speed set to 30 ft.');
+  await expect(status(page)).toHaveText('Removed 3 Stoneborn traits from Racial features. Speed set to 30 ft.');
   await expect.poll(() => traitNames(savedSheet)).toEqual(['Lucky Find']);
   await expect.poll(savedSheet).toMatchObject({ species: '', speed: 30 });
 });

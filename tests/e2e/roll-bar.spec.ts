@@ -18,7 +18,7 @@ async function roll(page: Page, name: string, formula: string) {
 async function openRollOptions(page: Page) {
   await page.evaluate(() => {
     (window as unknown as { e2eToggled: Promise<unknown> }).e2eToggled =
-      new Promise(r => document.addEventListener('toggle', r, { capture: true, once: true }));
+      new Promise(resolve => document.addEventListener('toggle', resolve, { capture: true, once: true }));
   });
   await page.getByText('VTT format and custom roll', { exact: true }).click();
   await page.evaluate(() => (window as unknown as { e2eToggled: Promise<unknown> }).e2eToggled);

@@ -23,7 +23,11 @@ test('a sheet from before AC was calculated, still on the default AC, switches t
 
 test('impossible values are brought back within the rules', async ({ page, seedSheet }) => {
   // PHB 2024: an ability score can't exceed 30, and Hit Points can't exceed the Hit Point maximum.
-  await seedSheet({ ...loadSheet('fighter-5'), ab: { str: 99, dex: 12, con: 14, int: 8, wis: 10, cha: 13 }, hp: { cur: 50, max: 44, temp: 0 } });
+  await seedSheet({
+    ...loadSheet('fighter-5'),
+    ab: { str: 99, dex: 12, con: 14, int: 8, wis: 10, cha: 13 },
+    hp: { cur: 50, max: 44, temp: 0 },
+  });
   await page.goto('/');
   await switchMode(page, 'Edit');
 
