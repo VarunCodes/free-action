@@ -157,26 +157,33 @@ function backupSection(){
  <div class="row" style="margin-top:8px"><button data-a="exp">Export</button><button data-a="imp">Import</button><button class="bad" data-a="reset">New character</button></div>
  ${IOMSG?`<p class="${IOMSG.bad?'reqn':'sub'}" role="${IOMSG.bad?'alert':'status'}" style="margin:8px 0 0">${esc(IOMSG.t)}</p>`:''}
  ${hist.length?`<div class="row" style="margin-top:8px"><select id="snp" aria-label="Earlier version" style="flex:1">${hist.map((x,i)=>`<option value="${i}">${esc(when(x.at))}: ${esc(x.name)}${x.why==='autosave'?'':` (${esc(x.why)})`}</option>`).join('')}</select><button data-a="rst">Restore an earlier version</button></div>`:''}`;
-    // Sections go into three columns: stats, inventory and spells, everything else. On phones the columns
-    // dissolve and the order values put the sections back into one reading order.
     return h;
 }
 
 // Sections go into three columns: stats, inventory and spells, everything else. On phones the columns
-// dissolve and the order values put the sections back into one reading order.
+// dissolve and each section's order puts them back into one reading order.
 function render(){
-    const v=sheetView();
-    S.spells.forEach(x=>{x.r=Object.assign(SR(),x.r)});
-    const header=headerSection(S,v,{customClass:CC,customSpecies:CS,librarySpecies:SPC,message:CMSG});
-    const html={};
-    for(const [k,f] of [['vit',v=>vitalsSection(S,v,{amount:amt})],['abil',v=>abilitiesSection(S,v)],['save',v=>savesSection(S,v)],['skill',v=>skillsSection(S,v)],['feat',v=>featuresSection(S,v,{isOpen:id=>OPEN.has(id)})],['race',v=>racialFeaturesSection(S,v,{isOpen:id=>OPEN.has(id)})],['spell',v=>spellsSection(S,v,{isOpen:id=>OPEN.has(id),slotFor:index=>UP[index]})],['inv',v=>inventorySection(S,v,{isOpen:id=>OPEN.has(id),attunementRefused:ATTMSG})],['notes',notesSection],['backup',backupSection]])html[k]=f(v);
-    const sec=(k,order)=>`<section class="c" style="order:${order}">${html[k]}</section>`;
-    const columns=[
-        [['vit',1],['abil',2],['save',3],['skill',4]],
-        [['inv',7],['spell',8]],
-        [['feat',5],['race',6],['notes',9],['backup',10]],
-    ];
-    document.getElementById('app').innerHTML=header+`<div class="grid">${columns.map(c=>`<div class="col">${c.map(([k,o])=>sec(k,o)).join('')}</div>`).join('')}</div>`;
+    const view=sheetView();
+    S.spells.forEach(spell=>{spell.r=Object.assign(SR(),spell.r)});
+    const isOpen=id=>OPEN.has(id);
+    const header=headerSection(S,view,{customClass:CC,customSpecies:CS,librarySpecies:SPC,message:CMSG});
+    const vitals=vitalsSection(S,view,{amount:amt});
+    const abilities=abilitiesSection(S,view);
+    const saves=savesSection(S,view);
+    const skills=skillsSection(S,view);
+    const features=featuresSection(S,view,{isOpen});
+    const racialFeatures=racialFeaturesSection(S,view,{isOpen});
+    const spells=spellsSection(S,view,{isOpen,slotFor:index=>UP[index]});
+    const inventory=inventorySection(S,view,{isOpen,attunementRefused:ATTMSG});
+    const notes=notesSection();
+    const backup=backupSection();
+
+    const section=(order,content)=>`<section class="c" style="order:${order}">${content}</section>`;
+    const column=(...sections)=>`<div class="col">${sections.join('')}</div>`;
+    const statsColumn=column(section(1,vitals),section(2,abilities),section(3,saves),section(4,skills));
+    const gearColumn=column(section(7,inventory),section(8,spells));
+    const otherColumn=column(section(5,features),section(6,racialFeatures),section(9,notes),section(10,backup));
+    document.getElementById('app').innerHTML=header+`<div class="grid">${statsColumn}${gearColumn}${otherColumn}</div>`;
     renderRoll();
     document.title=`${S.name.trim()||'Unnamed'} · Character Sheet`;
 }
