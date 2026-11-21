@@ -16,6 +16,8 @@ export const CLS = {
     Warlock: { sv: ['wis', 'cha'], ca: 'cha', hd: 8 }, Wizard: { sv: ['int', 'wis'], ca: 'int', hd: 6 },
 };
 export const CLASSES = Object.keys(CLS);
+// The SRD 5.2 species, offered before the Library has been downloaded; picking one fetches its traits.
+export const SRD_SPECIES = ['Dragonborn', 'Dwarf', 'Elf', 'Gnome', 'Goliath', 'Halfling', 'Human', 'Orc', 'Tiefling'];
 export const DEF = () => ({ name: 'New Hero', cls: '', sub: '', species: '', bg: '', level: 1, mode: 'play', ab: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }, sv: {}, sk: {}, hp: { cur: 10, max: 10, temp: 0 }, ac: 10, speed: 30, init: 0, cast: '', slots: Array.from({ length: 9 }, () => ({ m: 0, u: 0 })), spells: [], items: [], notes: '', insp: false, feats: [], race: [], vtt: 'foundry', spc: false, inc: false, acAuto: true, acb: 0, hd: 0, hdie: 0 });
 
 const obj = v => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});

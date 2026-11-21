@@ -13,7 +13,7 @@
 // Effects are how items, feats and traits change numbers: [type, target, value], such as ['ab', 'con', 2]
 // (+2 Constitution) or ['set', 'str', 19] (Strength becomes 19). Each kind is summed where it applies below.
 import { traitEffects } from './library.js';
-import { CLS, CLASSES } from './sheet.js';
+import { CLS, CLASSES, SRD_SPECIES } from './sheet.js';
 
 // Ability modifier: (score - 10) / 2, rounded down.
 export const abilityMod = score => Math.floor((score - 10) / 2);
@@ -27,6 +27,17 @@ export const profBonus = sheet => Math.ceil(Math.max(1, sheet.level) / 4) + 1;
 // The standard class a name refers to ("fighter " is Fighter), or undefined for a custom class.
 export const knownClass = name =>
     CLASSES.find(className => className.toLowerCase() === String(name).trim().toLowerCase());
+
+// The species to choose from: the Library's (SRD 5.2 and any custom packs) in alphabetical order, each
+// name once, or the SRD names before the Library has been downloaded.
+export function speciesNames(librarySpecies) {
+    if (!librarySpecies.length) return SRD_SPECIES;
+    return [...new Set(librarySpecies.map(species => species.name))].sort();
+}
+
+// The species a name refers to ("elf " is Elf), or undefined for a custom species.
+export const knownSpecies = (name, librarySpecies) => speciesNames(librarySpecies)
+    .find(speciesName => speciesName.toLowerCase() === String(name).trim().toLowerCase());
 
 // Hit dice: one per level, of the class's size (or the one picked for a custom class). sheet.hd counts
 // the ones spent. A short rest spends them one at a time (die + Con modifier, at least 1 HP); a long rest

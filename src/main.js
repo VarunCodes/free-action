@@ -2,9 +2,9 @@ import './style.css';
 import { openLibrary, swapSpecies } from './libraryui.js';
 import { cachedItems, cachedSpecies, loadLibrary } from './library.js';
 import { esc } from './text.js';
-import { ABN, DEF, CLS, CLASSES, cleanSheet } from './sheet.js';
+import { ABN, DEF, CLS, cleanSheet } from './sheet.js';
 import {
-    abilityMod, signed, profBonus, knownClass, hitDie, hitDiceLeft, averageHP, activeGear,
+    abilityMod, signed, profBonus, knownClass, knownSpecies, hitDie, hitDiceLeft, averageHP, activeGear,
     effectsOf, effectTotal, advantageFrom, score, skillGranted, skillProf, unmetStrength, currentSpeed,
     armorClass, currentAC,
 } from './rules.js';
@@ -14,6 +14,7 @@ import { abilitiesSection, savesSection, skillsSection } from './sections/stats.
 import { spellsSection } from './sections/spells.js';
 import { inventorySection } from './sections/inventory.js';
 import { featuresSection, racialFeaturesSection } from './sections/features.js';
+import { headerSection } from './sections/header.js';
 import { readKey, writeKey, loadSaved, saveSheet, snapshots, snapshot, lastBackup, markBackedUp, downloadSheet, readBackup } from './storage.js';
 let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null,RERR='',IOMSG=null,ATTMSG=-1,CC=false,CS=false,CMSG='',SPC=[];const UP={};
 const SR=()=>({a:false,s:'',d:'',b:'',t:'',h:false,m:false,by:'slot',up:[]});
@@ -55,15 +56,6 @@ function importText(t){
 // Dates spell out the month, so 03/04 can't be read two ways; the order still follows the browser's language.
 const when=t=>new Date(t).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'});
 function setPath(k,v){const p=k.split('.');let o=S;while(p.length>1)o=o[p.shift()];o[p[0]]=v}
-// Class is a drop-down of the standard classes, so other parts of the sheet can rely on the name. Custom (or any
-// name that isn't one of them, like a homebrew class or an older sheet's "Bard 3") opens a text box instead.
-const clsFld=()=>{const k=knownClass(S.cls),cu=CC||(!k&&!!S.cls.trim());return `<div><label class="lab" for="f-clsp">Class</label><select id="f-clsp"><option value="">Choose a class</option>${CLASSES.map(c=>`<option ${k===c?'selected':''}>${c}</option>`).join('')}<option value="*" ${cu?'selected':''}>Custom…</option></select>${cu?input('cls',S.cls,'text','class="clsx" placeholder="Class name" aria-label="Custom class"')+`<select class="clsx" data-k="hdie" aria-label="Custom class hit die"><option value="0">Hit die: not set</option>${[6,8,10,12].map(d=>`<option value="${d}" ${S.hdie===d?'selected':''}>Hit die: d${d}</option>`).join('')}</select>`:''}</div>`};
-// Species works like Class: the Library's species (SRD 5.2 and any custom packs), or Custom for anything else.
-// Before the Library has been downloaded once, the drop-down still lists the SRD names; picking one fetches the traits.
-const SPN=['Dragonborn','Dwarf','Elf','Gnome','Goliath','Halfling','Human','Orc','Tiefling'];
-const spNames=()=>SPC.length?[...new Set(SPC.map(x=>x.name))].sort():SPN;
-const knownSp=v=>spNames().find(c=>c.toLowerCase()===String(v).trim().toLowerCase());
-const spFld=()=>{const k=knownSp(S.species),cu=CS||(!k&&!!S.species.trim());return `<div><label class="lab" for="f-spp">Species</label><select id="f-spp"><option value="">Choose a species</option>${spNames().map(c=>`<option value="${esc(c)}" ${k===c?'selected':''}>${esc(c)}</option>`).join('')}<option value="*" ${cu?'selected':''}>Custom…</option></select>${cu?input('species',S.species,'text','class="clsx" placeholder="Species name" aria-label="Custom species"'):''}</div>`};
 // A species' walking speed, read from its Speed trait ("Your Speed is 35 feet."); 0 if it has none.
 const spSpeed=it=>{const t=it&&(it.traits||[]).find(x=>/^speed$/i.test(x.n));const m=t&&/(\d+)\s*(feet|ft)/i.exec(t.d);return m?+m[1]:0};
 // Picking a species swaps the old species' racial traits for the new one's ('' or Custom only removes them).
@@ -146,14 +138,6 @@ function sheetView(){
             return sources.length ? `Advantage from ${sources.map(source => source.n).join(', ')}` : '';
         },
     };
-}
-
-// The name, the Play/Edit switch and the Library button; in Edit, the identity fields.
-function headerSection({editing}){
-    let h=`<div class="top"><div><h1>${esc(S.name)||'Unnamed'}</h1><p class="sub">${esc([S.species,S.cls&&(S.cls+(S.sub?' ('+S.sub+')':'')),'Level '+S.level].filter(Boolean).join(', '))}</p></div>
- <div class="seg"><button data-a="mode" data-v="play" class="${editing?'':'on'}">Play</button><button data-a="mode" data-v="edit" class="${editing?'on':''}">Edit</button></div><button data-a="lib">Library</button></div>`;
-    if(editing)h+=`<div class="id">${field('Name','name',S.name)}${field('Level','level',S.level,'number','min=1 max=20')}${clsFld()}${field('Subclass','sub',S.sub)}${spFld()}${field('Background','bg',S.bg)}${CMSG?`<p class="sub w clsm" role="status">${esc(CMSG)}</p>`:''}</div>`;
-    return h;
 }
 
 // AC, Initiative, Speed and proficiency, then hit points and hit dice. In Edit, most boxes become fields.
@@ -259,7 +243,7 @@ function backupSection(){
 function render(){
     const v=sheetView();
     S.spells.forEach(x=>{x.r=Object.assign(SR(),x.r)});
-    const header=headerSection(v);
+    const header=headerSection(S,v,{customClass:CC,customSpecies:CS,librarySpecies:SPC,message:CMSG});
     const html={};
     for(const [k,f] of [['vit',vitalsSection],['abil',v=>abilitiesSection(S,v)],['save',v=>savesSection(S,v)],['skill',v=>skillsSection(S,v)],['feat',v=>featuresSection(S,v,{isOpen:id=>OPEN.has(id)})],['race',v=>racialFeaturesSection(S,v,{isOpen:id=>OPEN.has(id)})],['spell',v=>spellsSection(S,v,{isOpen:id=>OPEN.has(id),slotFor:index=>UP[index]})],['inv',v=>inventorySection(S,v,{isOpen:id=>OPEN.has(id),attunementRefused:ATTMSG})],['notes',notesSection],['backup',backupSection]])html[k]=f(v);
     const sec=(k,order)=>`<section class="c" style="order:${order}">${html[k]}</section>`;
@@ -284,7 +268,7 @@ document.addEventListener('change',e=>{
     if(t.id==='f-clsp'){CMSG='';CC=t.value==='*';if(!CC)setClass(t.value);else if(knownClass(S.cls))S.cls='';save();render();if(CC)document.getElementById('f-cls')?.focus();return}
     if(t.dataset.k==='cls'&&knownClass(t.value)){CMSG='';setClass(knownClass(t.value));CC=false;save();render();return}
     if(t.id==='f-spp'){CMSG='';CS=t.value==='*';setSpecies(CS?'':t.value);save();render();if(CS)document.getElementById('f-species')?.focus();return}
-    if(t.dataset.k==='species'&&knownSp(t.value)){CMSG='';CS=false;setSpecies(knownSp(t.value));save();render();return}
+    if(t.dataset.k==='species'&&knownSpecies(t.value,SPC)){CMSG='';CS=false;setSpecies(knownSpecies(t.value,SPC));save();render();return}
     if(!t.dataset.k)return;
     CMSG='';
     // A blank or non-numeric number box puts the old value back instead of becoming 0.
