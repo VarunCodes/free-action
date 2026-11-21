@@ -227,11 +227,8 @@ test.describe('adding to the sheet', () => {
     const lib = await openLibrary(page);
     await find(lib, 'Species', 'dwarf');
     await lib.getByRole('button', { name: 'Add species', exact: true }).click();
-    await expect.poll(savedSheet).toMatchObject({
-      species: 'Dwarf',
-      race: ['Size', 'Speed', 'Darkvision', 'Dwarven Resilience', 'Dwarven Toughness', 'Stonecunning']
-        .map(name => ({ n: name })),
-    });
+    const dwarfTraits = ['Size', 'Speed', 'Darkvision', 'Dwarven Resilience', 'Dwarven Toughness', 'Stonecunning'];
+    await expect.poll(savedSheet).toMatchObject({ species: 'Dwarf', race: dwarfTraits.map(name => ({ n: name })) });
     await lib.getByRole('button', { name: 'Close', exact: true }).click();
 
     // PHB 2024 fixed HP for Fighter 5, Con +2: (10 + 2) + 4 x (6 + 2) = 44; Dwarven Toughness +1 per level: 49.
@@ -244,8 +241,8 @@ test.describe('adding to the sheet', () => {
     await page.goto('/');
     const lib = await openLibrary(page);
     await lib.getByRole('tab', { name: 'Class features', exact: true }).click();
-    await expect(lib.getByRole('button', { name: 'Fighter (your class)', exact: true }))
-      .toHaveAttribute('aria-pressed', 'true');
+    const yourClass = lib.getByRole('button', { name: 'Fighter (your class)', exact: true });
+    await expect(yourClass).toHaveAttribute('aria-pressed', 'true');
     // PHB 2024 Fighter: Action Surge at level 2 (a second use at 17), listed under the level it starts.
     await find(lib, 'Class features', 'action surge');
     await expect(row(lib, 'Action Surge')).toHaveAccessibleName(/^Action Surge\s*Fighter, level 2$/);

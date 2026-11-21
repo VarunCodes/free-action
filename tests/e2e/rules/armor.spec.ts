@@ -22,8 +22,9 @@ const brakka = (dex: number, gear: Gear[] = [], extra: Sheet = {}) => {
 };
 
 const ac = (page: Page) => page.getByRole('group', { name: 'Armor class', exact: true });
-const expectAC = (page: Page, value: number) =>
-  expect(ac(page).getByText(String(value), { exact: true })).toBeVisible();
+async function expectAC(page: Page, value: number) {
+  await expect(ac(page).getByText(String(value), { exact: true })).toBeVisible();
+}
 
 const cases: [title: string, sheet: Sheet, expected: number][] = [
   ['no armor: 10 + Dex (+1)', brakka(12), 11],

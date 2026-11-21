@@ -5,8 +5,9 @@ import type { Page } from '@playwright/test';
 // Chain Mail, from the PHB 2024 Armor table: AC 16, Strength 13, Disadvantage on Stealth.
 const chain = { n: 'Chain Mail', q: 1, eq: true, on: true, ar: { k: 'heavy', ac: 16, str: 13, stl: true } };
 // PHB 2024, Ring of Protection: +1 to AC and saving throws, requires attunement.
-const ring = (name: string, att: boolean) =>
-  ({ n: name, q: 1, eq: true, on: true, at: true, att, ar: { k: 'bonus', ac: 1, str: 0, sb: 1 } });
+const ring = (name: string, att: boolean) => ({
+  n: name, q: 1, eq: true, on: true, at: true, att, ar: { k: 'bonus', ac: 1, str: 0, sb: 1 },
+});
 
 // Brakka (fighter-5): Str set per test, Dex 12 (+1), proficient in Strength saves, not in Stealth.
 const brakka = (str: number, items: Sheet[]) => {
@@ -92,8 +93,8 @@ test.describe('attunement', () => {
       await expect(page.getByRole('button', { name: 'Strength save +7', exact: true })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Dexterity save +2', exact: true })).toBeVisible();
       await expect(page.getByText('not attuned, no effect')).toHaveCount(0);
-      await expect.poll(savedSheet)
-        .toMatchObject({ items: [{ n: 'Chain Mail' }, { n: 'Ring of Protection', att: true }] });
+      const attunedRing = { n: 'Ring of Protection', att: true };
+      await expect.poll(savedSheet).toMatchObject({ items: [{ n: 'Chain Mail' }, attunedRing] });
     });
   });
 

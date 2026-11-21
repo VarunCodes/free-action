@@ -35,8 +35,8 @@ test.describe('a new level 1 character picks a class', () => {
       await page.goto('/');
       await classBox(page).selectOption(classInfo.cls);
 
-      await expect.poll(() => classPart(savedSheet))
-        .toEqual({ cls: classInfo.cls, sv: saves(...classInfo.sv), cast: classInfo.cast });
+      const expected = { cls: classInfo.cls, sv: saves(...classInfo.sv), cast: classInfo.cast };
+      await expect.poll(() => classPart(savedSheet)).toEqual(expected);
       await expect(hitDice(page)).toHaveText(`Hit dice 1 of 1 (d${classInfo.hd})`);
     });
   }
@@ -58,8 +58,8 @@ test.describe('changing class', () => {
 
     await classBox(page).selectOption('Wizard');
     // Fighter's Strength and Constitution go, Wizard's Intelligence and Wisdom come, Dexterity stays.
-    await expect.poll(() => classPart(savedSheet))
-      .toEqual({ cls: 'Wizard', sv: saves('dex', 'int', 'wis'), cast: 'int' });
+    const wizard = { cls: 'Wizard', sv: saves('dex', 'int', 'wis'), cast: 'int' };
+    await expect.poll(() => classPart(savedSheet)).toEqual(wizard);
   });
 
   test('a spellcasting ability picked by hand stays', async ({ page, savedSheet }) => {

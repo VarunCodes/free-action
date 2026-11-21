@@ -11,15 +11,17 @@ const longsword = {
 const shield = { n: 'Shield', q: 1, eq: true, on: false, ar: { k: 'shield', ac: 2, str: 0 } };
 const rope = { n: 'Rope', q: 1, d: '50 feet of **hempen** rope.' };
 // PHB 2024, Ring of Protection: +1 to AC and saving throws, requires attunement.
-const ring = (name: string, att: boolean) =>
-  ({ n: name, q: 1, eq: true, on: true, at: true, att, ar: { k: 'bonus', ac: 1, str: 0, sb: 1 } });
+const ring = (name: string, att: boolean) => ({
+  n: name, q: 1, eq: true, on: true, at: true, att, ar: { k: 'bonus', ac: 1, str: 0, sb: 1 },
+});
 
 // Brakka (fighter-5): Str 16, Dex 12 (+1), Int 8 (-1), proficient in Strength saves, level 5 (+3).
 const brakka = (items: Sheet[], extra: Sheet = {}) => ({ ...loadSheet('fighter-5'), items, ...extra });
 
 const ac = (page: Page) => page.getByRole('group', { name: 'Armor class', exact: true });
-const expectAC = (page: Page, value: number) =>
-  expect(ac(page).getByText(String(value), { exact: true })).toBeVisible();
+async function expectAC(page: Page, value: number) {
+  await expect(ac(page).getByText(String(value), { exact: true })).toBeVisible();
+}
 
 // Number fields save when they lose focus, as when the player moves to the next field.
 async function setNumber(page: Page, label: string, value: number) {
@@ -157,8 +159,8 @@ test.describe('Edit', () => {
     await switchMode(page, 'Edit');
 
     await test.step('add the effect', async () => {
-      await page.getByLabel(`${headband} effect`, { exact: true })
-        .selectOption({ label: 'Set Intelligence to (value)' });
+      const effectBox = page.getByLabel(`${headband} effect`, { exact: true });
+      await effectBox.selectOption({ label: 'Set Intelligence to (value)' });
       await page.getByLabel(`${headband} effect value`).fill('19');
       await page.getByRole('button', { name: `Add effect to ${headband}` }).click();
       await expect(page.getByRole('button', { name: `Remove Intelligence becomes 19 from ${headband}` })).toBeVisible();

@@ -10,10 +10,13 @@ const brakka = (more: Sheet = {}, ab: Sheet = {}) => {
 };
 // A Charisma caster with Cha 18 (+4), a modifier none of Brakka's other abilities has.
 const caster = (spells: Sheet[], level = 5) => brakka({ level, cast: 'cha', spells }, { cha: 18 });
-const weapon = (name: string, attack: Sheet, more: Sheet = {}) =>
-  ({ n: name, q: 1, eq: true, on: true, w: { b: 0, ...attack }, ...more });
-const rollModeButton = (page: Page, mode: 'Adv' | 'Dis') =>
-  page.getByRole('group', { name: 'Roll mode', exact: true }).getByRole('button', { name: mode, exact: true });
+const weapon = (name: string, attack: Sheet, more: Sheet = {}) => ({
+  n: name, q: 1, eq: true, on: true, w: { b: 0, ...attack }, ...more,
+});
+function rollModeButton(page: Page, mode: 'Adv' | 'Dis') {
+  const rollMode = page.getByRole('group', { name: 'Roll mode', exact: true });
+  return rollMode.getByRole('button', { name: mode, exact: true });
+}
 // SRD 5.2 weapons table.
 const longsword = weapon('Longsword', { d: '1d8', t: 'slashing', v: '1d10', ab: 'str' });
 const longbow = weapon('Longbow', { d: '1d8', t: 'piercing', ab: 'dex' });

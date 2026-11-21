@@ -5,8 +5,10 @@ import type { Page } from '@playwright/test';
 // Brakka (fighter-5), level 5 (proficiency +3): Str 16 (+3), Dex 12 (+1), Con 14 (+2), Int 8 (-1),
 // Wis 10 (+0), Cha 13 (+1). Proficient in Strength and Constitution saves, Athletics and Perception.
 const brakka = (more: Sheet = {}) => ({ ...loadSheet('fighter-5'), ...more });
-const trait = (name: string, description: string, fx?: unknown[]) =>
-  ({ n: name, t: '', d: description, ...(fx ? { fx } : {}) });
+function trait(name: string, description: string, fx?: unknown[]) {
+  const effects = fx ? { fx } : {};
+  return { n: name, t: '', d: description, ...effects };
+}
 // An equipped magic item that needs attunement.
 const magic = (name: string, fx: unknown[], att = true) => ({ n: name, q: 1, eq: true, on: true, at: true, att, fx });
 
