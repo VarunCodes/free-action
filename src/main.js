@@ -5,16 +5,16 @@ import { esc } from './text.js';
 import { ABN, DEF, CLS, cleanSheet } from './sheet.js';
 import {
     abilityMod, signed, profBonus, knownClass, knownSpecies, hitDie, hitDiceLeft, averageHP, activeGear,
-    effectsOf, effectTotal, advantageFrom, score, skillGranted, skillProf, unmetStrength, currentSpeed,
-    armorClass, currentAC,
+    effectsOf, effectTotal, advantageFrom, score, skillGranted, skillProf,
 } from './rules.js';
 import { rollMode, rollD20, rollDice, customRollError, chatCommand, spellDice, weaponMod, withMod } from './rolls.js';
-import { input, field, sourcesText } from './html.js';
+import { sourcesText } from './html.js';
 import { abilitiesSection, savesSection, skillsSection } from './sections/stats.js';
 import { spellsSection } from './sections/spells.js';
 import { inventorySection } from './sections/inventory.js';
 import { featuresSection, racialFeaturesSection } from './sections/features.js';
 import { headerSection } from './sections/header.js';
+import { vitalsSection } from './sections/vitals.js';
 import { readKey, writeKey, loadSaved, saveSheet, snapshots, snapshot, lastBackup, markBackedUp, downloadSheet, readBackup } from './storage.js';
 let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null,RERR='',IOMSG=null,ATTMSG=-1,CC=false,CS=false,CMSG='',SPC=[];const UP={};
 const SR=()=>({a:false,s:'',d:'',b:'',t:'',h:false,m:false,by:'slot',up:[]});
@@ -140,82 +140,6 @@ function sheetView(){
     };
 }
 
-// AC, Initiative, Speed and proficiency, then hit points and hit dice. In Edit, most boxes become fields.
-function vitalsSection(v){
-    let h=`<h2>Vitals</h2><div class="vitals">
- ${acBox(v)}
- ${initiativeBox(v)}
- ${speedBox(v)}
- <div class="vit" role="group" aria-label="Proficiency"><b>${signed(v.proficiency)}</b><span class="lab">Proficiency</span></div></div>
- ${hitPointsBox(v)}`;
-    if(v.editing)h+=acSettings();
-    return h;
-}
-
-// The tooltip lists what a calculated AC is made of, one part per line ("Chain Mail +16").
-function acBox({editing}){
-    const parts=S.acAuto?armorClass(S).parts.map(([name,value])=>name+' '+(value<0?value:'+'+value)).join('\n'):'Typed in by hand';
-    const inside=editing&&!S.acAuto?field('AC','ac',S.ac,'number'):`<b>${currentAC(S)}</b><span class="lab">Armor class</span>`;
-    return `<div class="vit" role="group" aria-label="Armor class" title="${esc(parts)}">${inside}</div>`;
-}
-
-// Initiative: Dex modifier, plus the bonus typed in Edit, plus bonuses to ability checks. Tapping it rolls.
-function initiativeBox({editing,checkBonus,checkBonusSources,advantageSources}){
-    if(editing)return `<div class="vit">${field('Init bonus','init',S.init,'number','min=-20 max=20')}</div>`;
-    const bonus=abilityMod(score(S,'dex'))+S.init+checkBonus;
-    const advantage=advantageSources('init');
-    const why=[checkBonusSources,advantage].filter(Boolean).join('. ');
-    const pill=advantage?' <span class="pill adv">Adv</span>':'';
-    return `<div class="vit"><button class="bigb" data-a="roll" data-l="Initiative" data-b="${bonus}" aria-label="Initiative ${signed(bonus)}" ${advantage?`data-adv="1"`:''} title="${esc(why)}">${signed(bonus)}</button><span class="lab">Initiative${pill}</span></div>`;
-}
-
-// Speed, 10 ft slower while wearing armor you're not strong enough for (the tooltip says which).
-function speedBox({editing}){
-    if(editing)return `<div class="vit" role="group" aria-label="Speed">${field('Speed','speed',S.speed,'number','min=0 max=999')}</div>`;
-    const now=currentSpeed(S);
-    const slowed=now<S.speed;
-    const why=`${S.speed} ft, minus 10 ft: ${unmetStrength(S).map(x=>`${x.n} needs Str ${x.ar.str}`).join(', ')}`;
-    const pill=slowed?' <span class="pill dis">&minus;10 ft</span>':'';
-    return `<div class="vit" role="group" aria-label="Speed"><b class="${slowed?'slow':''}" ${slowed?`title="${esc(why)}"`:''}>${now}</b><span class="lab">Speed${pill}</span></div>`;
-}
-
-// Current and max HP with a bar, Damage/Heal/Set temp, hit dice, Long rest and Heroic Inspiration.
-// In Edit, also the HP fields and the fixed-average max HP for the class.
-function hitPointsBox({editing}){
-    const pct=Math.max(0,Math.min(100,S.hp.max?S.hp.cur/S.hp.max*100:0));
-    const temp=S.hp.temp?`<span class="pill">+${S.hp.temp} temp</span>`:'';
-    return `<div class="hp"><div class="hpn" role="group" aria-label="Hit points"><b>${S.hp.cur}</b><span>/ ${S.hp.max} HP</span>${temp}</div>
- <div class="bar ${pct<25?'low':''}"><i style="width:${pct}%"></i></div>
- <div class="row"><input id="amt" type="number" min="0" value="${amt}" aria-label="Amount"><button class="bad" data-a="dmg">Damage</button><button class="pri" data-a="heal">Heal</button><button data-a="temp">Set temp</button></div>
- ${editing?hpFields():''}
- ${hitDie(S)?hitDiceRow():''}
- <div class="row" style="margin-top:8px"><button data-a="long">Long rest</button>
- <label class="row" style="margin-left:auto"><input type="checkbox" data-k="insp" ${S.insp?'checked':''}> Heroic Inspiration</label></div></div>`;
-}
-
-function hpFields(){
-    const fields=`<div class="row" style="margin-top:8px">${field('Max HP','hp.max',S.hp.max,'number','min=1 max=9999')}${field('Current HP','hp.cur',S.hp.cur,'number',`min=0 max=${S.hp.max}`)}</div>`;
-    if(!hitDie(S))return fields;
-    // "Average max HP for level 5 (d10, Con +2, Dwarven Toughness +1/level): 49"
-    const avg=averageHP(S);
-    const from=`d${hitDie(S)}, Con ${signed(abilityMod(score(S,'con')))}${effectsOf(S,'hp').map(([x,f])=>`, ${esc(x.n)} ${signed(f[2])}/level`).join('')}`;
-    return fields+`<p class="sub hds">Average max HP for level ${S.level} (${from}): <b>${avg}</b> <button data-a="avghp" ${avg===S.hp.max?'disabled':''}>Use ${avg}</button></p>`;
-}
-
-// A short rest spends one hit die at a time; the button says why it can't when it's disabled.
-function hitDiceRow(){
-    const left=hitDiceLeft(S);
-    const hurt=S.hp.cur<S.hp.max;
-    const why=!left?'No hit dice left. A long rest gives them all back.':hurt?`Short rest: roll d${hitDie(S)} ${signed(abilityMod(score(S,'con')))} and heal that much`:'Already at full HP';
-    return `<div class="row hds" style="margin-top:8px"><span>Hit dice <b>${left}</b> of ${S.level} (d${hitDie(S)})</span><button data-a="hd" ${left&&hurt?'':'disabled'} title="${why}">Spend a hit die</button></div>`;
-}
-
-// Edit only: whether AC comes from gear, and a bonus of your own on top.
-function acSettings(){
-    const bonus=S.acAuto?`<label class="row">Other AC bonus ${input('acb',S.acb,'number','min=-10 max=20 style="width:72px" aria-label="Other AC bonus"')}</label>`:'';
-    return `<div class="row acset"><label class="row"><input type="checkbox" data-k="acAuto" ${S.acAuto?'checked':''}> Calculate AC from equipped gear</label>${bonus}</div>`;
-}
-
 // Notes.
 function notesSection(){
     let h='';
@@ -245,7 +169,7 @@ function render(){
     S.spells.forEach(x=>{x.r=Object.assign(SR(),x.r)});
     const header=headerSection(S,v,{customClass:CC,customSpecies:CS,librarySpecies:SPC,message:CMSG});
     const html={};
-    for(const [k,f] of [['vit',vitalsSection],['abil',v=>abilitiesSection(S,v)],['save',v=>savesSection(S,v)],['skill',v=>skillsSection(S,v)],['feat',v=>featuresSection(S,v,{isOpen:id=>OPEN.has(id)})],['race',v=>racialFeaturesSection(S,v,{isOpen:id=>OPEN.has(id)})],['spell',v=>spellsSection(S,v,{isOpen:id=>OPEN.has(id),slotFor:index=>UP[index]})],['inv',v=>inventorySection(S,v,{isOpen:id=>OPEN.has(id),attunementRefused:ATTMSG})],['notes',notesSection],['backup',backupSection]])html[k]=f(v);
+    for(const [k,f] of [['vit',v=>vitalsSection(S,v,{amount:amt})],['abil',v=>abilitiesSection(S,v)],['save',v=>savesSection(S,v)],['skill',v=>skillsSection(S,v)],['feat',v=>featuresSection(S,v,{isOpen:id=>OPEN.has(id)})],['race',v=>racialFeaturesSection(S,v,{isOpen:id=>OPEN.has(id)})],['spell',v=>spellsSection(S,v,{isOpen:id=>OPEN.has(id),slotFor:index=>UP[index]})],['inv',v=>inventorySection(S,v,{isOpen:id=>OPEN.has(id),attunementRefused:ATTMSG})],['notes',notesSection],['backup',backupSection]])html[k]=f(v);
     const sec=(k,order)=>`<section class="c" style="order:${order}">${html[k]}</section>`;
     const columns=[
         [['vit',1],['abil',2],['save',3],['skill',4]],
