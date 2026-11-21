@@ -22,13 +22,14 @@ const pack = [
     ],
   },
 ];
-const stoneborn = pack[0].traits.map(t => ({ n: t.n, t: '', d: t.d, ...(t.fx ? { fx: t.fx } : {}) }));
+const stoneborn = pack[0].traits
+  .map(trait => ({ n: trait.n, t: '', d: trait.d, ...(trait.fx ? { fx: trait.fx } : {}) }));
 
 // Brakka (fighter-5): Con 14 (+2), proficient in Constitution saves (+3), Dex 12 (+1), Speed 30.
 const brakka = (more: Sheet = {}) => ({ ...loadSheet('fighter-5'), mode: 'edit', species: '', ...more });
 const speciesBox = (page: Page) => page.getByLabel('Species', { exact: true });
 const traitNames = async (savedSheet: () => Promise<Sheet | null>) =>
-  ((await savedSheet())!.race as { n: string }[]).map(x => x.n);
+  ((await savedSheet())!.race as { n: string }[]).map(trait => trait.n);
 
 test.beforeEach(async ({ seedPacks }) => {
   await seedPacks(pack);
@@ -52,10 +53,14 @@ test("changing species swaps the old species' traits for the new one's", async (
   await expect(speciesBox(page)).toHaveValue('Stoneborn');
   await speciesBox(page).selectOption('Windkin');
 
-  await expect(page.getByRole('status')).toHaveText('Swapped 3 Stoneborn traits for 3 Windkin traits in Racial features. Speed set to 35 ft.');
+  await expect(page.getByRole('status')).toHaveText(
+    'Swapped 3 Stoneborn traits for 3 Windkin traits in Racial features. Speed set to 35 ft.',
+  );
   await expect.poll(() => traitNames(savedSheet)).toEqual(['Speed', 'Darkvision', 'Light Step']);
   // The shared Darkvision now has Windkin's wording.
-  await expect.poll(savedSheet).toMatchObject({ species: 'Windkin', speed: 35, race: [{}, { d: 'You can see in dim light within 60 feet.' }, {}] });
+  await expect.poll(savedSheet).toMatchObject({
+    species: 'Windkin', speed: 35, race: [{}, { d: 'You can see in dim light within 60 feet.' }, {}],
+  });
   // Stone Hide's +2 Con is gone (save back to +5); Light Step's Stealth proficiency is on (+1, +3).
   await expect(page.getByRole('button', { name: 'Constitution save +5', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Stealth +4', exact: true })).toBeVisible();
@@ -76,7 +81,8 @@ test('a Speed typed by hand is kept when the species changes', async ({ page, se
   await seedSheet(brakka({ species: 'Stoneborn', speed: 40, race: stoneborn }));
   await page.goto('/');
   await speciesBox(page).selectOption('Windkin');
-  await expect(page.getByRole('status')).toHaveText('Swapped 3 Stoneborn traits for 3 Windkin traits in Racial features.');
+  await expect(page.getByRole('status'))
+    .toHaveText('Swapped 3 Stoneborn traits for 3 Windkin traits in Racial features.');
   await expect.poll(savedSheet).toMatchObject({ species: 'Windkin', speed: 40 });
 });
 
@@ -89,7 +95,8 @@ test('clearing the species removes its traits and puts Speed back to 30', async 
   await expect(speciesBox(page)).toHaveValue('Stoneborn');
   await speciesBox(page).selectOption('Choose a species');
 
-  await expect(page.getByRole('status')).toHaveText('Removed 3 Stoneborn traits from Racial features. Speed set to 30 ft.');
+  await expect(page.getByRole('status'))
+    .toHaveText('Removed 3 Stoneborn traits from Racial features. Speed set to 30 ft.');
   await expect.poll(() => traitNames(savedSheet)).toEqual(['Lucky Find']);
   await expect.poll(savedSheet).toMatchObject({ species: '', speed: 30 });
 });

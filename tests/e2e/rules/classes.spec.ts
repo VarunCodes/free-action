@@ -18,25 +18,26 @@ const CLASSES = [
   { cls: 'Wizard', sv: ['int', 'wis'], cast: 'int', hd: 6 },
 ];
 
-const saves = (...abilities: string[]) => Object.fromEntries(abilities.map(a => [a, true]));
+const saves = (...abilities: string[]) => Object.fromEntries(abilities.map(ability => [ability, true]));
 const classBox = (page: Page) => page.getByLabel('Class', { exact: true });
 const hitDice = (page: Page) => page.getByText(/^Hit dice \d+ of \d+/);
 
 // What the sheet saved for the fields a class sets.
 const classPart = async (savedSheet: () => Promise<Sheet | null>) => {
-  const s = (await savedSheet())!;
-  return { cls: s.cls, sv: s.sv, cast: s.cast };
+  const sheet = (await savedSheet())!;
+  return { cls: sheet.cls, sv: sheet.sv, cast: sheet.cast };
 };
 
 test.describe('a new level 1 character picks a class', () => {
-  for (const c of CLASSES) {
-    test(`${c.cls}: ${c.sv.join(' and ')} saves, ${c.cast || 'no'} spellcasting, d${c.hd} Hit Dice`, async ({ page, seedSheet, savedSheet }) => {
+  for (const classInfo of CLASSES) {
+    test(`${classInfo.cls}: ${classInfo.sv.join(' and ')} saves, ${classInfo.cast || 'no'} spellcasting, d${classInfo.hd} Hit Dice`, async ({ page, seedSheet, savedSheet }) => {
       await seedSheet({ name: 'Nova', mode: 'edit' });
       await page.goto('/');
-      await classBox(page).selectOption(c.cls);
+      await classBox(page).selectOption(classInfo.cls);
 
-      await expect.poll(() => classPart(savedSheet)).toEqual({ cls: c.cls, sv: saves(...c.sv), cast: c.cast });
-      await expect(hitDice(page)).toHaveText(`Hit dice 1 of 1 (d${c.hd})`);
+      await expect.poll(() => classPart(savedSheet))
+        .toEqual({ cls: classInfo.cls, sv: saves(...classInfo.sv), cast: classInfo.cast });
+      await expect(hitDice(page)).toHaveText(`Hit dice 1 of 1 (d${classInfo.hd})`);
     });
   }
 });
@@ -57,7 +58,8 @@ test.describe('changing class', () => {
 
     await classBox(page).selectOption('Wizard');
     // Fighter's Strength and Constitution go, Wizard's Intelligence and Wisdom come, Dexterity stays.
-    await expect.poll(() => classPart(savedSheet)).toEqual({ cls: 'Wizard', sv: saves('dex', 'int', 'wis'), cast: 'int' });
+    await expect.poll(() => classPart(savedSheet))
+      .toEqual({ cls: 'Wizard', sv: saves('dex', 'int', 'wis'), cast: 'int' });
   });
 
   test('a spellcasting ability picked by hand stays', async ({ page, savedSheet }) => {

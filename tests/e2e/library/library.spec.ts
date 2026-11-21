@@ -38,10 +38,10 @@ test.describe('downloading', () => {
     await test.step('first open: one request per part, and both pages of items', async () => {
       await expect(row(lib, 'Fire Bolt')).toBeVisible();
       await expect(lib.getByText(/^SRD data saved /)).toBeVisible();
-      const paths = open5e.requests.map(u => new URL(u).pathname.split('/')[2]).sort();
+      const paths = open5e.requests.map(url => new URL(url).pathname.split('/')[2]).sort();
       expect(paths).toEqual([...RESOURCES, 'items'].sort());
       // Open5e's "next" link is plain http; the app must follow it over https (or noInternet fails the test).
-      expect(open5e.requests.filter(u => u.includes('page=2'))).toHaveLength(1);
+      expect(open5e.requests.filter(url => url.includes('page=2'))).toHaveLength(1);
     });
 
     const loading = lib.getByText('Loading the 2024 SRD…', { exact: true });
@@ -69,11 +69,13 @@ test.describe('downloading', () => {
     // changes, the old copy may be shaped wrongly, so it must be replaced, not reused. Seeded here by
     // hand because seedPacks only writes custom packs; one entry per part, so no part counts as missing.
     await page.addInitScript(() => {
-      const kinds = Object.fromEntries(['spell', 'feat', 'race', 'class', 'item'].map(k => [k, [{ kind: k, name: `Stale ${k}`, sub: '', desc: '' }]]));
-      const r = indexedDB.open('dnd-sheet', 1);
-      r.onupgradeneeded = () => r.result.createObjectStore('kv').put({ ver: 1, at: 1, kinds }, 'srd-cache');
-      r.onsuccess = () => r.result.close();
-      r.onerror = () => console.error('seeding the old saved copy failed:', r.error);
+      const staleEntry = (kind: string) => [{ kind, name: `Stale ${kind}`, sub: '', desc: '' }];
+      const parts = ['spell', 'feat', 'race', 'class', 'item'];
+      const kinds = Object.fromEntries(parts.map(kind => [kind, staleEntry(kind)]));
+      const request = indexedDB.open('dnd-sheet', 1);
+      request.onupgradeneeded = () => request.result.createObjectStore('kv').put({ ver: 1, at: 1, kinds }, 'srd-cache');
+      request.onsuccess = () => request.result.close();
+      request.onerror = () => console.error('seeding the old saved copy failed:', request.error);
     });
     await seedSheet(brakka());
     await page.goto('/');
@@ -100,8 +102,8 @@ test.describe('downloading', () => {
       await lib.getByRole('tab', { name: 'Spells', exact: true }).click();
       await expect(row(lib, 'Fire Bolt')).toBeVisible();
       await expect(lib.getByText(/^Could not load/)).toHaveCount(0);
-      expect(open5e.requests.filter(u => u.includes('/v2/spells/'))).toHaveLength(2);
-      expect(open5e.requests.filter(u => u.includes('/v2/feats/'))).toHaveLength(1);
+      expect(open5e.requests.filter(url => url.includes('/v2/spells/'))).toHaveLength(2);
+      expect(open5e.requests.filter(url => url.includes('/v2/feats/'))).toHaveLength(1);
     });
   });
 
@@ -144,7 +146,9 @@ test.describe('adding to the sheet', () => {
 
     await expect(page.getByRole('button', { name: 'Hit +2', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: '2d10 fire', exact: true })).toBeVisible();
-    await expect.poll(savedSheet).toMatchObject({ spells: [{ n: 'Fire Bolt', l: 0, r: { a: true, d: '1d10', t: 'fire', by: 'char' } }] });
+    await expect.poll(savedSheet).toMatchObject({
+      spells: [{ n: 'Fire Bolt', l: 0, r: { a: true, d: '1d10', t: 'fire', by: 'char' } }],
+    });
   });
 
   test('Cure Wounds arrives as healing that adds the spellcasting modifier and grows with the slot', async ({ page, seedSheet, savedSheet }) => {
@@ -157,7 +161,9 @@ test.describe('adding to the sheet', () => {
     await lib.getByRole('button', { name: 'Close', exact: true }).click();
 
     await expect(page.getByRole('button', { name: '2d8-1 healing', exact: true })).toBeVisible(); // Int -1
-    await expect.poll(savedSheet).toMatchObject({ spells: [{ n: 'Cure Wounds', l: 1, r: { a: false, d: '2d8', h: true, m: true, by: 'slot' } }] });
+    await expect.poll(savedSheet).toMatchObject({
+      spells: [{ n: 'Cure Wounds', l: 1, r: { a: false, d: '2d8', h: true, m: true, by: 'slot' } }],
+    });
     await page.getByLabel('Cure Wounds slot level', { exact: true }).selectOption('Slot 3');
     await expect(page.getByRole('button', { name: '6d8-1 healing', exact: true })).toBeVisible();
   });
@@ -171,7 +177,11 @@ test.describe('adding to the sheet', () => {
     await lib.getByRole('button', { name: 'Add', exact: true }).click();
     await lib.getByRole('button', { name: 'Add (have 1)', exact: true }).click();
     // The 2024 copy (with Sap), not the 2014 one.
-    await expect.poll(savedSheet).toMatchObject({ items: [{ n: 'Longsword', q: 2, d: expect.stringContaining('Sap'), w: { d: '1d8', t: 'slashing', v: '1d10', ab: 'str' } }] });
+    await expect.poll(savedSheet).toMatchObject({
+      items: [{
+        n: 'Longsword', q: 2, d: expect.stringContaining('Sap'), w: { d: '1d8', t: 'slashing', v: '1d10', ab: 'str' },
+      }],
+    });
     await lib.getByRole('button', { name: 'Close', exact: true }).click();
 
     await expect(page.getByRole('button', { name: 'Hit +6', exact: true })).toBeVisible();
@@ -183,7 +193,10 @@ test.describe('adding to the sheet', () => {
     await seedSheet(brakka());
     await page.goto('/');
     const lib = await openLibrary(page);
-    for (const query of ['rapier', 'chain mail', 'shield', 'ring of protection', 'stone of good luck', 'gauntlets of ogre power']) {
+    const queries = [
+      'rapier', 'chain mail', 'shield', 'ring of protection', 'stone of good luck', 'gauntlets of ogre power',
+    ];
+    for (const query of queries) {
       await test.step(`add ${query}`, async () => {
         await find(lib, 'Items', query);
         await lib.getByRole('button', { name: 'Add', exact: true }).click();
@@ -216,7 +229,8 @@ test.describe('adding to the sheet', () => {
     await lib.getByRole('button', { name: 'Add species', exact: true }).click();
     await expect.poll(savedSheet).toMatchObject({
       species: 'Dwarf',
-      race: ['Size', 'Speed', 'Darkvision', 'Dwarven Resilience', 'Dwarven Toughness', 'Stonecunning'].map(n => ({ n })),
+      race: ['Size', 'Speed', 'Darkvision', 'Dwarven Resilience', 'Dwarven Toughness', 'Stonecunning']
+        .map(name => ({ n: name })),
     });
     await lib.getByRole('button', { name: 'Close', exact: true }).click();
 
@@ -230,7 +244,8 @@ test.describe('adding to the sheet', () => {
     await page.goto('/');
     const lib = await openLibrary(page);
     await lib.getByRole('tab', { name: 'Class features', exact: true }).click();
-    await expect(lib.getByRole('button', { name: 'Fighter (your class)', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(lib.getByRole('button', { name: 'Fighter (your class)', exact: true }))
+      .toHaveAttribute('aria-pressed', 'true');
     // PHB 2024 Fighter: Action Surge at level 2 (a second use at 17), listed under the level it starts.
     await find(lib, 'Class features', 'action surge');
     await expect(row(lib, 'Action Surge')).toHaveAccessibleName(/^Action Surge\s*Fighter, level 2$/);
@@ -258,11 +273,11 @@ test.describe('custom content', () => {
   // fires a moment after the click; a redraw before then would draw it closed. So this waits for it.
   async function openCustom(page: Page, lib: Locator) {
     await page.evaluate(() => {
-      (window as unknown as { e2eToggled: Promise<unknown> }).e2eToggled = new Promise(r => {
-        const done = (e: Event) => {
-          if (!(e.target as Element).classList.contains('pack')) return;
+      (window as unknown as { e2eToggled: Promise<unknown> }).e2eToggled = new Promise(resolve => {
+        const done = (event: Event) => {
+          if (!(event.target as Element).classList.contains('pack')) return;
           document.removeEventListener('toggle', done, true);
-          r(null);
+          resolve(null);
         };
         document.addEventListener('toggle', done, true);
       });

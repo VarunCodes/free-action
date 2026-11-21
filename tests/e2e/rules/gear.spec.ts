@@ -5,7 +5,8 @@ import type { Page } from '@playwright/test';
 // Chain Mail, from the PHB 2024 Armor table: AC 16, Strength 13, Disadvantage on Stealth.
 const chain = { n: 'Chain Mail', q: 1, eq: true, on: true, ar: { k: 'heavy', ac: 16, str: 13, stl: true } };
 // PHB 2024, Ring of Protection: +1 to AC and saving throws, requires attunement.
-const ring = (n: string, att: boolean) => ({ n, q: 1, eq: true, on: true, at: true, att, ar: { k: 'bonus', ac: 1, str: 0, sb: 1 } });
+const ring = (name: string, att: boolean) =>
+  ({ n: name, q: 1, eq: true, on: true, at: true, att, ar: { k: 'bonus', ac: 1, str: 0, sb: 1 } });
 
 // Brakka (fighter-5): Str set per test, Dex 12 (+1), proficient in Strength saves, not in Stealth.
 const brakka = (str: number, items: Sheet[]) => {
@@ -91,12 +92,15 @@ test.describe('attunement', () => {
       await expect(page.getByRole('button', { name: 'Strength save +7', exact: true })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Dexterity save +2', exact: true })).toBeVisible();
       await expect(page.getByText('not attuned, no effect')).toHaveCount(0);
-      await expect.poll(savedSheet).toMatchObject({ items: [{ n: 'Chain Mail' }, { n: 'Ring of Protection', att: true }] });
+      await expect.poll(savedSheet)
+        .toMatchObject({ items: [{ n: 'Chain Mail' }, { n: 'Ring of Protection', att: true }] });
     });
   });
 
   test('a fourth item cannot be attuned until one of the three is ended', async ({ page, seedSheet, savedSheet }) => {
-    await seedSheet(brakka(16, [ring('Ring A', true), ring('Ring B', true), ring('Ring C', true), ring('Ring D', false)]));
+    await seedSheet(brakka(16, [
+      ring('Ring A', true), ring('Ring B', true), ring('Ring C', true), ring('Ring D', false),
+    ]));
     await page.goto('/');
     const ringA = page.getByRole('button', { name: 'Attune Ring A' });
     const ringD = page.getByRole('button', { name: 'Attune Ring D' });
@@ -113,7 +117,12 @@ test.describe('attunement', () => {
       await ringD.click();
       await expect(ringD).toHaveAttribute('aria-pressed', 'true');
       await expect.poll(savedSheet).toMatchObject({
-        items: [{ n: 'Ring A', att: false }, { n: 'Ring B', att: true }, { n: 'Ring C', att: true }, { n: 'Ring D', att: true }],
+        items: [
+          { n: 'Ring A', att: false },
+          { n: 'Ring B', att: true },
+          { n: 'Ring C', att: true },
+          { n: 'Ring D', att: true },
+        ],
       });
     });
   });
@@ -146,7 +155,9 @@ test.describe('attunement', () => {
   test('a duplicate copy does not use up one of the three attunement slots', async ({ page, seedSheet }) => {
     // Three items are marked attuned, but the second Ring A can't be, so only two slots are used
     // and Ring C can still be attuned as the third.
-    await seedSheet(brakka(16, [chain, ring('Ring A', true), ring('Ring A', true), ring('Ring B', true), ring('Ring C', false)]));
+    await seedSheet(brakka(16, [
+      chain, ring('Ring A', true), ring('Ring A', true), ring('Ring B', true), ring('Ring C', false),
+    ]));
     await page.goto('/');
     const ringC = page.getByRole('button', { name: 'Attune Ring C' });
 
@@ -161,7 +172,9 @@ test.describe('attunement', () => {
   test('a sheet imported with four items attuned applies only three', async ({ page, seedSheet }) => {
     // Only reachable by importing or hand-editing a sheet. The app's policy: the first three count,
     // and the rest are flagged. With Chain Mail 16, three +1 rings: 16 + 3 = 19.
-    await seedSheet(brakka(16, [chain, ring('Ring A', true), ring('Ring B', true), ring('Ring C', true), ring('Ring D', true)]));
+    await seedSheet(brakka(16, [
+      chain, ring('Ring A', true), ring('Ring B', true), ring('Ring C', true), ring('Ring D', true),
+    ]));
     await page.goto('/');
 
     await expect(ac(page).getByText('19', { exact: true })).toBeVisible();

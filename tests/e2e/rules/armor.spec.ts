@@ -22,7 +22,8 @@ const brakka = (dex: number, gear: Gear[] = [], extra: Sheet = {}) => {
 };
 
 const ac = (page: Page) => page.getByRole('group', { name: 'Armor class', exact: true });
-const expectAC = (page: Page, value: number) => expect(ac(page).getByText(String(value), { exact: true })).toBeVisible();
+const expectAC = (page: Page, value: number) =>
+  expect(ac(page).getByText(String(value), { exact: true })).toBeVisible();
 
 const cases: [title: string, sheet: Sheet, expected: number][] = [
   ['no armor: 10 + Dex (+1)', brakka(12), 11],
@@ -39,7 +40,10 @@ const cases: [title: string, sheet: Sheet, expected: number][] = [
   ['a Shield with no armor: 10 + Dex (+1) + 2', brakka(12, [shield]), 13],
   ['of two armors worn, the better counts: Scale Mail 16 beats Leather 15', brakka(18, [leather, scale]), 16],
   ['armor carried but not equipped does not count: 10 + Dex (+1)', brakka(12, [{ ...chain, on: false }]), 11],
-  ['an AC bonus item adds on top: Chain Mail 16 + Ring of Protection 1', brakka(12, [chain, { n: 'Ring of Protection', ar: { k: 'bonus', ac: 1 } }]), 17],
+  [
+    'an AC bonus item adds on top: Chain Mail 16 + Ring of Protection 1',
+    brakka(12, [chain, { n: 'Ring of Protection', ar: { k: 'bonus', ac: 1 } }]), 17,
+  ],
   ['the sheet’s Other AC bonus adds on top: Chain Mail 16 + 1', brakka(12, [chain], { acb: 1 }), 17],
   ['a better unarmored base replaces 10: Robe 15 + Dex (+1)', brakka(12, [robe]), 16],
   ['an unarmored base does nothing under armor: Leather 11 + Dex (+1)', brakka(12, [robe, leather]), 12],

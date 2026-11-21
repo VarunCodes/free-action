@@ -105,8 +105,8 @@ test.describe('Hit Point Dice', () => {
       await expect(page.getByLabel('Chat command')).toHaveValue('/r 1d10+2 # Hit die (d10)');
       const roll = page.getByText(/^Hit die \(d10\) \[\d+\] \+ 2 · healed \d+$/);
       await expect(roll).toBeVisible();
-      const [, f, healed] = /\[(\d+)\].*healed (\d+)/.exec((await roll.textContent())!)!;
-      face = +f;
+      const [, faceText, healed] = /\[(\d+)\].*healed (\d+)/.exec((await roll.textContent())!)!;
+      face = +faceText;
       expect(face).toBeGreaterThanOrEqual(1); // a d10, so 1 to 10
       expect(face).toBeLessThanOrEqual(10);
       expect(+healed).toBe(face + 2);
@@ -159,7 +159,7 @@ test.describe('Hit Point Dice', () => {
 test('a long rest restores HP, hit dice and spell slots, and ends Temporary Hit Points', async ({ page, seedSheet, savedSheet }) => {
   // PHB 2024, Long Rest: regain all lost HP and all spent Hit Point Dice, and spell slots come back.
   // Temporary Hit Points last until a Long Rest ends.
-  const slots = Array.from({ length: 9 }, (_, i) => (i < 2 ? { m: 3, u: 2 } : { m: 0, u: 0 }));
+  const slots = Array.from({ length: 9 }, (_slot, i) => (i < 2 ? { m: 3, u: 2 } : { m: 0, u: 0 }));
   await seedSheet(brakka({ ...hp(10, 44, 5), hd: 3, slots }));
   await page.goto('/');
   await expect(hpBlock(page)).toHaveText('10/ 44 HP+5 temp');
@@ -181,12 +181,13 @@ test.describe('average maximum HP', () => {
     { cls: 'Fighter', level: 5, con: 14, avg: 44, why: 'd10, Con +2: (10 + 2) + 4 x (6 + 2)' },
     { cls: 'Barbarian', level: 6, con: 16, avg: 65, why: 'd12, Con +3: (12 + 3) + 5 x (7 + 3)' },
   ];
-  for (const c of cases) {
-    test(`a level ${c.level} ${c.cls} with Con ${c.con} averages ${c.avg} HP`, async ({ page, seedSheet }) => {
-      // c.why shows the working.
-      await seedSheet({ name: 'Avg', mode: 'edit', cls: c.cls, level: c.level, ab: { con: c.con } });
+  for (const testCase of cases) {
+    test(`a level ${testCase.level} ${testCase.cls} with Con ${testCase.con} averages ${testCase.avg} HP`, async ({ page, seedSheet }) => {
+      // testCase.why shows the working.
+      const { cls, level, con } = testCase;
+      await seedSheet({ name: 'Avg', mode: 'edit', cls, level, ab: { con } });
       await page.goto('/');
-      await expect(average(page)).toHaveText(new RegExp(`: ${c.avg} Use ${c.avg}$`));
+      await expect(average(page)).toHaveText(new RegExp(`: ${testCase.avg} Use ${testCase.avg}$`));
     });
   }
 
