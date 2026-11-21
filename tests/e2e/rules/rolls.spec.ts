@@ -10,13 +10,22 @@ const brakka = (more: Sheet = {}, ab: Sheet = {}) => {
 };
 // A Charisma caster with Cha 18 (+4), a modifier none of Brakka's other abilities has.
 const caster = (spells: Sheet[], level = 5) => brakka({ level, cast: 'cha', spells }, { cha: 18 });
-const weapon = (n: string, w: Sheet, more: Sheet = {}) => ({ n, q: 1, eq: true, on: true, w: { b: 0, ...w }, ...more });
+const weapon = (name: string, attack: Sheet, more: Sheet = {}) => ({
+  n: name, q: 1, eq: true, on: true, w: { b: 0, ...attack }, ...more,
+});
+function rollModeButton(page: Page, mode: 'Adv' | 'Dis') {
+  const rollMode = page.getByRole('group', { name: 'Roll mode', exact: true });
+  return rollMode.getByRole('button', { name: mode, exact: true });
+}
 // SRD 5.2 weapons table.
 const longsword = weapon('Longsword', { d: '1d8', t: 'slashing', v: '1d10', ab: 'str' });
 const longbow = weapon('Longbow', { d: '1d8', t: 'piercing', ab: 'dex' });
 const rapier = weapon('Rapier', { d: '1d8', t: 'piercing', ab: 'fin' });
 // SRD 5.2 Fire Bolt: 1d10 fire; the damage rises by 1d10 at character levels 5, 11 and 17.
-const fireBolt = { n: 'Fire Bolt', l: 0, p: true, d: '', r: { a: true, d: '1d10', b: '1d10', t: 'fire', by: 'char', up: [[5, '2d10', 0], [11, '3d10', 0], [17, '4d10', 0]] } };
+const fireBolt = {
+  n: 'Fire Bolt', l: 0, p: true, d: '',
+  r: { a: true, d: '1d10', b: '1d10', t: 'fire', by: 'char', up: [[5, '2d10', 0], [11, '3d10', 0], [17, '4d10', 0]] },
+};
 
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 // The big number on the roll bar.
@@ -86,7 +95,8 @@ test.describe('weapons', () => {
 
   test('a magic weapon that needs attunement adds its bonus only once attuned', async ({ page, seedSheet }) => {
     // A homebrew +1 blade that needs attunement.
-    await seedSheet(brakka({ items: [weapon('Oathblade', { d: '1d8', t: 'slashing', ab: 'str', b: 1 }, { at: true, att: false })] }));
+    const oathblade = weapon('Oathblade', { d: '1d8', t: 'slashing', ab: 'str', b: 1 }, { at: true, att: false });
+    await seedSheet(brakka({ items: [oathblade] }));
     await page.goto('/');
     await test.step('not attuned: no bonus', async () => {
       await expect(button(page, 'Hit +6')).toBeVisible();
@@ -156,7 +166,7 @@ test.describe('critical hits', () => {
       // PHB 2024, Advantage: use the higher d20. It's the second one here, a 20.
       await seedSheet(brakka({ items: [longsword] }));
       await page.goto('/');
-      await page.getByRole('group', { name: 'Roll mode', exact: true }).getByRole('button', { name: 'Adv', exact: true }).click();
+      await rollModeButton(page, 'Adv').click();
       await roll(page, 'Hit +6', '/r 2d20kh1+6 # Longsword attack');
       await natural20(page);
       await roll(page, '1d8+3 slashing', '/r 2d8+3 # Longsword damage');
@@ -166,7 +176,7 @@ test.describe('critical hits', () => {
       // PHB 2024, Disadvantage: use the lower d20, the 1. A natural 1 always misses; no crit follows.
       await seedSheet(brakka({ items: [longsword] }));
       await page.goto('/');
-      await page.getByRole('group', { name: 'Roll mode', exact: true }).getByRole('button', { name: 'Dis', exact: true }).click();
+      await rollModeButton(page, 'Dis').click();
       await roll(page, 'Hit +6', '/r 2d20kl1+6 # Longsword attack');
       await expect(page.getByText('Natural 1', { exact: true })).toBeVisible();
       await roll(page, '1d8+3 slashing', '/r 1d8+3 # Longsword damage');
@@ -194,7 +204,10 @@ test.describe('spell damage', () => {
   test('a healing spell cast with a higher slot rolls more dice, plus the spellcasting modifier', async ({ page, seedSheet }) => {
     // SRD 5.2 Cure Wounds: 2d8 + spellcasting modifier; +2d8 for each slot level above 1.
     // Cha +4. Slot 3: 6d8+4.
-    const cure = { n: 'Cure Wounds', l: 1, p: true, d: '', r: { d: '2d8', b: '2d8', h: true, m: true, by: 'slot', up: [[2, '4d8', 0], [3, '6d8', 0], [4, '8d8', 0]] } };
+    const cure = {
+      n: 'Cure Wounds', l: 1, p: true, d: '',
+      r: { d: '2d8', b: '2d8', h: true, m: true, by: 'slot', up: [[2, '4d8', 0], [3, '6d8', 0], [4, '8d8', 0]] },
+    };
     await seedSheet(caster([cure]));
     await page.goto('/');
     await expect(button(page, '2d8+4 healing')).toBeVisible();
@@ -224,7 +237,7 @@ test.describe('totals', () => {
       // PHB 2024, Disadvantage: roll two d20s and use the lower. 1 + floor(0.2 × 20) = 5.
       await seedSheet(brakka());
       await page.goto('/');
-      await page.getByRole('group', { name: 'Roll mode', exact: true }).getByRole('button', { name: 'Dis', exact: true }).click();
+      await rollModeButton(page, 'Dis').click();
       await roll(page, 'Athletics +6', '/r 2d20kl1+6 # Athletics');
       await expect(page.getByText('Athletics [11, 5] take 5 + 6', { exact: true })).toBeVisible();
       await expect(total(page)).toHaveText('11'); // 5 + 6
@@ -266,7 +279,8 @@ test.describe('totals', () => {
     await seedSheet(caster([{ ...fireBolt, r: { ...fireBolt.r, d: '1d10+fire' } }]));
     await page.goto('/');
     await button(page, '1d10+fire fire').click();
-    await expect(page.getByText('Fire Bolt has no valid dice. Use dice like 1d10 or 2d6+3; fix them in Edit.', { exact: true })).toBeVisible();
+    const message = 'Fire Bolt has no valid dice. Use dice like 1d10 or 2d6+3; fix them in Edit.';
+    await expect(page.getByText(message, { exact: true })).toBeVisible();
     await expect(page.getByLabel('Chat command', { exact: true })).toHaveValue('');
     await expect(total(page)).toHaveCount(0);
   });

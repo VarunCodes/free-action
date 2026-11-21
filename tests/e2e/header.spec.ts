@@ -68,7 +68,9 @@ test.describe('Edit', () => {
   });
 
   test("the Library's species are offered in alphabetical order, each once", async ({ page, seedSheet, seedPacks }) => {
-    const species = (name: string, sub: string) => ({ kind: 'race', name, level: 0, sub, desc: '', src: 'Custom', traits: [] });
+    const species = (name: string, sub: string) => ({
+      kind: 'race', name, level: 0, sub, desc: '', src: 'Custom', traits: [],
+    });
     await seedPacks([species('Windkin', 'Custom'), species('Aasimar', 'Custom'), species('Windkin', 'Homebrew')]);
     await seedSheet(brakka({ mode: 'edit', species: '' }));
     await page.goto('/');

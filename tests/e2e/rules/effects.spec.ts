@@ -5,12 +5,15 @@ import type { Page } from '@playwright/test';
 // Brakka (fighter-5), level 5 (proficiency +3): Str 16 (+3), Dex 12 (+1), Con 14 (+2), Int 8 (-1),
 // Wis 10 (+0), Cha 13 (+1). Proficient in Strength and Constitution saves, Athletics and Perception.
 const brakka = (more: Sheet = {}) => ({ ...loadSheet('fighter-5'), ...more });
-const trait = (n: string, d: string, fx?: unknown[]) => ({ n, t: '', d, ...(fx ? { fx } : {}) });
+function trait(name: string, description: string, fx?: unknown[]) {
+  const effects = fx ? { fx } : {};
+  return { n: name, t: '', d: description, ...effects };
+}
 // An equipped magic item that needs attunement.
-const magic = (n: string, fx: unknown[], att = true) => ({ n, q: 1, eq: true, on: true, at: true, att, fx });
+const magic = (name: string, fx: unknown[], att = true) => ({ n: name, q: 1, eq: true, on: true, at: true, att, fx });
 
 // SRD 5.2, Stone of Good Luck: +1 to ability checks and saving throws, requires attunement.
-const luckstone = (n = 'Stone of Good Luck') => magic(n, [['chk', '', 1], ['sv', '', 1]]);
+const luckstone = (name = 'Stone of Good Luck') => magic(name, [['chk', '', 1], ['sv', '', 1]]);
 // SRD 5.2, Gauntlets of Ogre Power: your Strength is 19 (no effect if it's already 19 or more).
 const gauntlets = (att = true) => magic('Gauntlets of Ogre Power', [['set', 'str', 19]], att);
 
@@ -43,7 +46,10 @@ test.describe('ability scores', () => {
   test('a bonus never takes a score above 30', async ({ page, seedSheet }) => {
     // PHB 2024, Ability Scores: a score can be at most 30. 29 + 4 stops at 30 (+10); 33 would be +11.
     // (+2 wouldn't do: 31 is also +10.)
-    await seedSheet(brakka({ ab: { ...brakka().ab as object, str: 29 }, race: [trait('Mighty', '', [['ab', 'str', 4]])] }));
+    await seedSheet(brakka({
+      ab: { ...brakka().ab as object, str: 29 },
+      race: [trait('Mighty', '', [['ab', 'str', 4]])],
+    }));
     await page.goto('/');
     await expect(button(page, 'Strength check +10')).toBeVisible();
   });
@@ -63,7 +69,11 @@ test.describe('ability scores', () => {
 
   test('Gauntlets of Ogre Power never lower a higher Strength', async ({ page, seedSheet }) => {
     // Str 18 with a +2 trait is 20, above the Gauntlets' 19: it stays 20 (+5).
-    await seedSheet(brakka({ ab: { ...brakka().ab as object, str: 18 }, race: [trait('Mighty', '', [['ab', 'str', 2]])], items: [gauntlets()] }));
+    await seedSheet(brakka({
+      ab: { ...brakka().ab as object, str: 18 },
+      race: [trait('Mighty', '', [['ab', 'str', 2]])],
+      items: [gauntlets()],
+    }));
     await page.goto('/');
     await expect(button(page, 'Strength check +5')).toBeVisible();
   });
@@ -84,7 +94,8 @@ test.describe('bonuses to checks and saves', () => {
   });
 
   test('bonuses from differently named sources add up', async ({ page, seedSheet }) => {
-    await seedSheet(brakka({ items: [luckstone()], feats: [{ n: 'Blessed', t: 'Feat', d: '', fx: [['chk', '', 1]] }] }));
+    const blessed = { n: 'Blessed', t: 'Feat', d: '', fx: [['chk', '', 1]] };
+    await seedSheet(brakka({ items: [luckstone()], feats: [blessed] }));
     await page.goto('/');
     await expect(button(page, 'Strength check +5')).toBeVisible(); // +3, +1, +1
   });
@@ -180,7 +191,8 @@ test.describe('skill proficiency', () => {
 
   test('Keen Senses counts once a skill is picked for it', async ({ page, seedSheet, savedSheet }) => {
     // SRD 5.2, Elf, Keen Senses: proficiency in Insight, Perception or Survival.
-    await seedSheet(brakka({ race: [trait('Keen Senses', 'You have proficiency in the Insight, Perception, or Survival skill.')] }));
+    const keenSenses = trait('Keen Senses', 'You have proficiency in the Insight, Perception, or Survival skill.');
+    await seedSheet(brakka({ race: [keenSenses] }));
     await page.goto('/');
     await expect(button(page, 'Insight +0')).toBeVisible(); // nothing picked yet
 
@@ -196,8 +208,8 @@ test.describe('skill proficiency', () => {
 
 test('a trait worded "Hit Point maximum increases by 2… again whenever you gain a level" adds 2 HP per level', async ({ page, seedSheet }) => {
   // Brakka at level 5: (10 + 2) + 4 x (6 + 2) = 44, plus 2 x 5 = 54.
-  const d = 'Your Hit Point maximum increases by 2, and it increases by 2 again whenever you gain a level.';
-  await seedSheet(brakka({ mode: 'edit', race: [trait('Tough Hide', d)] }));
+  const description = 'Your Hit Point maximum increases by 2, and it increases by 2 again whenever you gain a level.';
+  await seedSheet(brakka({ mode: 'edit', race: [trait('Tough Hide', description)] }));
   await page.goto('/');
   await expect(page.getByText(/^Average max HP/)).toHaveText('Average max HP for level 5 (d10, Con +2, Tough Hide +2/level): 54 Use 54');
 });

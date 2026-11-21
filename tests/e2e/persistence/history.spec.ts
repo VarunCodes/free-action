@@ -80,16 +80,16 @@ test('the list keeps the six newest versions and drops the oldest when a seventh
   // Each Import keeps the sheet it replaces. The first one replaces Brakka, who is already the newest
   // version (saved when the page opened), so it adds nothing; every later one adds the previous hero.
   const versions = page.getByLabel('Earlier version').getByRole('option');
-  const importHero = async (n: number) => {
+  const importHero = async (number: number) => {
     const asked = answerConfirm(page, 'accept');
-    await page.getByLabel('Backup JSON').fill(JSON.stringify({ ...loadSheet('fighter-5'), name: `Hero ${n}` }));
+    await page.getByLabel('Backup JSON').fill(JSON.stringify({ ...loadSheet('fighter-5'), name: `Hero ${number}` }));
     await page.getByRole('button', { name: 'Import', exact: true }).click();
     await asked;
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText(`Hero ${n}`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(`Hero ${number}`);
   };
 
   await test.step('import six heroes, making six versions', async () => {
-    for (let n = 1; n <= 6; n++) await importHero(n);
+    for (let i = 1; i <= 6; i++) await importHero(i);
   });
   await expect(versions).toHaveText([
     /: Hero 5 \(before import\)$/,

@@ -1,4 +1,7 @@
 import { test, expect, loadSheet, switchMode } from '../fixtures';
+import type { Page } from '@playwright/test';
+
+const proficiencyBox = (page: Page) => page.getByRole('group', { name: 'Proficiency', exact: true });
 
 // PHB 2024, Proficiency Bonus by character level: +2 at levels 1-4, +3 at 5-8, +4 at 9-12,
 // +5 at 13-16, +6 at 17-20. Both ends of every band are checked, so an off-by-one fails.
@@ -15,7 +18,7 @@ for (const [level, bonus] of bands) {
     await seedSheet({ ...loadSheet('fighter-5'), level });
     await page.goto('/');
 
-    await expect(page.getByRole('group', { name: 'Proficiency', exact: true }).getByText(bonus, { exact: true })).toBeVisible();
+    await expect(proficiencyBox(page).getByText(bonus, { exact: true })).toBeVisible();
   });
 }
 
@@ -34,7 +37,7 @@ test('levelling up raises the proficiency bonus everywhere it is used', async ({
   });
 
   // Level 9: proficiency +4. Athletics = +3 Str + 4 = +7; Strength save = +3 + 4 = +7.
-  await expect(page.getByRole('group', { name: 'Proficiency', exact: true }).getByText('+4', { exact: true })).toBeVisible();
+  await expect(proficiencyBox(page).getByText('+4', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Athletics +7', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Strength save +7', exact: true })).toBeVisible();
 });
