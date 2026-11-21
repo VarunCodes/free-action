@@ -145,10 +145,10 @@ function armorClassSettings(sheet) {
             ${input('acb', sheet.acb, 'number', 'min=-10 max=20 style="width:72px" aria-label="Other AC bonus"')}
         </label>`;
     const calculated = sheet.acAuto;
+    const checkbox = html`<input type="checkbox" data-k="acAuto" ${when(calculated, 'checked')}>`;
     return html`
         <div class="row acset">
-            <label class="row">
-                <input type="checkbox" data-k="acAuto" ${when(calculated, 'checked')}> Calculate AC from equipped gear</label>
+            <label class="row">${checkbox} Calculate AC from equipped gear</label>
             ${when(calculated, bonusField)}
         </div>`;
 }
