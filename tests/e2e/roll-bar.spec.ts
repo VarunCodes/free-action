@@ -154,3 +154,25 @@ test('hiding the roll options keeps the result, and stays hidden after a reload'
     await expect(mode).toBeVisible();
   });
 });
+
+test('a roll that fails clears the last one, so Copy goes back to off and says Copy', async ({ page }) => {
+  await roll(page, 'Athletics +6', '/r 1d20+6 # Athletics');
+  await expect(button(page, 'Copied')).toBeEnabled();
+
+  await openRollOptions(page);
+  await page.getByLabel('Custom dice', { exact: true }).fill('fireball');
+  await button(page, 'Roll').click();
+  await expect(page.getByRole('alert')).toHaveText('"fireball" is not a roll. Use dice like 2d6+3 or 1d20+1d4.');
+  await expect(button(page, 'Copy')).toBeDisabled();
+});
+
+test('a roll copies its chat command in the chosen format', async ({ page, context, browserName }) => {
+  // Reading the clipboard needs a permission that only Chromium lets a test grant.
+  test.skip(browserName !== 'chromium', 'Only Chromium can grant clipboard access here');
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await openRollOptions(page);
+  await page.getByLabel('Chat format', { exact: true }).selectOption('Roll20 (/roll)');
+
+  await roll(page, 'Athletics +6', '/roll 1d20+6');
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('/roll 1d20+6');
+});
