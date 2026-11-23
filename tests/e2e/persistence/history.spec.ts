@@ -38,6 +38,7 @@ test('New character starts a blank sheet, and the old one can be restored', asyn
     expect(await asked).toContain('Restore "Brakka"');
   });
 
+  await expect(page.getByRole('status')).toHaveText(/^Restored "Brakka" from .+\.$/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Brakka');
   await expect(page.getByText('Dwarf, Fighter, Level 5')).toBeVisible();
   await expect.poll(savedSheet).toEqual(before);
