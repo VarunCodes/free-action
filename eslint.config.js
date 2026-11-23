@@ -30,6 +30,8 @@ const READABLE = [
     'src/html.js',
     'src/effects.js',
     'src/sections/*.js',
+    'src/actions/*.js',
+    'src/ui.js',
 ];
 
 // Short lines, one statement per line, small functions and names that say what they hold.

@@ -4,10 +4,9 @@ import { cachedItems, cachedSpecies, loadLibrary } from './library.js';
 import { dateAndTime } from './text.js';
 import { ABN, DEF, CLS, cleanSheet } from './sheet.js';
 import {
-    abilityMod, signed, profBonus, knownClass, knownSpecies, hitDie, hitDiceLeft, averageHP, activeGear,
+    abilityMod, profBonus, knownClass, knownSpecies, averageHP, activeGear,
     effectsOf, effectTotal, advantageFrom, score, skillGranted, skillProf,
 } from './rules.js';
-import { rollMode, rollD20, rollDice, customRollError, chatCommand, spellDice, weaponMod, withMod } from './rolls.js';
 import { sourcesText } from './html.js';
 import { abilitiesSection, savesSection, skillsSection } from './sections/stats.js';
 import { spellsSection } from './sections/spells.js';
@@ -17,8 +16,14 @@ import { headerSection } from './sections/header.js';
 import { vitalsSection } from './sections/vitals.js';
 import { notesSection, backupSection } from './sections/backup.js';
 import { rollBarSection } from './sections/rollBar.js';
-import { readKey, writeKey, loadSaved, saveSheet, snapshots, snapshot, markBackedUp, downloadSheet, readBackup } from './storage.js';
-let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null,RERR='',IOMSG=null,ATTMSG=-1,CC=false,CS=false,CMSG='',SPC=[];const UP={};
+import { createUi, forgetListPlaces } from './ui.js';
+import {
+    rollCheck, rollSpellAttack, rollSpellEffect, rollWeaponAttack, rollWeaponDamage, spendHitDie,
+    rollCustomDice, copyLastRoll, setRollMode, toggleRollOptions,
+} from './actions/rolls.js';
+import { loadSaved, saveSheet, snapshots, snapshot, markBackedUp, downloadSheet, readBackup } from './storage.js';
+let S=DEF(),amt=1,io='';const OPEN=new Set();let IOMSG=null,ATTMSG=-1,CC=false,CS=false,CMSG='',SPC=[];
+const ui=createUi();
 const SR=()=>({a:false,s:'',d:'',b:'',t:'',h:false,m:false,by:'slot',up:[]});
 S=loadSaved()||S;
 function save(){
@@ -35,8 +40,7 @@ function replaceSheet(o,why){
     CC=false;
     CS=false;
     OPEN.clear();
-    Object.keys(UP).forEach(k=>delete UP[k]);
-    CRIT=null;
+    forgetListPlaces(ui);
 }
 
 // Import (pasted JSON) and Open backup file. The result shows under the Backup buttons.
@@ -117,37 +121,11 @@ function setClass(c){const o=CLS[knownClass(S.cls)],n=CLS[c],n0=ABN[S.cast];S.cl
     const ca=S.cast===n.ca?(n.ca?`${ABN[n.ca]} for spellcasting`:n0?'no spellcasting ability (pick one below if your subclass casts spells)':''):`spellcasting stays ${ABN[S.cast]}${n.ca?` (${c}s usually use ${ABN[n.ca]})`:''}`;
     CMSG=`${c}: proficient in ${n.sv.map(a=>ABN[a]).join(' and ')} saving throws${ca?', '+ca:''}. You can change these below.`}
 
-function copyText(t){try{navigator.clipboard.writeText(t).catch(()=>{});return true}catch(e){}try{const x=document.createElement('textarea');x.value=t;document.body.appendChild(x);x.select();const ok=document.execCommand('copy');x.remove();return ok}catch(e){return false}}
-// A d20 roll (checks, saves, attacks). dis/adv are this roll's own Disadvantage or Advantage; the
-// mode picked on the roll bar is added to them.
-function doRoll(label,b,dis,adv){
-    RERR='';
-    LAST=rollD20(label,b,rollMode(RM,dis,adv));
-}
-// A roll that can't be made clears the last one, so its chat command can't be pasted by mistake.
-const rollErr=t=>{LAST=null;RERR=t;COP=false};
-// Custom rolls from the roll bar, like 2d6+3 or 1d20+1d4-1.
-function doCustom(text){
-    const error=customRollError(text);
-    if(error)return rollErr(error);
-    rollExpr('Roll',text.replace(/\s/g,''),false,true);
-}
-// Rolls dice and shows the result. Returns false, changing nothing, if the dice can't be read.
-function rollExpr(label,e,crit,raw){
-    const result=rollDice(label,e,crit,raw);
-    if(!result)return false;
-    RERR='';
-    LAST=result;
-    return true;
-}
-// The roll bar can shrink to just the last result; the choice is kept per device, not in the sheet.
-let RMIN=readKey('roll-min')==='1';
-function renderRoll(){
-    const ui={lastRoll:LAST,rollError:RERR,mode:RM,copied:COP,customDice:CX,minimized:RMIN,isOpen:id=>OPEN.has(id)};
-    const rollBar=document.getElementById('roll');
-    rollBar.innerHTML=rollBarSection(S,ui);
+function renderRoll() {
+    const rollBar = document.getElementById('roll');
+    rollBar.innerHTML = rollBarSection(S, ui.roll, id => OPEN.has(id));
     // The page leaves room at the bottom for however tall the bar is now.
-    document.documentElement.style.setProperty('--rollh',rollBar.firstChild.offsetHeight+'px');
+    document.documentElement.style.setProperty('--rollh', rollBar.firstChild.offsetHeight + 'px');
 }
 // Values several sections use, worked out once per render:
 //   editing             true in Edit mode, false in Play
@@ -192,7 +170,7 @@ function render(){
     const skills=skillsSection(S,view);
     const features=featuresSection(S,view,{isOpen});
     const racialFeatures=racialFeaturesSection(S,view,{isOpen});
-    const spells=spellsSection(S,view,{isOpen,slotFor:index=>UP[index]});
+    const spells=spellsSection(S,view,{isOpen,slotFor:index=>ui.spellSlotLevels[index]});
     const inventory=inventorySection(S,view,{isOpen,attunementRefused:ATTMSG});
     const notes=notesSection(S);
     const backup=backupSection({backupText:io,message:IOMSG});
@@ -210,8 +188,8 @@ function render(){
 document.addEventListener('change',e=>{
     const t=e.target;
     if(t.id==='amt'){amt=Math.max(0,parseInt(t.value)||0);return}
-    if(t.id==='cx'){CX=t.value;return}
-    if(t.dataset.up!==undefined){UP[t.dataset.up]=+t.value;render();return}
+    if(t.id==='cx'){ui.roll.customDice=t.value;return}
+    if(t.dataset.up!==undefined){ui.spellSlotLevels[t.dataset.up]=+t.value;render();return}
     if(t.dataset.ch){const[k,i,j]=t.dataset.ch.split('.'),x=S[k]?.[+i];if(x){x.ch=x.ch||[];x.ch[+j]=t.value}CMSG='';save();render();return}
     // Picking Custom clears a standard class so the box starts empty; a typed name that is a standard class snaps to it.
     // The note on what a class set stays until the next change anywhere on the sheet.
@@ -238,7 +216,7 @@ document.addEventListener('click',e=>{
     else if(a==='heal')S.hp.cur=Math.min(S.hp.max,S.hp.cur+n);
     else if(a==='temp')S.hp.temp=Math.max(S.hp.temp,n);
     else if(a==='long'){S.hp.cur=S.hp.max;S.hp.temp=0;S.hd=0;S.slots.forEach(s=>s.u=0)}
-    else if(a==='hd'){const d=hitDie(S),c=abilityMod(score(S,'con'));if(d&&hitDiceLeft(S)&&rollExpr(`Hit die (d${d})`,`1d${d}${signed(c)}`,false,true)){const g=Math.max(1,LAST.total);LAST.total=g;LAST.detail+=` · healed ${Math.min(g,S.hp.max-S.hp.cur)}`;S.hp.cur=Math.min(S.hp.max,S.hp.cur+g);S.hd++;CRIT=null;COP=copyText(chatCommand(LAST,S.vtt))}}
+    else if(a==='hd')spendHitDie(S,ui);
     // Leveling up: the new max comes with the HP gained, so current HP rises by the same amount.
     else if(a==='avghp'){const m=averageHP(S);if(m>S.hp.max)S.hp.cur+=m-S.hp.max;S.hp.max=m}
     else if(a==='sv')S.sv[v]=!S.sv[v];
@@ -247,11 +225,11 @@ document.addEventListener('click',e=>{
     else if(a==='sk'){const g=skillGranted(S,v),nx=(skillProf(S,v)+1)%3;S.sk[v]=nx>g?nx:0}
     else if(a==='slot'){const[i,j]=v.split('.').map(Number),s=S.slots[i];s.u=(j<s.u)?j:j+1}
     else if(a==='addsp'){const nm=g('spn').value.trim();if(!nm)return;S.spells.push({n:nm,l:+g('spl').value,p:false})}
-    else if(a==='delsp'){S.spells.splice(+v,1);[...OPEN].filter(k=>k.startsWith('sp')).forEach(k=>OPEN.delete(k));Object.keys(UP).forEach(k=>delete UP[k]);CRIT=null}
-    else if(a==='satk'){const x=S.spells[+v],cm=S.cast?abilityMod(score(S,S.cast)):0;doRoll(x.n+' attack',profBonus(S)+cm+effectTotal(S,'sa'));CRIT=LAST.crit==='Natural 20'?'s'+v:null;COP=copyText(chatCommand(LAST,S.vtt))}
-    else if(a==='sdmg'){const x=S.spells[+v],{dice:d}=spellDice(S,x,UP[v]??x.l);if(!rollExpr(x.n+(x.r.h?' healing':' damage'),d,CRIT==='s'+v))rollErr(`${x.n} has no valid dice. Use dice like 1d10 or 2d6+3; fix them in Edit.`);else COP=copyText(chatCommand(LAST,S.vtt));CRIT=null}
-    else if(a==='iatk'){const x=S.items[+v];doRoll(x.n+' attack',profBonus(S)+weaponMod(S,x));CRIT=LAST.crit==='Natural 20'?'i'+v:null;COP=copyText(chatCommand(LAST,S.vtt))}
-    else if(a==='idmg'){const x=S.items[+v],tw=b.dataset.t==='v';if(!rollExpr(x.n+' damage'+(tw?' (two-handed)':''),withMod(tw?x.w.v:x.w.d,weaponMod(S,x)),CRIT==='i'+v))rollErr(`${x.n} has no valid damage dice.`);else COP=copyText(chatCommand(LAST,S.vtt));CRIT=null}
+    else if(a==='delsp'){S.spells.splice(+v,1);[...OPEN].filter(k=>k.startsWith('sp')).forEach(k=>OPEN.delete(k));forgetListPlaces(ui)}
+    else if(a==='satk')rollSpellAttack(S,ui,+v);
+    else if(a==='sdmg')rollSpellEffect(S,ui,+v);
+    else if(a==='iatk')rollWeaponAttack(S,ui,+v);
+    else if(a==='idmg')rollWeaponDamage(S,ui,+v,b.dataset.t==='v');
     else if(a==='addfx'){const x=S.items[+v],[t,k]=g('fxt-'+v).value.split('|');let n=parseInt(g('fxv-'+v).value)||0;if(t==='set')n=Math.min(30,Math.max(1,n||19));if(t==='adv')n=0;x.fx=[...(x.fx||[]).filter(f=>!(f[0]===t&&f[1]===k)),[t,k,n]]}
     else if(a==='delfx'){const[i,j]=v.split('.').map(Number);S.items[i].fx.splice(j,1)}
     else if(a==='itd'){const k='it'+v;OPEN.has(k)?OPEN.delete(k):OPEN.add(k)}
@@ -260,16 +238,16 @@ document.addEventListener('click',e=>{
     else if(a==='att'){const x=S.items[+v];if(!x.att&&activeGear(S).attuned>=3){ATTMSG=+v;render();return}x.att=!x.att}
     else if(a==='spd'){const k='sp'+v;OPEN.has(k)?OPEN.delete(k):OPEN.add(k)}
     // The Library may have just downloaded (or imported) species, so the drop-down re-reads them afterwards.
-    else if(a==='lib'){openLibrary(()=>S,removed=>{if(removed){OPEN.clear();Object.keys(UP).forEach(k=>delete UP[k]);CRIT=null}save();render();cachedSpecies().then(l=>{SPC=l;render()}).catch(()=>{})});return}
+    else if(a==='lib'){openLibrary(()=>S,removed=>{if(removed){OPEN.clear();forgetListPlaces(ui)}save();render();cachedSpecies().then(l=>{SPC=l;render()}).catch(()=>{})});return}
     else if(a==='addit'){const nm=g('itn').value.trim();if(!nm)return;S.items.push({n:nm,q:parseInt(g('itq').value)||1})}
-    else if(a==='delit'){S.items.splice(+v,1);[...OPEN].filter(k=>k.startsWith('it')).forEach(k=>OPEN.delete(k));CRIT=null}
+    else if(a==='delit'){S.items.splice(+v,1);[...OPEN].filter(k=>k.startsWith('it')).forEach(k=>OPEN.delete(k));ui.roll.criticalHit=null}
     else if(a==='addft'){const nm=g('ftn-'+v).value.trim();if(!nm)return;const t=g('ftt-'+v);S[v].push({n:nm,t:t?t.value:'',d:''})}
     else if(a==='delft'){const[k,i]=v.split('.');S[k].splice(+i,1);OPEN.clear()}
-    else if(a==='roll'){doRoll(b.dataset.l,+b.dataset.b,b.dataset.dis==='1',b.dataset.adv==='1');CRIT=null;COP=copyText(chatCommand(LAST,S.vtt))}
-    else if(a==='rm')RM=v;
-    else if(a==='rmin'){RMIN=!RMIN;writeKey('roll-min',RMIN?'1':'0');renderRoll();return}
-    else if(a==='cx'){CX=g('cx').value;doCustom(CX);CRIT=null;if(LAST)COP=copyText(chatCommand(LAST,S.vtt))}
-    else if(a==='cp'){if(LAST)COP=copyText(chatCommand(LAST,S.vtt))}
+    else if(a==='roll')rollCheck(S,ui,b);
+    else if(a==='rm')setRollMode(ui,v);
+    else if(a==='rmin'){toggleRollOptions(ui);renderRoll();return}
+    else if(a==='cx')rollCustomDice(S,ui,g('cx').value);
+    else if(a==='cp')copyLastRoll(S,ui);
     else if(a==='exp'){IOMSG=null;io=JSON.stringify(S,null,1);markBackedUp();save();render();const ta=g('io');ta.select();try{navigator.clipboard.writeText(io).catch(()=>{})}catch(x){}return}
     else if(a==='dl'){IOMSG=null;downloadSheet(S)}
     else if(a==='imp'){io=g('io').value;IOMSG=null;if(!importBackup(io)){render();return}}
