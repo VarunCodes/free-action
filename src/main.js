@@ -1,7 +1,7 @@
 import './style.css';
 import { openLibrary, swapSpecies } from './libraryui.js';
 import { cachedItems, cachedSpecies, loadLibrary } from './library.js';
-import { esc, dateAndTime } from './text.js';
+import { dateAndTime } from './text.js';
 import { ABN, DEF, CLS, cleanSheet } from './sheet.js';
 import {
     abilityMod, signed, profBonus, knownClass, knownSpecies, hitDie, hitDiceLeft, averageHP, activeGear,
@@ -16,6 +16,7 @@ import { featuresSection, racialFeaturesSection } from './sections/features.js';
 import { headerSection } from './sections/header.js';
 import { vitalsSection } from './sections/vitals.js';
 import { notesSection, backupSection } from './sections/backup.js';
+import { rollBarSection } from './sections/rollBar.js';
 import { readKey, writeKey, loadSaved, saveSheet, snapshots, snapshot, markBackedUp, downloadSheet, readBackup } from './storage.js';
 let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null,RERR='',IOMSG=null,ATTMSG=-1,CC=false,CS=false,CMSG='',SPC=[];const UP={};
 const SR=()=>({a:false,s:'',d:'',b:'',t:'',h:false,m:false,by:'slot',up:[]});
@@ -141,10 +142,13 @@ function rollExpr(label,e,crit,raw){
 }
 // The roll bar can shrink to just the last result; the choice is kept per device, not in the sheet.
 let RMIN=readKey('roll-min')==='1';
-function renderRoll(){const L=LAST,sg=(v,t)=>`<button data-a="rm" data-v="${v}" class="${RM===v?'on':''}" aria-pressed="${RM===v}">${t}</button>`,op=(v,t)=>`<option value="${v}" ${S.vtt===v?'selected':''}>${t}</option>`;
-    document.getElementById('roll').innerHTML=`<div class="rp${RMIN?' min':''}"><div class="rpi"><button class="hd rt" data-a="rmin" aria-expanded="${!RMIN}" aria-label="${RMIN?'Show roll options':'Hide roll options'}" title="${RMIN?'Show roll options':'Hide roll options'}"></button><div class="rr">${L?`<output class="tot" aria-label="Roll total">${L.total}</output><span>${esc(L.label)} ${esc(L.detail)}</span>${L.crit?`<span class="crit">${L.crit}</span>`:''}`:RERR?`<span class="reqn" role="alert">${esc(RERR)}</span>`:'<span class="sub">Tap any modifier to roll</span>'}</div>${RMIN?'':`<div class="rc"><div class="seg" role="group" aria-label="Roll mode">${sg('','Normal')}${sg('adv','Adv')}${sg('dis','Dis')}</div><input id="cmd" readonly value="${esc(chatCommand(LAST,S.vtt))}" placeholder="Chat command" aria-label="Chat command"><button class="pri" data-a="cp" ${L?'':'disabled'}>${COP?'Copied':'Copy'}</button></div><details data-id="more" ${OPEN.has('more')?'open':''}><summary>VTT format and custom roll</summary><div class="rc"><select data-k="vtt" aria-label="Chat format">${op('foundry','Foundry (/r)')}${op('roll20','Roll20 (/roll)')}${op('roll20t','Roll20 template')}</select><input id="cx" placeholder="2d6+3" value="${esc(CX)}" aria-label="Custom dice"><button data-a="cx">Roll</button></div></details>`}</div></div>`;
+function renderRoll(){
+    const ui={lastRoll:LAST,rollError:RERR,mode:RM,copied:COP,customDice:CX,minimized:RMIN,isOpen:id=>OPEN.has(id)};
+    const rollBar=document.getElementById('roll');
+    rollBar.innerHTML=rollBarSection(S,ui);
     // The page leaves room at the bottom for however tall the bar is now.
-    document.documentElement.style.setProperty('--rollh',document.getElementById('roll').firstChild.offsetHeight+'px')}
+    document.documentElement.style.setProperty('--rollh',rollBar.firstChild.offsetHeight+'px');
+}
 // Values several sections use, worked out once per render:
 //   editing             true in Edit mode, false in Play
 //   proficiency         the proficiency bonus for the character's level
