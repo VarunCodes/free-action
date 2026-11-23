@@ -16,6 +16,22 @@ export function createUi() {
         },
         // The slot level picked for each spell, by its place in the list, when cast with a higher slot.
         spellSlotLevels: {},
+        // The ids of the sections and descriptions the user opened, like 'sp2' or 'more'.
+        openSections: new Set(),
+        // The number in the Damage/Heal box.
+        hitPointAmount: 1,
+        // A note under the header on what picking a class or species changed.
+        headerMessage: '',
+        // True while the Class or Species picker is on Custom, so a typed name is used as it is.
+        customClass: false,
+        customSpecies: false,
+        // The species the Library has downloaded, for the Species picker.
+        librarySpecies: [],
+        // The place in the item list of the item that couldn't be attuned (the limit is 3), or -1.
+        attunementRefused: -1,
+        // What the Backup JSON box holds, and the result of the last import or restore: { text, isError }.
+        backupText: '',
+        backupMessage: null,
     };
 }
 
