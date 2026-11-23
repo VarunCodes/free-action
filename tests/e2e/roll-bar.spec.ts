@@ -32,17 +32,22 @@ test.beforeEach(async ({ page, seedSheet }) => {
 test('Advantage and Disadvantage modes roll two d20s until set back to Normal', async ({ page }) => {
   // PHB 2024, Advantage/Disadvantage: roll two d20s and use the higher (Advantage) or lower one.
   const mode = page.getByRole('group', { name: 'Roll mode', exact: true });
+  const pressed = mode.getByRole('button', { pressed: true });
+  await expect(pressed).toHaveText('Normal');
   await test.step('Advantage, for every roll until changed', async () => {
     await mode.getByRole('button', { name: 'Adv', exact: true }).click();
+    await expect(pressed).toHaveText('Adv');
     await roll(page, 'Athletics +6', '/r 2d20kh1+6 # Athletics');
     await roll(page, 'Strength check +3', '/r 2d20kh1+3 # Strength check');
   });
   await test.step('Disadvantage', async () => {
     await mode.getByRole('button', { name: 'Dis', exact: true }).click();
+    await expect(pressed).toHaveText('Dis');
     await roll(page, 'Athletics +6', '/r 2d20kl1+6 # Athletics');
   });
   await test.step('Normal', async () => {
     await mode.getByRole('button', { name: 'Normal', exact: true }).click();
+    await expect(pressed).toHaveText('Normal');
     await roll(page, 'Athletics +6', '/r 1d20+6 # Athletics');
   });
 });
@@ -59,6 +64,11 @@ test('the chat command follows the chosen virtual tabletop format, which is save
     await format.selectOption('Roll20 template');
     await expect(command(page)).toHaveValue('&{template:default} {{name=Athletics}} {{Roll=[[1d20+6]]}}');
     await expect.poll(savedSheet).toMatchObject({ vtt: 'roll20t' });
+  });
+  await test.step('after a reload, the saved format is still chosen', async () => {
+    await page.reload();
+    await openRollOptions(page);
+    await expect(format).toHaveValue('roll20t');
   });
 });
 
@@ -81,9 +91,10 @@ test('a custom roll accepts dice and numbers, and refuses anything else', async 
     });
   };
 
-  await test.step('2d6 + 1d4 - 1 is accepted', async () => {
+  await test.step('2d6 + 1d4 - 1 is accepted, and stays in the box to roll again', async () => {
     await customRoll('2d6 + 1d4 - 1');
     await expect(command(page)).toHaveValue('/r 2d6+1d4-1 # Roll');
+    await expect(custom).toHaveValue('2d6 + 1d4 - 1');
   });
   await test.step('100 dice, the most allowed, is accepted', async () => {
     await customRoll('100d6');
@@ -107,5 +118,39 @@ test.describe('a custom roll of 1d4-1d6-2 where the d4 rolls 1 and the d6 rolls 
     await expect(page.getByText('Roll [1] - [6] - 2', { exact: true })).toBeVisible();
     // 1 - 6 - 2. Unlike damage, a custom roll isn't held at 0.
     await expect(page.getByRole('status', { name: 'Roll total', exact: true })).toHaveText('-7');
+  });
+});
+
+test('Copy is off until there is a roll, and says Copied once the roll is copied', async ({ page }) => {
+  const copy = button(page, 'Copy');
+  await expect(copy).toBeDisabled();
+
+  await roll(page, 'Athletics +6', '/r 1d20+6 # Athletics');
+  await expect(button(page, 'Copied')).toBeEnabled();
+});
+
+test('hiding the roll options keeps the result, and stays hidden after a reload', async ({ page }) => {
+  const hide = button(page, 'Hide roll options');
+  const show = button(page, 'Show roll options');
+  const mode = page.getByRole('group', { name: 'Roll mode', exact: true });
+  await roll(page, 'Athletics +6', '/r 1d20+6 # Athletics');
+  await expect(hide).toHaveAttribute('aria-expanded', 'true');
+
+  await test.step('hide the options', async () => {
+    await hide.click();
+    await expect(show).toHaveAttribute('aria-expanded', 'false');
+    await expect(mode).toBeHidden();
+    await expect(command(page)).toBeHidden();
+    await expect(page.getByRole('status', { name: 'Roll total', exact: true })).toBeVisible();
+  });
+  await test.step('reload, and they are still hidden', async () => {
+    await page.reload();
+    await expect(show).toHaveAttribute('aria-expanded', 'false');
+    await expect(mode).toBeHidden();
+  });
+  await test.step('show them again', async () => {
+    await show.click();
+    await expect(hide).toHaveAttribute('aria-expanded', 'true');
+    await expect(mode).toBeVisible();
   });
 });
