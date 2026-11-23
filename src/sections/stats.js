@@ -6,7 +6,7 @@
 // A note on the sheet's data: items and features keep their name in `n`, and an effect is a list
 // [type, target, value], such as ['set', 'str', 19] or ['sk', 'Insight', 2].
 //
-// Buttons with data-a="roll" roll a d20 plus data-b when tapped (see doRoll in main.js).
+// Buttons with data-a="roll" roll a d20 plus data-b when tapped (see rollCheck in actions/rolls.js).
 import { AB, ABN, SK } from '../sheet.js';
 import {
     abilityMod, signed, score, scoreSetBy, scoreBonuses, baseScore,
