@@ -4,6 +4,12 @@
 const ENTITIES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };
 export const esc = value => String(value ?? '').replace(/[&<>"]/g, char => ENTITIES[char]);
 
+// A date and time such as "21 Nov 2026, 14:05". The month is spelled out, so 03/04 can't be read two ways;
+// the order follows the browser's language.
+export function dateAndTime(time) {
+    return new Date(time).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
 // Tiny, safe markdown-ish renderer for SRD descriptions: escapes everything, then allows **bold**,
 // *italic* and _italic_. Headings lose their #s, and table rows become "a / b / c".
 export function md(src) {

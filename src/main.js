@@ -1,7 +1,7 @@
 import './style.css';
 import { openLibrary, swapSpecies } from './libraryui.js';
 import { cachedItems, cachedSpecies, loadLibrary } from './library.js';
-import { esc } from './text.js';
+import { esc, dateAndTime } from './text.js';
 import { ABN, DEF, CLS, cleanSheet } from './sheet.js';
 import {
     abilityMod, signed, profBonus, knownClass, knownSpecies, hitDie, hitDiceLeft, averageHP, activeGear,
@@ -15,7 +15,8 @@ import { inventorySection } from './sections/inventory.js';
 import { featuresSection, racialFeaturesSection } from './sections/features.js';
 import { headerSection } from './sections/header.js';
 import { vitalsSection } from './sections/vitals.js';
-import { readKey, writeKey, loadSaved, saveSheet, snapshots, snapshot, lastBackup, markBackedUp, downloadSheet, readBackup } from './storage.js';
+import { notesSection, backupSection } from './sections/backup.js';
+import { readKey, writeKey, loadSaved, saveSheet, snapshots, snapshot, markBackedUp, downloadSheet, readBackup } from './storage.js';
 let S=DEF(),amt=1,io='';const OPEN=new Set();let RM='',LAST=null,COP=false,CX='',CRIT=null,RERR='',IOMSG=null,ATTMSG=-1,CC=false,CS=false,CMSG='',SPC=[];const UP={};
 const SR=()=>({a:false,s:'',d:'',b:'',t:'',h:false,m:false,by:'slot',up:[]});
 S=loadSaved()||S;
@@ -37,24 +38,58 @@ function replaceSheet(o,why){
     CRIT=null;
 }
 
-const ago=t=>{const d=Math.floor((Date.now()-t)/864e5);return d<1?'today':d===1?'yesterday':d+' days ago'};
-
-// Import (pasted) and Open backup file. Problems and results show under the Backup buttons.
+// Import (pasted JSON) and Open backup file. The result shows under the Backup buttons.
 // Returns true if the sheet was replaced.
-function importText(t){
-    const o=readBackup(t);
-    if(!o){
-        IOMSG={bad:true,t:'That is not a valid exported sheet. Use a file from Download backup, or paste the full JSON from Export.'};
+function importBackup(text) {
+    const backup = readBackup(text);
+    if (!backup) {
+        IOMSG = {
+            isError: true,
+            text: 'That is not a valid exported sheet. '
+                + 'Use a file from Download backup, or paste the full JSON from Export.',
+        };
         return false;
     }
-    const nm=cleanSheet(o).name;
-    if(!confirm(`Replace "${S.name}" with "${nm}"? The current character can be brought back from "Restore an earlier version".`))return false;
-    replaceSheet(o,'before import');
-    IOMSG={t:`Imported "${nm}".`};
+    const name = cleanSheet(backup).name;
+    const question = `Replace "${S.name}" with "${name}"? `
+        + 'The current character can be brought back from "Restore an earlier version".';
+    if (!confirm(question)) return false;
+    replaceSheet(backup, 'before import');
+    IOMSG = { text: `Imported "${name}".` };
     return true;
 }
-// Dates spell out the month, so 03/04 can't be read two ways; the order still follows the browser's language.
-const when=t=>new Date(t).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'});
+
+// Restore the earlier version at this place in the list, after asking. Returns true if the sheet was replaced.
+function restoreVersion(index) {
+    const version = snapshots()[index];
+    if (!version) return false;
+    const savedAt = dateAndTime(version.at);
+    if (!confirm(`Restore "${version.name}" from ${savedAt}? The current version is kept in the list.`)) return false;
+    try {
+        replaceSheet(JSON.parse(version.s), 'before restore');
+    } catch {
+        IOMSG = { isError: true, text: 'That version could not be read.' };
+        render();
+        return false;
+    }
+    IOMSG = { text: `Restored "${version.name}" from ${savedAt}.` };
+    return true;
+}
+
+// Open backup file. The input is cleared afterwards, so picking the same file again still imports it.
+async function openBackupFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    IOMSG = null;
+    const reading = file.text();
+    input.value = '';
+    try {
+        if (importBackup(await reading)) save();
+    } catch {
+        IOMSG = { isError: true, text: 'Could not read that file.' };
+    }
+    render();
+}
 function setPath(k,v){const p=k.split('.');let o=S;while(p.length>1)o=o[p.shift()];o[p[0]]=v}
 // A species' walking speed, read from its Speed trait ("Your Speed is 35 feet."); 0 if it has none.
 const spSpeed=it=>{const t=it&&(it.traits||[]).find(x=>/^speed$/i.test(x.n));const m=t&&/(\d+)\s*(feet|ft)/i.exec(t.d);return m?+m[1]:0};
@@ -140,26 +175,6 @@ function sheetView(){
     };
 }
 
-// Notes.
-function notesSection(){
-    let h='';
-    h+=`<h2>Notes</h2><textarea data-k="notes" aria-label="Notes" placeholder="Features, backstory, session notes">${esc(S.notes)}</textarea>`;
-    return h;
-}
-
-// Backup: download, open, export, import, new character and earlier versions.
-function backupSection(){
-    let h='';
-    const ex=lastBackup(),hist=snapshots();
-    h+=`<h2>Backup</h2><p class="sub" style="margin:0 0 8px">Saves automatically in this browser only. Browsers can clear saved data (Safari after 7 days without a visit), so keep a backup file. <b>${ex?`Last backup ${ago(ex)}.`:'No backup downloaded yet.'}</b></p>
- <div class="row" style="margin-bottom:8px"><button class="pri" data-a="dl">Download backup</button><label class="btn">Open backup file<input type="file" id="imf" class="vh" accept=".json,application/json"></label></div>
- <textarea id="io" aria-label="Backup JSON" placeholder="Exported JSON appears here. Paste JSON here to import.">${esc(io)}</textarea>
- <div class="row" style="margin-top:8px"><button data-a="exp">Export</button><button data-a="imp">Import</button><button class="bad" data-a="reset">New character</button></div>
- ${IOMSG?`<p class="${IOMSG.bad?'reqn':'sub'}" role="${IOMSG.bad?'alert':'status'}" style="margin:8px 0 0">${esc(IOMSG.t)}</p>`:''}
- ${hist.length?`<div class="row" style="margin-top:8px"><select id="snp" aria-label="Earlier version" style="flex:1">${hist.map((x,i)=>`<option value="${i}">${esc(when(x.at))}: ${esc(x.name)}${x.why==='autosave'?'':` (${esc(x.why)})`}</option>`).join('')}</select><button data-a="rst">Restore an earlier version</button></div>`:''}`;
-    return h;
-}
-
 // Sections go into three columns: stats, inventory and spells, everything else. On phones the columns
 // dissolve and each section's order puts them back into one reading order.
 function render(){
@@ -175,8 +190,8 @@ function render(){
     const racialFeatures=racialFeaturesSection(S,view,{isOpen});
     const spells=spellsSection(S,view,{isOpen,slotFor:index=>UP[index]});
     const inventory=inventorySection(S,view,{isOpen,attunementRefused:ATTMSG});
-    const notes=notesSection();
-    const backup=backupSection();
+    const notes=notesSection(S);
+    const backup=backupSection({backupText:io,message:IOMSG});
 
     const section=(order,content)=>`<section class="c" style="order:${order}">${content}</section>`;
     const column=(...sections)=>`<div class="col">${sections.join('')}</div>`;
@@ -253,12 +268,14 @@ document.addEventListener('click',e=>{
     else if(a==='cp'){if(LAST)COP=copyText(chatCommand(LAST,S.vtt))}
     else if(a==='exp'){IOMSG=null;io=JSON.stringify(S,null,1);markBackedUp();save();render();const ta=g('io');ta.select();try{navigator.clipboard.writeText(io).catch(()=>{})}catch(x){}return}
     else if(a==='dl'){IOMSG=null;downloadSheet(S)}
-    else if(a==='imp'){io=g('io').value;IOMSG=null;if(!importText(io)){render();return}}
-    else if(a==='rst'){const x=snapshots()[+g('snp').value];if(!x||!confirm(`Restore "${x.name}" from ${when(x.at)}? The current version is kept in the list.`))return;try{replaceSheet(JSON.parse(x.s),'before restore');IOMSG={t:`Restored "${x.name}" from ${when(x.at)}.`}}catch(e){IOMSG={bad:true,t:'That version could not be read.'};render();return}}
+    else if(a==='imp'){io=g('io').value;IOMSG=null;if(!importBackup(io)){render();return}}
+    else if(a==='rst'){if(!restoreVersion(+g('snp').value))return}
     else if(a==='reset'){if(!confirm('Start a new character? The current one can be brought back from "Restore an earlier version".'))return;replaceSheet({},'before new character')}
     save();render();
 });
-document.addEventListener('change',e=>{const f=e.target.id==='imf'&&e.target.files[0];if(!f)return;IOMSG=null;f.text().then(t=>{if(importText(t))save();render()}).catch(()=>{IOMSG={bad:true,t:'Could not read that file.'};render()});e.target.value=''});
+document.addEventListener('change', event => {
+    if (event.target.id === 'imf') openBackupFile(event.target);
+});
 // Another tab saved: take its version, so this tab never writes a stale copy over it.
 window.addEventListener('storage',e=>{if(e.key!=='sheet'||!e.newValue)return;try{S=cleanSheet(JSON.parse(e.newValue));render()}catch(x){}});
 // Ask the browser not to clear this site's data under storage pressure (granted silently or not at all).
