@@ -222,12 +222,18 @@ function cleanSpellRoll(saved) {
         h: asBoolean(roll.h),
         m: asBoolean(roll.m),
         by: oneOf(roll.by, ['char', 'slot'], 'slot'),
-        up: asList(roll.up, 20).filter(Array.isArray).map(([level, dice, step]) => [
-            asWholeNumber(level, 0, 20, 0),
-            asText(dice, 40),
-            asWholeNumber(step, 0, 20, 0),
-        ]),
+        up: asList(roll.up, 20).filter(Array.isArray).map(cleanScalingStep),
     };
+}
+
+// One step of a spell's scaling, saved as a list: [from level, dice, attacks]. From that level (the slot level,
+// or the character level for a cantrip) the spell rolls those dice, as that many attacks.
+function cleanScalingStep([fromLevel, dice, attacks]) {
+    return [
+        asWholeNumber(fromLevel, 0, 20, 0),
+        asText(dice, 40),
+        asWholeNumber(attacks, 0, 20, 0),
+    ];
 }
 
 // An item. Optional parts are only kept when the item has them:
