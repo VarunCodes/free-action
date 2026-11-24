@@ -116,7 +116,7 @@ function customEntry(entry, index) {
         sub: String(entry.sub || defaultSummary(entry.kind, level, entry.level)),
         desc: String(entry.desc || ''),
         src: 'Custom',
-        ...(hasTraits ? { traits: entry.traits.map(customTrait) } : {}),
+        ...(hasTraits ? { traits: entry.traits.map(packTrait) } : {}),
     };
 }
 
@@ -125,14 +125,16 @@ function defaultSummary(kind, level, levelAsGiven) {
     return level ? 'Level ' + levelAsGiven : 'Cantrip';
 }
 
-// A trait may use short keys (n, d) like the sheet or long ones (name, desc).
-function customTrait(trait) {
-    const effects = cleanEffects(trait.fx);
-    return {
+// A species trait from a custom pack, stored the way the sheet keeps traits: n (name), d (description) and,
+// only if it has any, fx (effects). A pack may also spell the name and description out as "name" and "desc".
+function packTrait(trait) {
+    const stored = {
         n: String(trait.n || trait.name),
         d: String(trait.d || trait.desc || ''),
-        ...(effects.length ? { fx: effects } : {}),
     };
+    const effects = cleanEffects(trait.fx);
+    if (effects.length) stored.fx = effects;
+    return stored;
 }
 
 export async function clearPacks() {
