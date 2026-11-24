@@ -292,7 +292,7 @@ function upgradeItem(item) {
     return item;
 }
 
-// Item and trait effects are [type, target, value]. See effectsOf() and traitEffects() in library.js.
+// Item and trait effects are [type, target, value]. See magicItemEffects() in library/items.js and library/traits.js.
 //   set  sets an ability score (target: the ability)
 //   ab   a bonus to an ability score (target: the ability)
 //   adv  Advantage (target: 'init' or a skill)

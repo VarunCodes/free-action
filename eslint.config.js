@@ -30,6 +30,7 @@ const READABLE = [
     'src/html.js',
     'src/effects.js',
     'src/gearUpgrade.js',
+    'src/library.js',
     'src/library/*.js',
     'src/main.js',
     'src/sheet.js',
