@@ -1,5 +1,6 @@
 import { KINDS, loadLibrary, search, importPack, clearPacks } from './library.js';
 import { esc, md, rarityTag, RARITY, magicMark } from './text.js';
+import { addToSheet, removeFromSheet, isOnSheet, ownedCount } from './actions/library.js';
 
 let dlg, data = null, status = 'idle', errors = [], kind = 'spell', query = '', open = new Set(), msg = '', packOpen = false;
 // Items tab filter: all, mundane, magic, or a rarity rank ('1'-'6').
@@ -27,71 +28,13 @@ const ffOk = it => { const s = (it.sub || '').toLowerCase(), boon = /\bboon\b/.t
 const chipRow = (label, attr, cur, opts) => `<div class="chips" role="group" aria-label="${label}">${opts.map(([v, t, cls = '']) => `<button class="chip${cur === v ? ' on' : ''}${cls}" data-${attr}="${esc(v)}" aria-pressed="${cur === v}">${esc(t)}</button>`).join('')}</div>`;
 let getS, onChange;
 
-// Where a Library entry sits on the sheet: [list, index], or null. Items are never "added" (they stack).
-// Several classes share feature names (Spellcasting, Extra Attack), so a class feature only matches
-// when its class tag or its text matches too.
-const onSheet = (S, it) => {
-    const n = it.name.toLowerCase(), at = (l, f = () => true) => { const i = l.findIndex(x => x.n.toLowerCase() === n && f(x)); return i < 0 ? null : [l, i]; };
-    if (it.kind === 'spell') return at(S.spells);
-    if (it.kind === 'class') return at(S.feats, x => x.t === clsOf(it) || x.d === it.desc);
-    if (it.kind === 'feat') return at(S.feats);
-    return null;
-};
-const has = (S, it) => it.kind === 'race' ? !!S.species && S.species.toLowerCase() === it.name.toLowerCase() : !!onSheet(S, it);
-const traitsOf = it => (it.traits && it.traits.length ? it.traits : [{ n: it.name, d: it.desc }]);
-// Take a species' own traits off the sheet. Each is matched by name, since every species has a Size and a
-// Speed and most have a Darkvision (worded differently). Where several racial features share a name, the one
-// with this species' text goes, or else the first, so a trait you reworded still goes with its species.
-function dropTraits(S, it) {
-    let n = 0;
-    for (const t of traitsOf(it)) {
-        const same = S.race.filter(x => x.n.toLowerCase() === t.n.toLowerCase());
-        const x = same.find(x => x.d === t.d) || same[0];
-        if (x) { S.race.splice(S.race.indexOf(x), 1); n++; }
-    }
-    return n;
+// Add and Remove. Both tell the page whether list places on the sheet may have moved.
+function add(entry) {
+    onChange(addToSheet(getS(), entry, data.items));
 }
-// A character has one species: the old one's traits come off before the new one's go on, so shared traits
-// (Size, Speed, Darkvision) end up with the new species' wording. A trait the new species has that is still on
-// the sheet under the same name (left by a custom species the Library doesn't know) is replaced, never doubled.
-// it = null just clears the species.
-export function swapSpecies(S, items, it) {
-    const old = S.species && items.find(x => x.kind === 'race' && x.name.toLowerCase() === S.species.toLowerCase());
-    const removed = old ? dropTraits(S, old) : 0;
-    let added = 0;
-    S.species = it ? it.name : '';
-    if (it) for (const t of traitsOf(it)) {
-        const i = S.race.findIndex(x => x.n.toLowerCase() === t.n.toLowerCase()), x = { n: t.n, t: '', d: t.d, ...(t.fx ? { fx: t.fx.map(f => [...f]) } : {}) };
-        if (i < 0) S.race.push(x); else S.race[i] = x;
-        added++;
-    }
-    return { old: old ? old.name : '', removed, added };
-}
-// Undo an Add. A species also takes its traits with it.
-function remove(it) {
-    const S = getS();
-    if (it.kind === 'race') { S.species = ''; dropTraits(S, it); }
-    else { const o = onSheet(S, it); if (!o) return; o[0].splice(o[1], 1); }
-    onChange(true);
-}
-// "Paladin, level 1" -> "Paladin"; "Cleric: Life Domain, level 3" -> "Cleric: Life Domain".
-const clsOf = it => (it.sub || '').replace(/, level \d+$/, '') || 'Class feature';
-const owned = (S, it) => it.kind === 'item' ? (S.items.find(x => x.n.toLowerCase() === it.name.toLowerCase())?.q || 0) : 0;
 
-function add(it) {
-    const S = getS();
-    if (it.kind === 'spell') S.spells.push({ n: it.name, l: it.level, p: false, d: it.desc, ...(it.roll ? { r: { ...it.roll } } : {}) });
-    else if (it.kind === 'feat') S.feats.push({ n: it.name, t: 'Feat', d: it.desc });
-    else if (it.kind === 'class') S.feats.push({ n: it.name, t: clsOf(it), d: it.desc });
-    else if (it.kind === 'item') {
-        const x = S.items.find(o => o.n.toLowerCase() === it.name.toLowerCase());
-        if (x) x.q = (Number(x.q) || 0) + 1;
-        else S.items.push({ n: it.name, q: 1, d: it.desc, eq: !!it.eq, on: false, ...(it.w ? { w: { ...it.w } } : {}), ...(it.ar ? { ar: { ...it.ar } } : {}), ...(it.at ? { at: true } : {}), ...(it.fx ? { fx: it.fx.map(f => [...f]) } : {}), rr: it.rr || 0, v: 3 });
-    }
-    else {
-        if (swapSpecies(S, data.items, it).old) { onChange(true); return; }
-    }
-    onChange();
+function remove(entry) {
+    if (removeFromSheet(getS(), entry)) onChange(true);
 }
 
 // Redrawing replaces the dialog's contents, which would jump the list back to the top. A new list
@@ -116,10 +59,10 @@ function draw(top) {
                 : kind === 'class' && data ? chipRow('Filter by class', 'lcf', cf, [['all', 'All'], ...classes.map(c => [c, c === S.cls ? c + ' (your class)' : c])]) : '';
     const rows = shown.map((it, idx) => {
         const id = kind + ':' + it.name + ':' + idx;
-        const done = has(S, it);
+        const done = isOnSheet(S, it);
         const lt = later(S, it);
         return `<div class="lrow${lt ? ' later' : ''}"><div class="lhd"><button class="lk" data-lo="${esc(id)}" aria-expanded="${open.has(id)}"><span>${magicMark(it.rr)}${esc(it.name)}${rarityTag(it.rr)}</span><small>${esc(it.sub)}${it.src === 'Custom' ? ' (custom)' : ''}${lt ? ` &middot; you're level ${S.level}` : ''}</small></button>
-      ${done ? `<button class="bad" data-lrm="${idx}" title="On your sheet. Click to remove it.">${kind === 'race' ? 'Remove species' : 'Remove'}</button>` : `<button class="pri" data-la="${idx}">${kind === 'race' ? (S.species ? 'Switch species' : 'Add species') : owned(S, it) ? `Add (have ${owned(S, it)})` : 'Add'}</button>`}</div>
+      ${done ? `<button class="bad" data-lrm="${idx}" title="On your sheet. Click to remove it.">${kind === 'race' ? 'Remove species' : 'Remove'}</button>` : `<button class="pri" data-la="${idx}">${kind === 'race' ? (S.species ? 'Switch species' : 'Add species') : ownedCount(S, it) ? `Add (have ${ownedCount(S, it)})` : 'Add'}</button>`}</div>
       ${open.has(id) ? `<p class="sd">${md(it.desc) || 'No description.'}</p>` : ''}</div>`;
     }).join('');
     const stamp = data && data.at ? `SRD data saved ${new Date(data.at).toLocaleDateString(undefined, { dateStyle: 'medium' })}` : '';

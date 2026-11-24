@@ -2,7 +2,7 @@
 // (ui.headerMessage) that says what it did, so nothing on the sheet changes without the player seeing it.
 import { ABILITY_NAMES, STANDARD_CLASSES, newSheet } from '../sheet.js';
 import { knownClass } from '../rules.js';
-import { swapSpecies } from '../libraryui.js';
+import { swapSpecies } from './library.js';
 import { snapshots, snapshot } from '../storage.js';
 
 const DEFAULT_SPEED = newSheet().speed;
