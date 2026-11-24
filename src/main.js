@@ -1,8 +1,8 @@
 import './style.css';
-import { openLibrary, swapSpecies } from './libraryui.js';
+import { openLibrary } from './libraryui.js';
 import { cachedItems, cachedSpecies, loadLibrary } from './library.js';
 import { dateAndTime } from './text.js';
-import { ABN, DEF, CLS, cleanSheet } from './sheet.js';
+import { DEF, cleanSheet } from './sheet.js';
 import {
     abilityMod, profBonus, knownClass, knownSpecies, averageHP, activeGear,
     effectsOf, effectTotal, advantageFrom, score, skillGranted, skillProf,
@@ -21,6 +21,7 @@ import {
     rollCheck, rollSpellAttack, rollSpellEffect, rollWeaponAttack, rollWeaponDamage, spendHitDie,
     rollCustomDice, copyLastRoll, setRollMode, toggleRollOptions,
 } from './actions/rolls.js';
+import { setClass, setSpecies } from './actions/character.js';
 import { loadSaved, saveSheet, snapshots, snapshot, markBackedUp, downloadSheet, readBackup } from './storage.js';
 let sheet = loadSaved() || DEF();
 const ui = createUi();
@@ -96,31 +97,34 @@ async function openBackupFile(input) {
     }
     render();
 }
-function setPath(k,v){const p=k.split('.');let o=sheet;while(p.length>1)o=o[p.shift()];o[p[0]]=v}
-// A species' walking speed, read from its Speed trait ("Your Speed is 35 feet."); 0 if it has none.
-const spSpeed=it=>{const t=it&&(it.traits||[]).find(x=>/^speed$/i.test(x.n));const m=t&&/(\d+)\s*(feet|ft)/i.exec(t.d);return m?+m[1]:0};
-// Picking a species swaps the old species' racial traits for the new one's ('' or Custom only removes them).
-// The sheet is saved to "Restore an earlier version" first, since the old traits (and any rewording) go; only
-// before the first of several swaps in a row, so trying species one after another can't push out older versions.
-// Speed follows the species unless you typed your own: it changes only from the default or the old species' speed.
-function setSpecies(n){const go=()=>{const it=n?ui.librarySpecies.find(x=>x.kind==='race'&&x.name===n):null;
-    if(n&&!it){sheet.species=n;ui.headerMessage=`Couldn't load ${n}'s traits. Open the Library once to download them, then pick ${n} again.`;return}
-    const ob=sheet.species&&ui.librarySpecies.find(x=>x.kind==='race'&&x.name.toLowerCase()===sheet.species.toLowerCase());
-    if((sheet.species||sheet.race.length)&&snapshots()[0]?.why!=='before species change')snapshot(sheet,'before species change',true);
-    const r=swapSpecies(sheet,ui.librarySpecies,it),o=r.old&&r.old!==n?r.old:'',sp0=sheet.speed,ns=spSpeed(it)||(it?0:DEF().speed);
-    if(ns&&(sp0===DEF().speed||sp0===spSpeed(ob)))sheet.speed=ns;
-    const tr=(k,x)=>`${k} ${x} trait${k===1?'':'s'}`,spd=sheet.speed!==sp0?` Speed set to ${sheet.speed} ft.`:'';
-    ui.headerMessage=(it?(o?`Swapped ${tr(r.removed,o)} for ${tr(r.added,n)} in Racial features.`:`Added ${tr(r.added,n)} to Racial features.`):o&&r.removed?`Removed ${tr(r.removed,o)} from Racial features.`:'')+spd};
-if(!n||ui.librarySpecies.some(x=>x.name===n)){go();return}
-ui.headerMessage=`Loading ${n}'s traits…`;loadLibrary().then(d=>{ui.librarySpecies=d.items.filter(x=>x.kind==='race')}).catch(()=>{}).finally(()=>{go();save();render()})}
-// Picking a standard class swaps the old class's save proficiencies and spellcasting ability for the new one's.
-// Other saves, and an ability you chose by hand, stay; the sheet can't tell a hand-ticked save from one the old
-// class gave, so those go with the old class. The Spellcasting drop-down can always override what was picked.
-function setClass(c){const o=CLS[knownClass(sheet.cls)],n=CLS[c],n0=ABN[sheet.cast];sheet.cls=c;if(!n)return;
-    if(o)o.sv.forEach(a=>{if(!n.sv.includes(a))delete sheet.sv[a]});n.sv.forEach(a=>sheet.sv[a]=true);
-    if(!sheet.cast||(o&&sheet.cast===o.ca))sheet.cast=n.ca;
-    const ca=sheet.cast===n.ca?(n.ca?`${ABN[n.ca]} for spellcasting`:n0?'no spellcasting ability (pick one below if your subclass casts spells)':''):`spellcasting stays ${ABN[sheet.cast]}${n.ca?` (${c}s usually use ${ABN[n.ca]})`:''}`;
-    ui.headerMessage=`${c}: proficient in ${n.sv.map(a=>ABN[a]).join(' and ')} saving throws${ca?', '+ca:''}. You can change these below.`}
+// Writes a value into the sheet at a data-k path, such as 'hp.max' or 'ab.str'.
+function setPath(path, value) {
+    const keys = path.split('.');
+    const lastKey = keys.pop();
+    const parent = keys.reduce((object, key) => object[key], sheet);
+    parent[lastKey] = value;
+}
+
+// A species missing from the Library's list is downloaded first, then picked. The sheet is looked up again
+// once the download finishes, because saving in the meantime replaces it.
+function chooseSpecies(speciesName) {
+    const isLoaded = ui.librarySpecies.some(species => species.name === speciesName);
+    if (!speciesName || isLoaded) {
+        setSpecies(sheet, ui, speciesName);
+        return;
+    }
+    ui.headerMessage = `Loading ${speciesName}'s traits…`;
+    loadLibrary()
+        .then(library => {
+            ui.librarySpecies = library.items.filter(entry => entry.kind === 'race');
+        })
+        .catch(() => {})
+        .finally(() => {
+            setSpecies(sheet, ui, speciesName);
+            save();
+            render();
+        });
+}
 
 function renderRoll() {
     const rollBar = document.getElementById('roll');
@@ -186,25 +190,81 @@ function render(){
     document.title=`${sheet.name.trim()||'Unnamed'} · Character Sheet`;
 }
 
-document.addEventListener('change',e=>{
-    const t=e.target;
-    if(t.id==='amt'){ui.hitPointAmount=Math.max(0,parseInt(t.value)||0);return}
-    if(t.id==='cx'){ui.roll.customDice=t.value;return}
-    if(t.dataset.up!==undefined){ui.spellSlotLevels[t.dataset.up]=+t.value;render();return}
-    if(t.dataset.ch){const[k,i,j]=t.dataset.ch.split('.'),x=sheet[k]?.[+i];if(x){x.ch=x.ch||[];x.ch[+j]=t.value}ui.headerMessage='';save();render();return}
-    // Picking Custom clears a standard class so the box starts empty; a typed name that is a standard class snaps to it.
-    // The note on what a class set stays until the next change anywhere on the sheet.
-    if(t.id==='f-clsp'){ui.headerMessage='';ui.customClass=t.value==='*';if(!ui.customClass)setClass(t.value);else if(knownClass(sheet.cls))sheet.cls='';save();render();if(ui.customClass)document.getElementById('f-cls')?.focus();return}
-    if(t.dataset.k==='cls'&&knownClass(t.value)){ui.headerMessage='';setClass(knownClass(t.value));ui.customClass=false;save();render();return}
-    if(t.id==='f-spp'){ui.headerMessage='';ui.customSpecies=t.value==='*';setSpecies(ui.customSpecies?'':t.value);save();render();if(ui.customSpecies)document.getElementById('f-species')?.focus();return}
-    if(t.dataset.k==='species'&&knownSpecies(t.value,ui.librarySpecies)){ui.headerMessage='';ui.customSpecies=false;setSpecies(knownSpecies(t.value,ui.librarySpecies));save();render();return}
-    if(!t.dataset.k)return;
-    ui.headerMessage='';
-    // A blank or non-numeric number box puts the old value back instead of becoming 0.
-    const n=parseInt(t.value);if(t.type==='number'&&!Number.isFinite(n)){render();return}
-    setPath(t.dataset.k,t.type==='number'?n:t.type==='checkbox'?t.checked:t.value);
-    save();render();
+// Boxes that only change what the page shows: the Damage/Heal amount, the custom dice and a spell's slot level.
+// Everything else edits the sheet.
+document.addEventListener('change', event => {
+    const input = event.target;
+    if (input.id === 'amt') {
+        ui.hitPointAmount = Math.max(0, parseInt(input.value) || 0);
+    } else if (input.id === 'cx') {
+        ui.roll.customDice = input.value;
+    } else if (input.dataset.up !== undefined) {
+        ui.spellSlotLevels[input.dataset.up] = Number(input.value);
+        render();
+    } else if (input.dataset.k || input.dataset.ch || input.id === 'f-clsp' || input.id === 'f-spp') {
+        editSheet(input);
+    }
 });
+
+// An edit to the sheet. The note on what a class or species set stays only until the next edit anywhere.
+function editSheet(input) {
+    ui.headerMessage = '';
+    const path = input.dataset.k;
+    if (input.dataset.ch) {
+        chooseFeatureSkill(input.dataset.ch, input.value);
+    } else if (input.id === 'f-clsp') {
+        pickClassFromList(input.value);
+    } else if (input.id === 'f-spp') {
+        pickSpeciesFromList(input.value);
+    } else if (path === 'cls' && knownClass(input.value)) {
+        // A typed name that is a standard class snaps to it.
+        setClass(sheet, ui, knownClass(input.value));
+        ui.customClass = false;
+    } else if (path === 'species' && knownSpecies(input.value, ui.librarySpecies)) {
+        ui.customSpecies = false;
+        chooseSpecies(knownSpecies(input.value, ui.librarySpecies));
+    } else if (input.type === 'number' && !Number.isFinite(parseInt(input.value))) {
+        // A blank or non-numeric number box puts the old value back instead of becoming 0.
+        render();
+        return;
+    } else {
+        setPath(path, inputValue(input));
+    }
+    save();
+    render();
+    // Picking Custom moves straight to the box for typing the name.
+    if (input.id === 'f-clsp' && ui.customClass) document.getElementById('f-cls')?.focus();
+    if (input.id === 'f-spp' && ui.customSpecies) document.getElementById('f-species')?.focus();
+}
+
+function inputValue(input) {
+    if (input.type === 'number') return parseInt(input.value);
+    if (input.type === 'checkbox') return input.checked;
+    return input.value;
+}
+
+// A feature's skill choice, such as "Choose a skill" on a feat. Its id is like 'feats.2.0': the list, the
+// feature's place in it, and which of the feature's choices this is.
+function chooseFeatureSkill(choiceId, skill) {
+    const [listKey, featureIndex, choiceIndex] = choiceId.split('.');
+    const feature = sheet[listKey]?.[Number(featureIndex)];
+    if (!feature) return;
+    feature.ch = feature.ch || [];
+    feature.ch[Number(choiceIndex)] = skill;
+}
+
+// The Class drop-down. Picking Custom clears a standard class, so the name box starts empty.
+function pickClassFromList(value) {
+    ui.customClass = value === '*';
+    if (!ui.customClass) setClass(sheet, ui, value);
+    else if (knownClass(sheet.cls)) sheet.cls = '';
+}
+
+// The Species drop-down. Picking Custom removes the old species' traits, and the name box starts empty.
+function pickSpeciesFromList(value) {
+    ui.customSpecies = value === '*';
+    chooseSpecies(ui.customSpecies ? '' : value);
+}
 document.addEventListener('toggle',e=>{const d=e.target;if(d.dataset&&d.dataset.id&&(sheet.mode!=='edit'||d.dataset.id==='more')){d.open?ui.openSections.add(d.dataset.id):ui.openSections.delete(d.dataset.id)}},true);
 document.addEventListener('click',e=>{
     const b=e.target.closest('[data-a]');
