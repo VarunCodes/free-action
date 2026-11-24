@@ -1,6 +1,7 @@
 // The Library dialog's contents: tabs, search, filter chips, the list of entries with Add and Remove, custom
 // packs, and the credits. libraryui.js draws it and handles its buttons, which use data-library="…" (and
-// data-filter, data-entry, data-add, data-remove), so the page's own data-a click handler leaves them alone.
+// data-filter, data-entry, data-add, data-remove), never the page's own action attribute, so the page's click
+// handler leaves them alone.
 import { html, raw, when } from '../html.js';
 import { md, rarityTag, magicMark } from '../text.js';
 import { KINDS } from '../library.js';
