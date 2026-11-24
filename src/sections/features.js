@@ -35,15 +35,16 @@ function featureList(sheet, list, editing, ui) {
 function featureRow(feature, id, editing, ui) {
     const effects = effectsLine(feature, id, editing);
     const removeButton = html`
-        <button class="x" data-a="remove-feature" data-v="${id}" aria-label="Remove ${feature.n}">✕</button>`;
+        <button class="x" data-action="remove-feature" data-value="${id}"
+            aria-label="Remove ${feature.n}">✕</button>`;
     const description = md(feature.d);
     const body = editing
-        ? html`<textarea data-k="${id}.d" placeholder="Description"
+        ? html`<textarea data-field="${id}.d" placeholder="Description"
             aria-label="${feature.n} description">${feature.d}</textarea>`
         : html`<p>${description ? raw(description) : 'No description.'}</p>`;
 
     return html`
-        <details class="ft" data-id="${id}" ${when(editing || ui.isOpen(id), 'open')}>
+        <details class="ft" data-section="${id}" ${when(editing || ui.isOpen(id), 'open')}>
             <summary>
                 <span class="g">${feature.n}</span>
                 ${when(feature.t, () => html`<span class="pill">${feature.t}</span>`)}
@@ -78,7 +79,7 @@ function skillChoice(feature, [, picked, , offered], choice) {
     const label = `${feature.n} skill${choice.count > 1 ? ` ${choice.number}` : ''}`;
     const options = skills.map(skill => html`<option ${when(picked === skill, 'selected')}>${skill}</option>`);
     return html`
-        <select data-ch="${choice.id}" aria-label="${label}">
+        <select data-skill-choice="${choice.id}" aria-label="${label}">
             <option value="">Choose a skill</option>${options}
         </select>`;
 }
@@ -88,11 +89,11 @@ function addFeatureRow({ key, hasType }) {
     const what = key === 'race' ? 'racial feature' : 'feature';
     return html`
         <div class="add">
-            <input class="n" id="ftn-${key}" placeholder="Name" aria-label="New ${what} name">
+            <input class="n" id="new-feature-name-${key}" placeholder="Name" aria-label="New ${what} name">
             ${when(hasType, html`
-                <select id="ftt-${key}" aria-label="New feature type">
+                <select id="new-feature-type-${key}" aria-label="New feature type">
                     <option>Class feature</option><option>Feat</option>
                 </select>`)}
-            <button class="pri" data-a="add-feature" data-v="${key}" aria-label="Add ${what}">Add</button>
+            <button class="pri" data-action="add-feature" data-value="${key}" aria-label="Add ${what}">Add</button>
         </div>`;
 }

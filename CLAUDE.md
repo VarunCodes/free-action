@@ -39,6 +39,6 @@ A D&D 5.5e (2024 rules) character sheet in plain HTML, CSS and JS. Vite builds i
 - Every field must be handled in `cleanSheet()` (`src/sheet.js`). A field it doesn't handle is silently dropped on the next save.
 - Sheets saved before a change must still load. Upgrade them in `cleanSheet()` or in `backfill()`.
 - `render()` rebuilds the whole page with `innerHTML`. Sections in `src/sections/` write HTML with the ``html`…` `` tag from `src/html.js`, which escapes every value unless it's made by that tag or wrapped in `raw(…)` (only for already-safe markup, such as `md()` for descriptions). Older code in `main.js` still calls `esc()` by hand on every user or API value.
-- Inputs bind to state through `data-k="path"`. Buttons dispatch through `data-a="action"`.
+- Inputs bind to state through `data-field="path"`. Buttons dispatch through `data-action="name"` (see `CLICK_ACTIONS` in `main.js`), with `data-value` saying which spell, item or ability.
 - Items, feats and traits change numbers only through effects: `[type, target, value]`. A new effect type must be added to `EFFECT_TYPES` and `cleanEffect` (`src/sheet.js`), to `effectLabel`, and wherever its sum is used.
 - In `src/main.js`, new code goes in normally formatted functions. Don't extend the long one-liners.

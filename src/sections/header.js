@@ -17,10 +17,10 @@ export function headerSection(sheet, { editing }, ui) {
         <div class="top">
             <div><h1>${sheet.name || 'Unnamed'}</h1><p class="sub">${summary(sheet)}</p></div>
             <div class="seg">
-                <button data-a="set-mode" data-v="play" class="${when(!editing, 'on')}">Play</button>
-                <button data-a="set-mode" data-v="edit" class="${when(editing, 'on')}">Edit</button>
+                <button data-action="set-mode" data-value="play" class="${when(!editing, 'on')}">Play</button>
+                <button data-action="set-mode" data-value="edit" class="${when(editing, 'on')}">Edit</button>
             </div>
-            <button data-a="open-library">Library</button>
+            <button data-action="open-library">Library</button>
         </div>
         ${when(editing, () => identityFields(sheet, ui))}`;
 }
@@ -54,8 +54,8 @@ function classPicker(sheet, customPicked) {
     const options = CLASS_NAMES.map(name => html`<option ${when(known === name, 'selected')}>${name}</option>`);
     return html`
         <div>
-            <label class="lab" for="f-clsp">Class</label>
-            <select id="f-clsp">
+            <label class="lab" for="class-picker">Class</label>
+            <select id="class-picker">
                 <option value="">Choose a class</option>${options}
                 <option value="*" ${when(custom, 'selected')}>Custom…</option>
             </select>
@@ -68,7 +68,7 @@ function customClassFields(sheet) {
         <option value="${sides}" ${when(sheet.hdie === sides, 'selected')}>Hit die: d${sides}</option>`);
     return html`
         ${input('cls', sheet.cls, 'text', 'class="clsx" placeholder="Class name" aria-label="Custom class"')}
-        <select class="clsx" data-k="hdie" aria-label="Custom class hit die">
+        <select class="clsx" data-field="hdie" aria-label="Custom class hit die">
             <option value="0">Hit die: not set</option>${dice}
         </select>`;
 }
@@ -83,8 +83,8 @@ function speciesPicker(sheet, { customSpecies, librarySpecies }) {
         'class="clsx" placeholder="Species name" aria-label="Custom species"');
     return html`
         <div>
-            <label class="lab" for="f-spp">Species</label>
-            <select id="f-spp">
+            <label class="lab" for="species-picker">Species</label>
+            <select id="species-picker">
                 <option value="">Choose a species</option>${options}
                 <option value="*" ${when(custom, 'selected')}>Custom…</option>
             </select>

@@ -6,7 +6,7 @@
 // A note on the sheet's data: items and features keep their name in `n`, and an effect is a list
 // [type, target, value], such as ['set', 'str', 19] or ['sk', 'Insight', 2].
 //
-// Buttons with data-a="roll" roll a d20 plus data-b when tapped (see rollCheck in actions/rolls.js).
+// Buttons with data-action="roll" roll a d20 plus data-roll-bonus when tapped (see rollCheck in actions/rolls.js).
 import { ABILITIES, ABILITY_NAMES, SKILLS } from '../sheet.js';
 import {
     abilityMod, signed, score, scoreSetBy, scoreBonuses, baseScore,
@@ -48,7 +48,7 @@ function abilityBox(sheet, ability, editing, checkBonus) {
     return html`
         <div class="ab${when(raised, ' boost')}" ${when(why, html`title="${why}"`)}>
             <div class="n">${name.slice(0, 3)}</div>
-            <button class="rb m" data-a="roll" data-l="${name} check" data-b="${check}"
+            <button class="rb m" data-action="roll" data-roll-label="${name} check" data-roll-bonus="${check}"
                 aria-label="${name} check ${signed(check)}">${signed(check)}</button>
             ${scoreShown}
         </div>`;
@@ -58,7 +58,7 @@ function abilityBox(sheet, ability, editing, checkBonus) {
 // proficiency; in Play it's disabled.
 function proficiencyMark({ action, value, label, level, description, editing }) {
     return html`
-        <button class="pr" data-a="${action}" data-v="${value}" aria-label="${label} proficiency"
+        <button class="pr" data-action="${action}" data-value="${value}" aria-label="${label} proficiency"
             aria-pressed="${level > 0}" aria-description="${description}"
             title="${description}" ${when(!editing, 'disabled')}>${PROF_MARK[level]}</button>`;
 }
@@ -88,7 +88,7 @@ function saveRow(sheet, ability, { editing, proficiency, bonus, bonusSources }) 
                 action: 'toggle-save', value: ability, label: `${name} save`, level, description, editing,
             })}
             <span class="g">${name}</span>
-            <button class="rb" data-a="roll" data-l="${name} save" data-b="${total}"
+            <button class="rb" data-action="roll" data-roll-label="${name} save" data-roll-bonus="${total}"
                 aria-label="${name} save ${signed(total)}" title="${bonusSources}">${signed(total)}</button>
         </div>`;
 }
@@ -141,8 +141,9 @@ function skillRow(sheet, view, skill, ability, stealthPenalty) {
         <div class="ln">
             ${proficiencyMark({ action: 'cycle-skill', value: skill, label: skill, level, description, editing })}
             <span class="g">${skill} <span class="a">${ability}</span>${disPill}${advPill}</span>
-            <button class="rb" data-a="roll" data-l="${skill}" data-b="${total}" aria-label="${skill} ${signed(total)}"
-                ${when(disadvantage, html`data-dis="1"`)} ${when(advantage, html`data-adv="1"`)}
+            <button class="rb" data-action="roll" data-roll-label="${skill}" data-roll-bonus="${total}"
+                aria-label="${skill} ${signed(total)}"
+                ${when(disadvantage, html`data-disadvantage="1"`)} ${when(advantage, html`data-advantage="1"`)}
                 title="${why}">${signed(total)}</button>
         </div>`;
 }
