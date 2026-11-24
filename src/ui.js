@@ -16,7 +16,7 @@ export function createUi() {
         },
         // The slot level picked for each spell, by its place in the list, when cast with a higher slot.
         spellSlotLevels: {},
-        // The ids of the sections and descriptions the user opened, like 'sp2' or 'more'.
+        // The ids of the sections and descriptions the user opened, like 'sp2' or 'roll-options'.
         openSections: new Set(),
         // The number in the Damage/Heal box.
         hitPointAmount: 1,

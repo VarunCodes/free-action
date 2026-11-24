@@ -49,12 +49,12 @@ export function html(strings, ...values) {
 }
 
 // Every bound field gets an id from its key (f-hp-max), so a visible label can point at it with for=.
-export const fieldId = key => 'f-' + key.split('.').join('-');
+export const fieldId = key => 'field-' + key.split('.').join('-');
 
-// An input bound to a path in the sheet through data-k, such as 'hp.max' or 'ab.str'. extra holds more
+// An input bound to a path in the sheet through data-field, such as 'hp.max' or 'ab.str'. extra holds more
 // attributes, written by the code (min=1 max=30 aria-label="…"), so it goes in as it is.
 export const input = (key, value, type = 'text', extra = '') =>
-    html`<input id="${fieldId(key)}" data-k="${key}" type="${type}" value="${value}" ${raw(extra)}>`;
+    html`<input id="${fieldId(key)}" data-field="${key}" type="${type}" value="${value}" ${raw(extra)}>`;
 
 // An input with a visible label above it.
 export const field = (label, key, value, type, extra) =>

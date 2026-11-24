@@ -102,7 +102,7 @@ async function openBackupFile(input) {
     }
     render();
 }
-// Writes a value into the sheet at a data-k path, such as 'hp.max' or 'ab.str'.
+// Writes a value into the sheet at a data-field path, such as 'hp.max' or 'ab.str'.
 function setPath(path, value) {
     const keys = path.split('.');
     const lastKey = keys.pop();
@@ -218,17 +218,23 @@ function column(...sections) {
 // Everything else edits the sheet.
 document.addEventListener('change', event => {
     const input = event.target;
-    if (input.id === 'amt') {
+    if (input.id === 'hit-point-amount') {
         ui.hitPointAmount = Math.max(0, parseInt(input.value) || 0);
-    } else if (input.id === 'cx') {
+    } else if (input.id === 'custom-dice') {
         ui.roll.customDice = input.value;
-    } else if (input.dataset.up !== undefined) {
-        ui.spellSlotLevels[input.dataset.up] = Number(input.value);
+    } else if (input.dataset.slotLevelFor !== undefined) {
+        ui.spellSlotLevels[input.dataset.slotLevelFor] = Number(input.value);
         render();
-    } else if (input.dataset.k || input.dataset.ch || input.id === 'f-clsp' || input.id === 'f-spp') {
+    } else if (editsTheSheet(input)) {
         editSheet(input);
     }
 });
+
+// A box bound to the sheet, a feature's skill choice, or the Class or Species drop-down.
+function editsTheSheet(input) {
+    const { field, skillChoice } = input.dataset;
+    return Boolean(field || skillChoice) || input.id === 'class-picker' || input.id === 'species-picker';
+}
 
 // An edit to the sheet. The note on what a class or species set stays only until the next edit anywhere.
 function editSheet(input) {
@@ -242,17 +248,17 @@ function editSheet(input) {
     save();
     render();
     // Picking Custom moves straight to the box for typing the name.
-    if (input.id === 'f-clsp' && ui.customClass) document.getElementById('f-cls')?.focus();
-    if (input.id === 'f-spp' && ui.customSpecies) document.getElementById('f-species')?.focus();
+    if (input.id === 'class-picker' && ui.customClass) document.getElementById('field-cls')?.focus();
+    if (input.id === 'species-picker' && ui.customSpecies) document.getElementById('field-species')?.focus();
 }
 
 function applyEdit(input) {
-    const path = input.dataset.k;
-    if (input.dataset.ch) {
-        chooseFeatureSkill(input.dataset.ch, input.value);
-    } else if (input.id === 'f-clsp') {
+    const path = input.dataset.field;
+    if (input.dataset.skillChoice) {
+        chooseFeatureSkill(input.dataset.skillChoice, input.value);
+    } else if (input.id === 'class-picker') {
         pickClassFromList(input.value);
-    } else if (input.id === 'f-spp') {
+    } else if (input.id === 'species-picker') {
         pickSpeciesFromList(input.value);
     } else if (path === 'cls' && knownClass(input.value)) {
         // A typed name that is a standard class snaps to it.
@@ -298,20 +304,20 @@ function pickSpeciesFromList(value) {
 // when the page is redrawn. In Edit every feature shows its fields, so only the roll bar's options are kept.
 document.addEventListener('toggle', event => {
     const details = event.target;
-    const id = details.dataset?.id;
-    if (!id || (sheet.mode === 'edit' && id !== 'more')) return;
+    const id = details.dataset?.section;
+    if (!id || (sheet.mode === 'edit' && id !== 'roll-options')) return;
     if (details.open) ui.openSections.add(id);
     else ui.openSections.delete(id);
 }, true);
 
-// What each button does, by its data-a name. Each action gets the clicked button, whose data-v says which
+// What each button does, by its data-action name. Each action gets the clicked button, whose data-value says which
 // spell, item or ability it is about. Afterwards the sheet is saved and the page redrawn, unless the action
 // returns NOTHING_TO_SAVE (nothing changed, or it already redrew what it needed to).
 const NOTHING_TO_SAVE = false;
-const valueOf = button => button.dataset.v;
-const indexOf = button => Number(button.dataset.v);
-// A data-v of '2.0' names a part inside a part: a slot level and one of its pips, an item and one of its effects.
-const twoIndexesOf = button => button.dataset.v.split('.').map(Number);
+const valueOf = button => button.dataset.value;
+const indexOf = button => Number(button.dataset.value);
+// A data-value of '2.0' names a part inside a part: a slot level and one of its pips, an item and one of its effects.
+const twoIndexesOf = button => button.dataset.value.split('.').map(Number);
 const textIn = id => document.getElementById(id).value.trim();
 const numberIn = id => parseInt(document.getElementById(id).value);
 
@@ -340,7 +346,7 @@ const CLICK_ACTIONS = {
     'weapon-attack': button => rollWeaponAttack(sheet, ui, indexOf(button)),
     'weapon-damage': button => rollWeaponDamage(sheet, ui, indexOf(button), button.dataset.twoHanded === '1'),
     'set-roll-mode': button => setRollMode(ui, valueOf(button)),
-    'roll-custom-dice': () => rollCustomDice(sheet, ui, document.getElementById('cx').value),
+    'roll-custom-dice': () => rollCustomDice(sheet, ui, document.getElementById('custom-dice').value),
     'copy-roll': () => copyLastRoll(sheet, ui),
     'toggle-roll-options': () => {
         toggleRollOptions(ui);
@@ -352,15 +358,15 @@ const CLICK_ACTIONS = {
         sheet.spc = !sheet.spc;
     },
     'toggle-slot': button => toggleSpellSlot(sheet, ...twoIndexesOf(button)),
-    'toggle-spell-description': button => toggleOpen('sp' + valueOf(button)),
-    'add-spell': () => addSpell(sheet, textIn('spn'), numberIn('spl')) || NOTHING_TO_SAVE,
+    'toggle-spell-description': button => toggleOpen('spell-' + valueOf(button)),
+    'add-spell': () => addSpell(sheet, textIn('new-spell-name'), numberIn('new-spell-level')) || NOTHING_TO_SAVE,
     'remove-spell': button => removeSpell(sheet, ui, indexOf(button)),
 
     'toggle-inventory': () => {
         sheet.inc = !sheet.inc;
     },
-    'toggle-item-description': button => toggleOpen('it' + valueOf(button)),
-    'add-item': () => addItem(sheet, textIn('itn'), numberIn('itq')) || NOTHING_TO_SAVE,
+    'toggle-item-description': button => toggleOpen('item-' + valueOf(button)),
+    'add-item': () => addItem(sheet, textIn('new-item-name'), numberIn('new-item-quantity')) || NOTHING_TO_SAVE,
     'remove-item': button => removeItem(sheet, ui, indexOf(button)),
     'toggle-attunement': button => {
         if (toggleAttunement(sheet, indexOf(button))) return;
@@ -370,8 +376,8 @@ const CLICK_ACTIONS = {
     },
     'add-effect': button => {
         const index = valueOf(button);
-        const choice = document.getElementById('fxt-' + index).value;
-        addItemEffect(sheet.items[index], choice, numberIn('fxv-' + index));
+        const choice = document.getElementById('new-effect-' + index).value;
+        addItemEffect(sheet.items[index], choice, numberIn('new-effect-value-' + index));
     },
     'remove-effect': button => {
         const [itemIndex, effectIndex] = twoIndexesOf(button);
@@ -380,9 +386,9 @@ const CLICK_ACTIONS = {
 
     'add-feature': button => {
         const listKey = valueOf(button);
-        const typePicker = document.getElementById('ftt-' + listKey);
+        const typePicker = document.getElementById('new-feature-type-' + listKey);
         const type = typePicker ? typePicker.value : '';
-        return addFeature(sheet, listKey, textIn('ftn-' + listKey), type) || NOTHING_TO_SAVE;
+        return addFeature(sheet, listKey, textIn('new-feature-name-' + listKey), type) || NOTHING_TO_SAVE;
     },
     'remove-feature': button => {
         const [listKey, index] = valueOf(button).split('.');
@@ -398,13 +404,13 @@ const CLICK_ACTIONS = {
         downloadSheet(sheet);
     },
     'import': () => {
-        ui.backupText = document.getElementById('io').value;
+        ui.backupText = document.getElementById('backup-json').value;
         ui.backupMessage = null;
         if (importBackup(ui.backupText)) return;
         render();
         return NOTHING_TO_SAVE;
     },
-    'restore': () => restoreVersion(numberIn('snp')) || NOTHING_TO_SAVE,
+    'restore': () => restoreVersion(numberIn('earlier-version')) || NOTHING_TO_SAVE,
     'new-character': () => {
         const question = 'Start a new character? '
             + 'The current one can be brought back from "Restore an earlier version".';
@@ -414,8 +420,8 @@ const CLICK_ACTIONS = {
 };
 
 document.addEventListener('click', event => {
-    const button = event.target.closest('[data-a]');
-    const action = button?.dataset.a;
+    const button = event.target.closest('[data-action]');
+    const action = button?.dataset.action;
     // The attunement-limit message goes away on the next click anywhere.
     if (ui.attunementRefused >= 0 && action !== 'toggle-attunement') {
         ui.attunementRefused = -1;
@@ -430,7 +436,7 @@ document.addEventListener('click', event => {
 
 // The number in the Damage/Heal box, at least 0.
 function typedHitPointAmount() {
-    return Math.max(0, parseInt(document.getElementById('amt')?.value) || 0);
+    return Math.max(0, parseInt(document.getElementById('hit-point-amount')?.value) || 0);
 }
 
 // The box keeps its number across redraws, unless it was cleared or set to 0.
@@ -469,7 +475,7 @@ function exportToBox() {
     markBackedUp();
     save();
     render();
-    document.getElementById('io').select();
+    document.getElementById('backup-json').select();
     try {
         navigator.clipboard.writeText(ui.backupText).catch(() => {});
     } catch {
@@ -478,7 +484,7 @@ function exportToBox() {
 }
 
 document.addEventListener('change', event => {
-    if (event.target.id === 'imf') openBackupFile(event.target);
+    if (event.target.id === 'backup-file') openBackupFile(event.target);
 });
 // Another tab saved: take its version, so this tab never writes a stale copy over it.
 window.addEventListener('storage', event => {

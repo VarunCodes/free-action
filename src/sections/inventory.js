@@ -25,7 +25,7 @@ const ARMOR_KINDS = [
 const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
 /**
- * The Inventory section. ui.isOpen(id) says whether an item's description is open ('it' + index), and
+ * The Inventory section. ui.isOpen(id) says whether an item's description is open ('item-' + index), and
  * ui.attunementRefused is the index of the item whose Attune button was just refused (-1 for none).
  * Collapsed, it keeps only what's equipped, with its roll buttons.
  */
@@ -59,7 +59,8 @@ export function inventorySection(sheet, { editing, proficiency }, ui) {
 
 function inventoryHeading(sheet, equippedCount) {
     const counts = `${plural(sheet.items.length, 'item')}, ${equippedCount} equipped`;
-    const button = html`<button class="hd" data-a="toggle-inventory" aria-expanded="${!sheet.inc}">Inventory</button>`;
+    const button = html`
+        <button class="hd" data-action="toggle-inventory" aria-expanded="${!sheet.inc}">Inventory</button>`;
     return html`
         <h2>${button}${when(sheet.inc, html`<small>${counts}</small>`)}</h2>`;
 }
@@ -101,7 +102,7 @@ function itemRow(item, index, inventory) {
             ${when(editing && item.eq, () => attunementAndEffects(item, index))}
             ${when(editing, () => equippableSettings(item, index))}
             ${when(item.w && !editing, () => weaponButtons(item, index, inventory))}
-            ${when(item.d && ui.isOpen('it' + index), () => html`<p class="sd">${raw(md(item.d))}</p>`)}
+            ${when(item.d && ui.isOpen('item-' + index), () => html`<p class="sd">${raw(md(item.d))}</p>`)}
         </div>`;
 }
 
@@ -118,14 +119,14 @@ function itemHighlight(item, inventory) {
 function itemLine(item, index, inventory) {
     const { editing } = inventory;
     const equippedBox = item.eq
-        ? html`<input type="checkbox" data-k="items.${index}.on" ${when(item.on, 'checked')}
+        ? html`<input type="checkbox" data-field="items.${index}.on" ${when(item.on, 'checked')}
             aria-label="${item.n} equipped" title="Equipped">`
         : html`<span class="pk"></span>`;
     const quantity = editing
         ? input(`items.${index}.q`, item.q, 'number', html`min=0 style="width:64px" aria-label="${item.n} quantity"`)
         : html`<span class="v">&times;${item.q}</span>`;
     const removeButton = html`
-        <button class="x" data-a="remove-item" data-v="${index}" aria-label="Remove ${item.n}">✕</button>`;
+        <button class="x" data-action="remove-item" data-value="${index}" aria-label="Remove ${item.n}">✕</button>`;
 
     return html`
         <div class="ln">
@@ -145,8 +146,8 @@ function itemLine(item, index, inventory) {
 function itemName(item, index, ui) {
     if (!item.d) return item.n;
     return html`
-        <button class="lk" data-a="toggle-item-description" data-v="${index}"
-            aria-expanded="${ui.isOpen('it' + index)}">${item.n}</button>`;
+        <button class="lk" data-action="toggle-item-description" data-value="${index}"
+            aria-expanded="${ui.isOpen('item-' + index)}">${item.n}</button>`;
 }
 
 // Notes after the name: too heavy to wear well, the Attune button, and why an item has no effect.
@@ -167,7 +168,7 @@ function attuneButton(item, index) {
     const attuned = Boolean(item.att);
     const title = attuned ? 'Attuned. Click to end attunement' : 'Needs attunement. Click to attune';
     const label = attuned ? 'Attuned' : 'Attune';
-    return html` <button class="pill att${when(attuned, ' on')}" data-a="toggle-attunement" data-v="${index}"
+    return html` <button class="pill att${when(attuned, ' on')}" data-action="toggle-attunement" data-value="${index}"
         aria-label="Attune ${item.n}" aria-pressed="${attuned}" title="${title}">${label}</button>`;
 }
 
@@ -175,20 +176,22 @@ function attuneButton(item, index) {
 function attunementAndEffects(item, index) {
     const effects = (item.fx || []).map((effect, effectIndex) => {
         const label = effectLabel(effect);
-        return html`<span class="pill">${label} <button class="x" data-a="remove-effect"
-            data-v="${index}.${effectIndex}"
+        return html`<span class="pill">${label} <button class="x" data-action="remove-effect"
+            data-value="${index}.${effectIndex}"
             aria-label="Remove ${label} from ${item.n}">✕</button></span>`;
     });
     const choices = ITEM_EFFECT_CHOICES.map(({ value, label }) => html`<option value="${value}">${label}</option>`);
 
     return html`
         <div class="srl">
-            <label class="row"><input type="checkbox" data-k="items.${index}.at" ${when(item.at, 'checked')}
+            <label class="row"><input type="checkbox" data-field="items.${index}.at" ${when(item.at, 'checked')}
                 aria-label="${item.n} needs attunement"> Needs attunement</label>
             ${effects}
-            <select id="fxt-${index}" aria-label="${item.n} effect">${choices}</select>
-            <input id="fxv-${index}" type="number" value="1" style="width:64px" aria-label="${item.n} effect value">
-            <button data-a="add-effect" data-v="${index}" aria-label="Add effect to ${item.n}">Add effect</button>
+            <select id="new-effect-${index}" aria-label="${item.n} effect">${choices}</select>
+            <input id="new-effect-value-${index}" type="number" value="1" style="width:64px"
+                aria-label="${item.n} effect value">
+            <button data-action="add-effect" data-value="${index}"
+                aria-label="Add effect to ${item.n}">Add effect</button>
         </div>`;
 }
 
@@ -198,10 +201,10 @@ function equippableSettings(item, index) {
         <option value="${value}" ${when(item.ar?.k === value, 'selected')}>${label}</option>`);
     return html`
         <div class="srl">
-            <label class="row"><input type="checkbox" data-k="items.${index}.eq" ${when(item.eq, 'checked')}
+            <label class="row"><input type="checkbox" data-field="items.${index}.eq" ${when(item.eq, 'checked')}
                 aria-label="${item.n} equippable"> Equippable</label>
             ${when(item.eq, () => html`
-                <select data-k="items.${index}.ar.k" aria-label="${item.n} armor class effect">${kinds}</select>
+                <select data-field="items.${index}.ar.k" aria-label="${item.n} armor class effect">${kinds}</select>
                 ${when(item.ar.k, () => armorFields(item, index))}`)}
         </div>`;
 }
@@ -213,7 +216,7 @@ function armorFields(item, index) {
         <label class="row">AC ${number('ac', item.ar.ac, 'min=-10 max=30', 'AC value')}</label>
         <label class="row">Str needed ${number('str', item.ar.str, 'min=0 max=30', 'strength needed')}</label>
         <label class="row">Save bonus ${number('sb', item.ar.sb || 0, 'min=-5 max=10', 'saving throw bonus')}</label>
-        <label class="row"><input type="checkbox" data-k="items.${index}.ar.stl" ${when(item.ar.stl, 'checked')}
+        <label class="row"><input type="checkbox" data-field="items.${index}.ar.stl" ${when(item.ar.stl, 'checked')}
             aria-label="${item.n} Stealth Disadvantage"> Stealth Disadvantage</label>`;
 }
 
@@ -223,11 +226,12 @@ function weaponButtons(item, index, { sheet, proficiency }) {
     const modifier = weaponMod(sheet, item);
     return html`
         <div class="srl">
-            <button class="rb" data-a="weapon-attack" data-v="${index}">Hit ${signed(proficiency + modifier)}</button>
-            <button class="rb" data-a="weapon-damage"
-                data-v="${index}">${withMod(weapon.d, modifier)} ${weapon.t}</button>
+            <button class="rb" data-action="weapon-attack"
+                data-value="${index}">Hit ${signed(proficiency + modifier)}</button>
+            <button class="rb" data-action="weapon-damage"
+                data-value="${index}">${withMod(weapon.d, modifier)} ${weapon.t}</button>
             ${when(weapon.v, html`
-                <button class="rb" data-a="weapon-damage" data-v="${index}" data-two-handed="1">
+                <button class="rb" data-action="weapon-damage" data-value="${index}" data-two-handed="1">
                     ${withMod(weapon.v, modifier)} two-handed</button>`)}
         </div>`;
 }
@@ -235,8 +239,8 @@ function weaponButtons(item, index, { sheet, proficiency }) {
 function addItemRow() {
     return html`
         <div class="add">
-            <input class="n" id="itn" placeholder="Item name" aria-label="New item name">
-            <input class="q" id="itq" type="number" value="1" min="0" aria-label="New item quantity">
-            <button class="pri" data-a="add-item" aria-label="Add item">Add</button>
+            <input class="n" id="new-item-name" placeholder="Item name" aria-label="New item name">
+            <input class="q" id="new-item-quantity" type="number" value="1" min="0" aria-label="New item quantity">
+            <button class="pri" data-action="add-item" aria-label="Add item">Add</button>
         </div>`;
 }
