@@ -35,7 +35,7 @@ function featureList(sheet, list, editing, ui) {
 function featureRow(feature, id, editing, ui) {
     const effects = effectsLine(feature, id, editing);
     const removeButton = html`
-        <button class="x" data-a="delft" data-v="${id}" aria-label="Remove ${feature.n}">✕</button>`;
+        <button class="x" data-a="remove-feature" data-v="${id}" aria-label="Remove ${feature.n}">✕</button>`;
     const description = md(feature.d);
     const body = editing
         ? html`<textarea data-k="${id}.d" placeholder="Description"
@@ -93,6 +93,6 @@ function addFeatureRow({ key, hasType }) {
                 <select id="ftt-${key}" aria-label="New feature type">
                     <option>Class feature</option><option>Feat</option>
                 </select>`)}
-            <button class="pri" data-a="addft" data-v="${key}" aria-label="Add ${what}">Add</button>
+            <button class="pri" data-a="add-feature" data-v="${key}" aria-label="Add ${what}">Add</button>
         </div>`;
 }
