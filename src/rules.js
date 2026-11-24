@@ -12,7 +12,7 @@
 //
 // Effects are how items, feats and traits change numbers: [type, target, value], such as ['ab', 'con', 2]
 // (+2 Constitution) or ['set', 'str', 19] (Strength becomes 19). Each kind is summed where it applies below.
-import { traitEffects } from './library.js';
+import { traitEffects } from './library/traits.js';
 import { STANDARD_CLASSES, CLASS_NAMES, SRD_SPECIES } from './sheet.js';
 
 // Ability modifier: (score - 10) / 2, rounded down.
@@ -80,7 +80,7 @@ export function activeGear(sheet) {
     return { live, over: uniq.slice(3), dup, attuned: uniq.length };
 }
 
-// A feature's or trait's effects (see traitEffects in library.js). A skill choice ('?' for any skill,
+// A feature's or trait's effects (see library/traits.js). A skill choice ('?' for any skill,
 // '?A|B' for one of a list) becomes the skill picked for it in Edit (feature.ch, one pick per choice, in
 // order), and keeps the choice as a fourth entry; until a skill is picked it counts for nothing.
 export function featureEffects(feature) {
