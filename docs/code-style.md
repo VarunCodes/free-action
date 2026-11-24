@@ -27,6 +27,11 @@ to the author and the reviewer.
   - `src/library/`: reading, filtering and storing Library content.
   - Plain modules (`rules.js`, `rolls.js`, `sheet.js`, `gearUpgrade.js`): logic that needs no browser, so it can
     have unit tests.
+- HTML is built only in `src/sections/`, with the `html` tag, which escapes every value. Never build markup in a
+  logic file or call `esc()` by hand: custom packs are pasted-in JSON, and one missed value puts their markup on
+  the page.
+- Return an object with named fields, not an array whose positions carry meaning: `{ list, index }`, not
+  `[list, index]`.
 - Pass `sheet` and `ui` in as arguments instead of reaching for globals, so a function says what it uses.
 
 ## Comments
@@ -42,6 +47,7 @@ to the author and the reviewer.
 - The short keys already saved (`sv`, `sk`, `n`, `fx`, a spell's `r.a`, `r.s`, …) are known debt. Don't copy them
   into new code. Rename one only in its own PR, with an upgrade in `cleanSheet()` and a test that loads a sheet
   in the old format, because saved sheets, backups and history versions must still load.
+- Element ids, `data-` attributes and `ui` fields aren't saved, so they can be renamed in any PR.
 
 ## What lint checks
 
