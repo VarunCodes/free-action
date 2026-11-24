@@ -9,7 +9,7 @@
 //
 // The spell save DC is 8 + proficiency + the spellcasting modifier, and the spell attack is
 // proficiency + the spellcasting modifier (PHB 2024), each plus any bonuses from items.
-import { AB, ABN } from '../sheet.js';
+import { ABILITIES, ABILITY_NAMES } from '../sheet.js';
 import { esc, md } from '../text.js';
 import { signed, effectsOf } from '../rules.js';
 import { spellDice } from '../rolls.js';
@@ -57,9 +57,9 @@ function castingAbilityField(castingAbility) {
                 <label class="lab" for="f-cast">Spellcasting ability</label>
                 <select id="f-cast" data-k="cast">
                     <option value="">None</option>
-                    ${AB.map(ability => html`
+                    ${ABILITIES.map(ability => html`
                         <option value="${ability}"
-                            ${when(castingAbility === ability, 'selected')}>${ABN[ability]}</option>`)}
+                            ${when(castingAbility === ability, 'selected')}>${ABILITY_NAMES[ability]}</option>`)}
                 </select>
             </div>
         </div>`;
@@ -183,9 +183,9 @@ function spellRollFields(spell, index) {
                 aria-label="${name} attack"> Attack</label>
             <select data-k="${key}s" aria-label="${name} saving throw">
                 <option value="">No save</option>
-                ${AB.map(ability => html`
+                ${ABILITIES.map(ability => html`
                     <option value="${ability}"
-                        ${when(roll.s === ability, 'selected')}>${ABN[ability].slice(0, 3)} save</option>`)}
+                        ${when(roll.s === ability, 'selected')}>${ABILITY_NAMES[ability].slice(0, 3)} save</option>`)}
             </select>
             ${input(key + 'd', roll.d, 'text',
                 `class="dmg" placeholder="Dice, e.g. 1d10" aria-label="${esc(name)} damage dice"`)}
@@ -202,7 +202,7 @@ function spellRollButtons(sheet, view, ui, spell, index) {
     const roll = spell.r;
     const slot = ui.slotFor(index) ?? spell.l;
     const { dice, attacks } = spellDice(sheet, spell, slot);
-    const saveName = ABN[roll.s];
+    const saveName = ABILITY_NAMES[roll.s];
     if (!roll.a && !saveName && !dice) return '';
 
     const attack = proficiency + castingModifier + spellAttackBonus;

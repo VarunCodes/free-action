@@ -7,7 +7,7 @@
 // [type, target, value], such as ['set', 'str', 19] or ['sk', 'Insight', 2].
 //
 // Buttons with data-a="roll" roll a d20 plus data-b when tapped (see rollCheck in actions/rolls.js).
-import { AB, ABN, SK } from '../sheet.js';
+import { ABILITIES, ABILITY_NAMES, SKILLS } from '../sheet.js';
 import {
     abilityMod, signed, score, scoreSetBy, scoreBonuses, baseScore,
     skillProf, skillGranted, skillGrants, saveBonus, saveBonuses, wornWith,
@@ -20,12 +20,12 @@ export function abilitiesSection(sheet, { editing, checkBonus, checkBonusSources
     const showNote = !editing && checkBonus !== 0;
     return html`
         <h2>Abilities ${when(showNote, html`<small>${checkBonusSources} on checks</small>`)}</h2>
-        <div class="abs">${AB.map(ability => abilityBox(sheet, ability, editing, checkBonus))}</div>`;
+        <div class="abs">${ABILITIES.map(ability => abilityBox(sheet, ability, editing, checkBonus))}</div>`;
 }
 
 // One ability. A score raised by an item or a bonus is highlighted, and its tooltip says by what.
 function abilityBox(sheet, ability, editing, checkBonus) {
-    const name = ABN[ability];
+    const name = ABILITY_NAMES[ability];
     const setBy = scoreSetBy(sheet, ability);
     const bonuses = scoreBonuses(sheet, ability);
     const raised = setBy !== undefined || bonuses.length > 0;
@@ -74,11 +74,11 @@ export function savesSection(sheet, { editing, proficiency }) {
     const save = { editing, proficiency, bonus, bonusSources };
     return html`
         <h2>Saving throws ${note}</h2>
-        <div class="list two">${AB.map(ability => saveRow(sheet, ability, save))}</div>`;
+        <div class="list two">${ABILITIES.map(ability => saveRow(sheet, ability, save))}</div>`;
 }
 
 function saveRow(sheet, ability, { editing, proficiency, bonus, bonusSources }) {
-    const name = ABN[ability];
+    const name = ABILITY_NAMES[ability];
     const level = sheet.sv[ability] ? 1 : 0;
     const total = abilityMod(score(sheet, ability)) + level * proficiency + bonus;
     const description = PROF_LABEL[level];
@@ -111,7 +111,7 @@ export function skillsSection(sheet, view) {
     const perception = abilityMod(score(sheet, 'wis')) + skillProf(sheet, 'Perception') * proficiency + checkBonus;
     const passive = 10 + perception + (perceptionAdvantage ? 5 : 0);
     const passiveWhy = [checkBonusSources, perceptionAdvantage ? '+5 for Advantage' : ''].filter(Boolean).join('. ');
-    const rows = SK.map(([skill, ability]) => skillRow(sheet, view, skill, ability, stealthPenalty));
+    const rows = SKILLS.map(([skill, ability]) => skillRow(sheet, view, skill, ability, stealthPenalty));
     return html`
         <h2>Skills ${note}</h2>
         <div class="list two">${rows}</div>

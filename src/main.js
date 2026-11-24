@@ -2,7 +2,7 @@ import './style.css';
 import { openLibrary } from './libraryui.js';
 import { cachedItems, cachedSpecies, loadLibrary } from './library.js';
 import { dateAndTime } from './text.js';
-import { DEF, cleanSheet } from './sheet.js';
+import { newSheet, cleanSheet } from './sheet.js';
 import {
     abilityMod, profBonus, knownClass, knownSpecies, effectsOf, effectTotal, advantageFrom, score,
 } from './rules.js';
@@ -28,7 +28,7 @@ import {
     addItemEffect, removeItemEffect, toggleAttunement, addFeature, removeFeature,
 } from './actions/lists.js';
 import { loadSaved, saveSheet, snapshots, snapshot, markBackedUp, downloadSheet, readBackup } from './storage.js';
-let sheet = loadSaved() || DEF();
+let sheet = loadSaved() || newSheet();
 const ui = createUi();
 // A spell's roll settings when it has none yet (saved under short keys, renamed in a later step).
 const newSpellRoll = () => ({ a: false, s: '', d: '', b: '', t: '', h: false, m: false, by: 'slot', up: [] });

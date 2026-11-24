@@ -13,7 +13,7 @@
 // Effects are how items, feats and traits change numbers: [type, target, value], such as ['ab', 'con', 2]
 // (+2 Constitution) or ['set', 'str', 19] (Strength becomes 19). Each kind is summed where it applies below.
 import { traitEffects } from './library.js';
-import { CLS, CLASSES, SRD_SPECIES } from './sheet.js';
+import { STANDARD_CLASSES, CLASS_NAMES, SRD_SPECIES } from './sheet.js';
 
 // Ability modifier: (score - 10) / 2, rounded down.
 export const abilityMod = score => Math.floor((score - 10) / 2);
@@ -26,7 +26,7 @@ export const profBonus = sheet => Math.ceil(Math.max(1, sheet.level) / 4) + 1;
 
 // The standard class a name refers to ("fighter " is Fighter), or undefined for a custom class.
 export const knownClass = name =>
-    CLASSES.find(className => className.toLowerCase() === String(name).trim().toLowerCase());
+    CLASS_NAMES.find(className => className.toLowerCase() === String(name).trim().toLowerCase());
 
 // The species to choose from: the Library's (SRD 5.2 and any custom packs) in alphabetical order, each
 // name once, or the SRD names before the Library has been downloaded.
@@ -42,7 +42,7 @@ export const knownSpecies = (name, librarySpecies) => speciesNames(librarySpecie
 // Hit dice: one per level, of the class's size (or the one picked for a custom class). sheet.hd counts
 // the ones spent. A short rest spends them one at a time (die + Con modifier, at least 1 HP); a long rest
 // gives them all back (2024 rules).
-export const hitDie = sheet => CLS[knownClass(sheet.cls)]?.hd || sheet.hdie;
+export const hitDie = sheet => STANDARD_CLASSES[knownClass(sheet.cls)]?.hitDie || sheet.hdie;
 export const hitDiceLeft = sheet => Math.max(0, sheet.level - sheet.hd);
 
 // Max HP by the fixed-average rule: the full die plus Con at level 1, then half the die + 1 + Con per level,
