@@ -21,6 +21,7 @@ import {
     rollCustomDice, copyLastRoll, setRollMode, toggleRollOptions,
 } from './actions/rolls.js';
 import { setClass, setSpecies } from './actions/character.js';
+import { fillGearFromLibrary } from './gearUpgrade.js';
 import { takeDamage, heal, setTemporaryHitPoints, longRest, useAverageHitPoints } from './actions/hitPoints.js';
 import {
     toggleSaveProficiency, cycleSkillProficiency, toggleSpellSlot, addSpell, removeSpell, addItem, removeItem,
@@ -133,8 +134,13 @@ function chooseSpecies(speciesName) {
 function renderRoll() {
     const rollBar = document.getElementById('roll');
     rollBar.innerHTML = rollBarSection(sheet, ui.roll, id => ui.openSections.has(id));
-    // The page leaves room at the bottom for however tall the bar is now.
-    document.documentElement.style.setProperty('--rollh', rollBar.firstChild.offsetHeight + 'px');
+    fitPageAboveRollBar();
+}
+
+// The page leaves room at the bottom for however tall the roll bar is now.
+function fitPageAboveRollBar() {
+    const bar = document.getElementById('roll').firstChild;
+    if (bar) document.documentElement.style.setProperty('--rollh', bar.offsetHeight + 'px');
 }
 // Values several sections use, worked out once per render:
 //   editing             true in Edit mode, false in Play
@@ -168,30 +174,44 @@ function sheetView(){
 
 // Sections go into three columns: stats, inventory and spells, everything else. On phones the columns
 // dissolve and each section's order puts them back into one reading order.
-function render(){
-    const view=sheetView();
-    sheet.spells.forEach(spell=>{spell.r=Object.assign(newSpellRoll(),spell.r)});
-    const isOpen=id=>ui.openSections.has(id);
-    const header=headerSection(sheet,view,{customClass:ui.customClass,customSpecies:ui.customSpecies,librarySpecies:ui.librarySpecies,message:ui.headerMessage});
-    const vitals=vitalsSection(sheet,view,{amount:ui.hitPointAmount});
-    const abilities=abilitiesSection(sheet,view);
-    const saves=savesSection(sheet,view);
-    const skills=skillsSection(sheet,view);
-    const features=featuresSection(sheet,view,{isOpen});
-    const racialFeatures=racialFeaturesSection(sheet,view,{isOpen});
-    const spells=spellsSection(sheet,view,{isOpen,slotFor:index=>ui.spellSlotLevels[index]});
-    const inventory=inventorySection(sheet,view,{isOpen,attunementRefused:ui.attunementRefused});
-    const notes=notesSection(sheet);
-    const backup=backupSection({backupText:ui.backupText,message:ui.backupMessage});
+function render() {
+    const view = sheetView();
+    for (const spell of sheet.spells) spell.r = { ...newSpellRoll(), ...spell.r };
+    const isOpen = id => ui.openSections.has(id);
+    const header = headerSection(sheet, view, {
+        customClass: ui.customClass,
+        customSpecies: ui.customSpecies,
+        librarySpecies: ui.librarySpecies,
+        message: ui.headerMessage,
+    });
+    const vitals = vitalsSection(sheet, view, { amount: ui.hitPointAmount });
+    const abilities = abilitiesSection(sheet, view);
+    const saves = savesSection(sheet, view);
+    const skills = skillsSection(sheet, view);
+    const features = featuresSection(sheet, view, { isOpen });
+    const racialFeatures = racialFeaturesSection(sheet, view, { isOpen });
+    const spells = spellsSection(sheet, view, { isOpen, slotFor: index => ui.spellSlotLevels[index] });
+    const inventory = inventorySection(sheet, view, { isOpen, attunementRefused: ui.attunementRefused });
+    const notes = notesSection(sheet);
+    const backup = backupSection({ backupText: ui.backupText, message: ui.backupMessage });
 
-    const section=(order,content)=>`<section class="c" style="order:${order}">${content}</section>`;
-    const column=(...sections)=>`<div class="col">${sections.join('')}</div>`;
-    const statsColumn=column(section(1,vitals),section(2,abilities),section(3,saves),section(4,skills));
-    const gearColumn=column(section(7,inventory),section(8,spells));
-    const otherColumn=column(section(5,features),section(6,racialFeatures),section(9,notes),section(10,backup));
-    document.getElementById('app').innerHTML=header+`<div class="grid">${statsColumn}${gearColumn}${otherColumn}</div>`;
+    const statsColumn = column(section(1, vitals), section(2, abilities), section(3, saves), section(4, skills));
+    const gearColumn = column(section(7, inventory), section(8, spells));
+    const otherColumn = column(
+        section(5, features), section(6, racialFeatures), section(9, notes), section(10, backup));
+    const grid = `<div class="grid">${statsColumn}${gearColumn}${otherColumn}</div>`;
+    document.getElementById('app').innerHTML = header + grid;
     renderRoll();
-    document.title=`${sheet.name.trim()||'Unnamed'} · Character Sheet`;
+    document.title = `${sheet.name.trim() || 'Unnamed'} · Character Sheet`;
+}
+
+// The order is where the section goes when the columns dissolve into one on phones.
+function section(order, content) {
+    return `<section class="c" style="order:${order}">${content}</section>`;
+}
+
+function column(...sections) {
+    return `<div class="col">${sections.join('')}</div>`;
 }
 
 // Boxes that only change what the page shows: the Damage/Heal amount, the custom dice and a spell's slot level.
@@ -213,6 +233,20 @@ document.addEventListener('change', event => {
 // An edit to the sheet. The note on what a class or species set stays only until the next edit anywhere.
 function editSheet(input) {
     ui.headerMessage = '';
+    // A blank or non-numeric number box puts the old value back instead of becoming 0.
+    if (input.type === 'number' && !Number.isFinite(parseInt(input.value))) {
+        render();
+        return;
+    }
+    applyEdit(input);
+    save();
+    render();
+    // Picking Custom moves straight to the box for typing the name.
+    if (input.id === 'f-clsp' && ui.customClass) document.getElementById('f-cls')?.focus();
+    if (input.id === 'f-spp' && ui.customSpecies) document.getElementById('f-species')?.focus();
+}
+
+function applyEdit(input) {
     const path = input.dataset.k;
     if (input.dataset.ch) {
         chooseFeatureSkill(input.dataset.ch, input.value);
@@ -227,18 +261,9 @@ function editSheet(input) {
     } else if (path === 'species' && knownSpecies(input.value, ui.librarySpecies)) {
         ui.customSpecies = false;
         chooseSpecies(knownSpecies(input.value, ui.librarySpecies));
-    } else if (input.type === 'number' && !Number.isFinite(parseInt(input.value))) {
-        // A blank or non-numeric number box puts the old value back instead of becoming 0.
-        render();
-        return;
     } else {
         setPath(path, inputValue(input));
     }
-    save();
-    render();
-    // Picking Custom moves straight to the box for typing the name.
-    if (input.id === 'f-clsp' && ui.customClass) document.getElementById('f-cls')?.focus();
-    if (input.id === 'f-spp' && ui.customSpecies) document.getElementById('f-species')?.focus();
 }
 
 function inputValue(input) {
@@ -456,26 +481,53 @@ document.addEventListener('change', event => {
     if (event.target.id === 'imf') openBackupFile(event.target);
 });
 // Another tab saved: take its version, so this tab never writes a stale copy over it.
-window.addEventListener('storage',e=>{if(e.key!=='sheet'||!e.newValue)return;try{sheet=cleanSheet(JSON.parse(e.newValue));render()}catch(x){}});
+window.addEventListener('storage', event => {
+    if (event.key !== 'sheet' || !event.newValue) return;
+    try {
+        sheet = cleanSheet(JSON.parse(event.newValue));
+        render();
+    } catch {
+        // Not a sheet this tab can read: keep the one it has.
+    }
+});
+
+// Fill in gear data from the saved Library copy, on opening and whenever the Library downloads again.
+async function upgradeGear() {
+    let libraryItems;
+    try {
+        libraryItems = await cachedItems();
+    } catch {
+        return;
+    }
+    if (!fillGearFromLibrary(sheet, libraryItems)) return;
+    save();
+    render();
+}
+window.addEventListener('library-loaded', upgradeGear);
+
+// Keep the room at the bottom right when the roll bar rewraps (window resized, phone rotated).
+window.addEventListener('resize', fitPageAboveRollBar);
+
 // Ask the browser not to clear this site's data under storage pressure (granted silently or not at all).
-try{navigator.storage?.persisted?.().then(p=>p||navigator.storage.persist()).catch(()=>{})}catch(e){}
-snapshot(sheet,'opened',true);
-// Gear added before the Library knew about AC, save bonuses or Stealth gets that data filled in
-// from the saved Library copy, matched by name. Each item is filled once per data version (v), so
-// later hand edits stick. v2 adds attunement, magic effects and the Mithral fix; v3 adds rarity.
-async function backfill(){let lib;try{lib=await cachedItems()}catch(e){return}if(!lib.length)return;
-    const by=new Map(lib.map(x=>[x.name.toLowerCase(),x]));let ch=false;
-    for(const x of sheet.items){const l=by.get(x.n.toLowerCase());if(!l||(x.v||0)>=3)continue;
-        if(l.eq&&!x.eq)x.eq=true;if(l.w&&!x.w)x.w={...l.w};
-        if((x.v||0)<1&&l.ar){if(!x.ar||!x.ar.k)x.ar={...l.ar};else{if(!x.ar.sb&&l.ar.sb)x.ar.sb=l.ar.sb;if(!x.ar.stl&&l.ar.stl)x.ar.stl=true}}
-        if(l.rr&&!x.rr)x.rr=l.rr;
-        if(l.at&&x.at===undefined)x.at=true;if(l.fx&&!x.fx)x.fx=l.fx.map(f=>[...f]);
-        if(/^Mithral Armor/i.test(x.n)&&x.ar){x.ar.str=0;x.ar.stl=false}
-        x.v=3;ch=true}
-    if(ch){save();render()}}
-window.addEventListener('library-loaded',backfill);
-// Keep the bottom room right when the roll bar rewraps (window resized, phone rotated).
-window.addEventListener('resize',()=>{const r=document.getElementById('roll').firstChild;if(r)document.documentElement.style.setProperty('--rollh',r.offsetHeight+'px')});
-backfill();
-cachedSpecies().then(l=>{ui.librarySpecies=l;if(sheet.mode==='edit')render()}).catch(()=>{});
+function askToKeepStorage() {
+    try {
+        navigator.storage?.persisted?.()
+            .then(alreadyKept => alreadyKept || navigator.storage.persist())
+            .catch(() => {});
+    } catch {
+        // No Storage API: the browser decides on its own.
+    }
+}
+
+// Opening the page: keep the version it opened with, upgrade old gear, and read the Library's species
+// for the Species picker, which only Edit shows.
+askToKeepStorage();
+snapshot(sheet, 'opened', true);
+upgradeGear();
+cachedSpecies()
+    .then(species => {
+        ui.librarySpecies = species;
+        if (sheet.mode === 'edit') render();
+    })
+    .catch(() => {});
 render();
