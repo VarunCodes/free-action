@@ -294,7 +294,7 @@ export async function importPack(text) {
             kind: d.kind, name: String(d.name), level: Number(d.level) || 0,
             sub: String(d.sub || (d.kind === 'spell' ? (Number(d.level) ? 'Level ' + d.level : 'Cantrip') : 'Custom')),
             desc: String(d.desc || ''), src: 'Custom',
-            ...(d.kind === 'race' && Array.isArray(d.traits) ? { traits: d.traits.map(t => { const fx = cleanEffects(t.fx); return { n: String(t.n || t.name), d: String(t.d || t.desc || ''), ...(fx.length ? { fx } : {}) }; }) } : {}),
+            ...(d.kind === 'race' && Array.isArray(d.traits) ? { traits: d.traits.map(packTrait) } : {}),
         };
     });
     const old = (await kvGet('packs')) || [];
@@ -302,6 +302,18 @@ export async function importPack(text) {
     const ok = await kvSet('packs', [...keep, ...items]);
     if (!ok) throw new Error('Could not save to this browser (storage is blocked).');
     return items.length;
+}
+
+// A species trait from a custom pack, stored the way the sheet keeps traits: n (name), d (description) and,
+// only if it has any, fx (effects). A pack may also spell the name and description out as "name" and "desc".
+function packTrait(trait) {
+    const stored = {
+        n: String(trait.n || trait.name),
+        d: String(trait.d || trait.desc || ''),
+    };
+    const effects = cleanEffects(trait.fx);
+    if (effects.length) stored.fx = effects;
+    return stored;
 }
 
 export async function clearPacks() { await kvSet('packs', []); }
