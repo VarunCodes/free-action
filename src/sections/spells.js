@@ -45,7 +45,7 @@ function spellsHeading(sheet, { proficiency, castingAbility, castingModifier, sp
     const summary = html`<small>${spells}${when(castingAbility, `, save DC ${dc}`)}</small>`;
     return html`
         <h2>
-            <button class="hd" data-a="spc" aria-expanded="${!sheet.spc}">Spellcasting</button>
+            <button class="hd" data-a="toggle-spellcasting" aria-expanded="${!sheet.spc}">Spellcasting</button>
             ${when(sheet.spc, summary)}
         </h2>`;
 }
@@ -103,7 +103,7 @@ function slotRow(slots, level, editing) {
             <span class="lv">Lvl ${level}</span>
             <div class="pips">
                 ${[...Array(slots.m).keys()].map(pip => html`
-                    <button class="pip ${when(pip < slots.u, 'used')}" data-a="slot" data-v="${index}.${pip}"
+                    <button class="pip ${when(pip < slots.u, 'used')}" data-a="toggle-slot" data-v="${index}.${pip}"
                         aria-label="Level ${level} slot ${pip + 1}"></button>`)}
             </div>
             ${when(editing, () => input(`slots.${index}.m`, slots.m, 'number',
@@ -149,7 +149,8 @@ function spellEntry(sheet, view, ui, spell, index, anyPrepared) {
                 ${preparedBox(spell, index)}
                 <span class="g">${spellTitle(spell, index, descriptionOpen)}</span>
                 ${when(editing, html`
-                    <button class="x" data-a="delsp" data-v="${index}" aria-label="Remove ${spell.n}">✕</button>`)}
+                    <button class="x" data-a="remove-spell" data-v="${index}"
+                        aria-label="Remove ${spell.n}">✕</button>`)}
             </div>
             ${editing ? spellRollFields(spell, index) : spellRollButtons(sheet, view, ui, spell, index)}
             ${when(spell.d && descriptionOpen, () => html`<p class="sd">${raw(md(spell.d))}</p>`)}
@@ -166,7 +167,7 @@ function preparedBox(spell, index) {
 // The spell's name. When it has a description, the name is a button that shows or hides it.
 function spellTitle(spell, index, descriptionOpen) {
     if (!spell.d) return spell.n;
-    return html`<button class="lk" data-a="spd" data-v="${index}"
+    return html`<button class="lk" data-a="toggle-spell-description" data-v="${index}"
         aria-expanded="${descriptionOpen}">${spell.n}</button>`;
 }
 
@@ -209,9 +210,10 @@ function spellRollButtons(sheet, view, ui, spell, index) {
     const effect = roll.h || roll.t ? ` ${roll.h ? 'healing' : roll.t}` : '';
     return html`
         <div class="srl">
-            ${when(roll.a, html`<button class="rb" data-a="satk" data-v="${index}">Hit ${signed(attack)}</button>`)}
+            ${when(roll.a, html`
+                <button class="rb" data-a="spell-attack" data-v="${index}">Hit ${signed(attack)}</button>`)}
             ${when(saveName, () => html`<span class="pill">DC ${dc} ${saveName.slice(0, 3)}</span>`)}
-            ${when(dice, html`<button class="rb" data-a="sdmg" data-v="${index}">${dice}${effect}</button>`)}
+            ${when(dice, html`<button class="rb" data-a="spell-effect" data-v="${index}">${dice}${effect}</button>`)}
             ${when(attacks > 1, html`<span class="a">&times;${attacks}</span>`)}
             ${slotLevelPicker(spell, index, slot)}
         </div>`;
@@ -237,6 +239,6 @@ function addSpellForm() {
                 ${SPELL_LEVELS.map(level => html`
                     <option value="${level}">${level ? `Lvl ${level}` : 'Cantrip'}</option>`)}
             </select>
-            <button class="pri" data-a="addsp">Add</button>
+            <button class="pri" data-a="add-spell">Add</button>
         </div>`;
 }

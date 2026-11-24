@@ -17,10 +17,10 @@ export function headerSection(sheet, { editing }, ui) {
         <div class="top">
             <div><h1>${sheet.name || 'Unnamed'}</h1><p class="sub">${summary(sheet)}</p></div>
             <div class="seg">
-                <button data-a="mode" data-v="play" class="${when(!editing, 'on')}">Play</button>
-                <button data-a="mode" data-v="edit" class="${when(editing, 'on')}">Edit</button>
+                <button data-a="set-mode" data-v="play" class="${when(!editing, 'on')}">Play</button>
+                <button data-a="set-mode" data-v="edit" class="${when(editing, 'on')}">Edit</button>
             </div>
-            <button data-a="lib">Library</button>
+            <button data-a="open-library">Library</button>
         </div>
         ${when(editing, () => identityFields(sheet, ui))}`;
 }

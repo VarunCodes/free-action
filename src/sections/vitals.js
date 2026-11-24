@@ -85,14 +85,14 @@ function hitPointsBox(sheet, { editing }, amount) {
             <div class="bar ${when(percent < 25, 'low')}"><i style="width:${percent}%"></i></div>
             <div class="row">
                 <input id="amt" type="number" min="0" value="${amount}" aria-label="Amount">
-                <button class="bad" data-a="dmg">Damage</button>
+                <button class="bad" data-a="damage">Damage</button>
                 <button class="pri" data-a="heal">Heal</button>
-                <button data-a="temp">Set temp</button>
+                <button data-a="set-temp-hp">Set temp</button>
             </div>
             ${when(editing, () => hitPointFields(sheet))}
             ${when(hitDie(sheet), () => hitDiceRow(sheet))}
             <div class="row" style="margin-top:8px">
-                <button data-a="long">Long rest</button>
+                <button data-a="long-rest">Long rest</button>
                 <label class="row" style="margin-left:auto">
                     <input type="checkbox" data-k="insp" ${when(sheet.insp, 'checked')}> Heroic Inspiration</label>
             </div>
@@ -108,7 +108,7 @@ function hitPointFields(sheet) {
     if (!hitDie(sheet)) return fields;
     const average = averageHP(sheet);
     const alreadyUsed = average === sheet.hp.max;
-    const useButton = html`<button data-a="avghp" ${when(alreadyUsed, 'disabled')}>Use ${average}</button>`;
+    const useButton = html`<button data-a="use-average-hp" ${when(alreadyUsed, 'disabled')}>Use ${average}</button>`;
     const sources = averageHPSources(sheet);
     return html`
         ${fields}
@@ -134,7 +134,8 @@ function hitDiceRow(sheet) {
     return html`
         <div class="row hds" style="margin-top:8px">
             <span>Hit dice <b>${left}</b> of ${sheet.level} (d${die})</span>
-            <button data-a="hd" ${when(!left || !hurt, 'disabled')} title="${tooltip}">Spend a hit die</button>
+            <button data-a="spend-hit-die" ${when(!left || !hurt, 'disabled')}
+                title="${tooltip}">Spend a hit die</button>
         </div>`;
 }
 

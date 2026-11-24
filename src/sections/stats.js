@@ -84,7 +84,9 @@ function saveRow(sheet, ability, { editing, proficiency, bonus, bonusSources }) 
     const description = PROF_LABEL[level];
     return html`
         <div class="ln">
-            ${proficiencyMark({ action: 'sv', value: ability, label: `${name} save`, level, description, editing })}
+            ${proficiencyMark({
+                action: 'toggle-save', value: ability, label: `${name} save`, level, description, editing,
+            })}
             <span class="g">${name}</span>
             <button class="rb" data-a="roll" data-l="${name} save" data-b="${total}"
                 aria-label="${name} save ${signed(total)}" title="${bonusSources}">${signed(total)}</button>
@@ -137,7 +139,7 @@ function skillRow(sheet, view, skill, ability, stealthPenalty) {
 
     return html`
         <div class="ln">
-            ${proficiencyMark({ action: 'sk', value: skill, label: skill, level, description, editing })}
+            ${proficiencyMark({ action: 'cycle-skill', value: skill, label: skill, level, description, editing })}
             <span class="g">${skill} <span class="a">${ability}</span>${disPill}${advPill}</span>
             <button class="rb" data-a="roll" data-l="${skill}" data-b="${total}" aria-label="${skill} ${signed(total)}"
                 ${when(disadvantage, html`data-dis="1"`)} ${when(advantage, html`data-adv="1"`)}

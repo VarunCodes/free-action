@@ -4,8 +4,7 @@ import { cachedItems, cachedSpecies, loadLibrary } from './library.js';
 import { dateAndTime } from './text.js';
 import { DEF, cleanSheet } from './sheet.js';
 import {
-    abilityMod, profBonus, knownClass, knownSpecies, averageHP, activeGear,
-    effectsOf, effectTotal, advantageFrom, score, skillGranted, skillProf,
+    abilityMod, profBonus, knownClass, knownSpecies, effectsOf, effectTotal, advantageFrom, score,
 } from './rules.js';
 import { sourcesText } from './html.js';
 import { abilitiesSection, savesSection, skillsSection } from './sections/stats.js';
@@ -22,6 +21,11 @@ import {
     rollCustomDice, copyLastRoll, setRollMode, toggleRollOptions,
 } from './actions/rolls.js';
 import { setClass, setSpecies } from './actions/character.js';
+import { takeDamage, heal, setTemporaryHitPoints, longRest, useAverageHitPoints } from './actions/hitPoints.js';
+import {
+    toggleSaveProficiency, cycleSkillProficiency, toggleSpellSlot, addSpell, removeSpell, addItem, removeItem,
+    addItemEffect, removeItemEffect, toggleAttunement, addFeature, removeFeature,
+} from './actions/lists.js';
 import { loadSaved, saveSheet, snapshots, snapshot, markBackedUp, downloadSheet, readBackup } from './storage.js';
 let sheet = loadSaved() || DEF();
 const ui = createUi();
@@ -265,57 +269,189 @@ function pickSpeciesFromList(value) {
     ui.customSpecies = value === '*';
     chooseSpecies(ui.customSpecies ? '' : value);
 }
-document.addEventListener('toggle',e=>{const d=e.target;if(d.dataset&&d.dataset.id&&(sheet.mode!=='edit'||d.dataset.id==='more')){d.open?ui.openSections.add(d.dataset.id):ui.openSections.delete(d.dataset.id)}},true);
-document.addEventListener('click',e=>{
-    const b=e.target.closest('[data-a]');
+// A details section (a feature's description, the roll bar's options) remembers being opened, so it stays open
+// when the page is redrawn. In Edit every feature shows its fields, so only the roll bar's options are kept.
+document.addEventListener('toggle', event => {
+    const details = event.target;
+    const id = details.dataset?.id;
+    if (!id || (sheet.mode === 'edit' && id !== 'more')) return;
+    if (details.open) ui.openSections.add(id);
+    else ui.openSections.delete(id);
+}, true);
+
+// What each button does, by its data-a name. Each action gets the clicked button, whose data-v says which
+// spell, item or ability it is about. Afterwards the sheet is saved and the page redrawn, unless the action
+// returns NOTHING_TO_SAVE (nothing changed, or it already redrew what it needed to).
+const NOTHING_TO_SAVE = false;
+const valueOf = button => button.dataset.v;
+const indexOf = button => Number(button.dataset.v);
+// A data-v of '2.0' names a part inside a part: a slot level and one of its pips, an item and one of its effects.
+const twoIndexesOf = button => button.dataset.v.split('.').map(Number);
+const textIn = id => document.getElementById(id).value.trim();
+const numberIn = id => parseInt(document.getElementById(id).value);
+
+const CLICK_ACTIONS = {
+    'set-mode': button => {
+        sheet.mode = valueOf(button);
+        ui.headerMessage = '';
+    },
+    'open-library': () => {
+        showLibrary();
+        return NOTHING_TO_SAVE;
+    },
+
+    'damage': () => takeDamage(sheet, typedHitPointAmount()),
+    'heal': () => heal(sheet, typedHitPointAmount()),
+    'set-temp-hp': () => setTemporaryHitPoints(sheet, typedHitPointAmount()),
+    'long-rest': () => longRest(sheet),
+    'spend-hit-die': () => spendHitDie(sheet, ui),
+    'use-average-hp': () => useAverageHitPoints(sheet),
+    'toggle-save': button => toggleSaveProficiency(sheet, valueOf(button)),
+    'cycle-skill': button => cycleSkillProficiency(sheet, valueOf(button)),
+
+    'roll': button => rollCheck(sheet, ui, button),
+    'spell-attack': button => rollSpellAttack(sheet, ui, indexOf(button)),
+    'spell-effect': button => rollSpellEffect(sheet, ui, indexOf(button)),
+    'weapon-attack': button => rollWeaponAttack(sheet, ui, indexOf(button)),
+    'weapon-damage': button => rollWeaponDamage(sheet, ui, indexOf(button), button.dataset.twoHanded === '1'),
+    'set-roll-mode': button => setRollMode(ui, valueOf(button)),
+    'roll-custom-dice': () => rollCustomDice(sheet, ui, document.getElementById('cx').value),
+    'copy-roll': () => copyLastRoll(sheet, ui),
+    'toggle-roll-options': () => {
+        toggleRollOptions(ui);
+        renderRoll();
+        return NOTHING_TO_SAVE;
+    },
+
+    'toggle-spellcasting': () => {
+        sheet.spc = !sheet.spc;
+    },
+    'toggle-slot': button => toggleSpellSlot(sheet, ...twoIndexesOf(button)),
+    'toggle-spell-description': button => toggleOpen('sp' + valueOf(button)),
+    'add-spell': () => addSpell(sheet, textIn('spn'), numberIn('spl')) || NOTHING_TO_SAVE,
+    'remove-spell': button => removeSpell(sheet, ui, indexOf(button)),
+
+    'toggle-inventory': () => {
+        sheet.inc = !sheet.inc;
+    },
+    'toggle-item-description': button => toggleOpen('it' + valueOf(button)),
+    'add-item': () => addItem(sheet, textIn('itn'), numberIn('itq')) || NOTHING_TO_SAVE,
+    'remove-item': button => removeItem(sheet, ui, indexOf(button)),
+    'toggle-attunement': button => {
+        if (toggleAttunement(sheet, indexOf(button))) return;
+        ui.attunementRefused = indexOf(button);
+        render();
+        return NOTHING_TO_SAVE;
+    },
+    'add-effect': button => {
+        const index = valueOf(button);
+        const choice = document.getElementById('fxt-' + index).value;
+        addItemEffect(sheet.items[index], choice, numberIn('fxv-' + index));
+    },
+    'remove-effect': button => {
+        const [itemIndex, effectIndex] = twoIndexesOf(button);
+        removeItemEffect(sheet.items[itemIndex], effectIndex);
+    },
+
+    'add-feature': button => {
+        const listKey = valueOf(button);
+        const typePicker = document.getElementById('ftt-' + listKey);
+        const type = typePicker ? typePicker.value : '';
+        return addFeature(sheet, listKey, textIn('ftn-' + listKey), type) || NOTHING_TO_SAVE;
+    },
+    'remove-feature': button => {
+        const [listKey, index] = valueOf(button).split('.');
+        removeFeature(sheet, ui, listKey, Number(index));
+    },
+
+    'export': () => {
+        exportToBox();
+        return NOTHING_TO_SAVE;
+    },
+    'download-backup': () => {
+        ui.backupMessage = null;
+        downloadSheet(sheet);
+    },
+    'import': () => {
+        ui.backupText = document.getElementById('io').value;
+        ui.backupMessage = null;
+        if (importBackup(ui.backupText)) return;
+        render();
+        return NOTHING_TO_SAVE;
+    },
+    'restore': () => restoreVersion(numberIn('snp')) || NOTHING_TO_SAVE,
+    'new-character': () => {
+        const question = 'Start a new character? '
+            + 'The current one can be brought back from "Restore an earlier version".';
+        if (!confirm(question)) return NOTHING_TO_SAVE;
+        replaceSheet({}, 'before new character');
+    },
+};
+
+document.addEventListener('click', event => {
+    const button = event.target.closest('[data-a]');
+    const action = button?.dataset.a;
     // The attunement-limit message goes away on the next click anywhere.
-    if(ui.attunementRefused>=0&&!(b&&b.dataset.a==='att')){ui.attunementRefused=-1;if(!b){render();return}}if(!b)return;
-    const a=b.dataset.a,v=b.dataset.v,g=id=>document.getElementById(id);
-    const n=Math.max(0,parseInt(g('amt')?.value)||0);ui.hitPointAmount=n||ui.hitPointAmount;
-    if(a==='mode'){sheet.mode=v;ui.headerMessage=''}
-    else if(a==='dmg'){let d=n,t=Math.min(sheet.hp.temp,d);sheet.hp.temp-=t;d-=t;sheet.hp.cur=Math.max(0,sheet.hp.cur-d)}
-    else if(a==='heal')sheet.hp.cur=Math.min(sheet.hp.max,sheet.hp.cur+n);
-    else if(a==='temp')sheet.hp.temp=Math.max(sheet.hp.temp,n);
-    else if(a==='long'){sheet.hp.cur=sheet.hp.max;sheet.hp.temp=0;sheet.hd=0;sheet.slots.forEach(s=>s.u=0)}
-    else if(a==='hd')spendHitDie(sheet,ui);
-    // Leveling up: the new max comes with the HP gained, so current HP rises by the same amount.
-    else if(a==='avghp'){const m=averageHP(sheet);if(m>sheet.hp.max)sheet.hp.cur+=m-sheet.hp.max;sheet.hp.max=m}
-    else if(a==='sv')sheet.sv[v]=!sheet.sv[v];
-    // A trait-granted skill cycles between its granted level and Expertise; only what you add on top is stored,
-    // so changing species never leaves a proficiency behind that you didn't pick.
-    else if(a==='sk'){const g=skillGranted(sheet,v),nx=(skillProf(sheet,v)+1)%3;sheet.sk[v]=nx>g?nx:0}
-    else if(a==='slot'){const[i,j]=v.split('.').map(Number),s=sheet.slots[i];s.u=(j<s.u)?j:j+1}
-    else if(a==='addsp'){const nm=g('spn').value.trim();if(!nm)return;sheet.spells.push({n:nm,l:+g('spl').value,p:false})}
-    else if(a==='delsp'){sheet.spells.splice(+v,1);[...ui.openSections].filter(k=>k.startsWith('sp')).forEach(k=>ui.openSections.delete(k));forgetListPlaces(ui)}
-    else if(a==='satk')rollSpellAttack(sheet,ui,+v);
-    else if(a==='sdmg')rollSpellEffect(sheet,ui,+v);
-    else if(a==='iatk')rollWeaponAttack(sheet,ui,+v);
-    else if(a==='idmg')rollWeaponDamage(sheet,ui,+v,b.dataset.t==='v');
-    else if(a==='addfx'){const x=sheet.items[+v],[t,k]=g('fxt-'+v).value.split('|');let n=parseInt(g('fxv-'+v).value)||0;if(t==='set')n=Math.min(30,Math.max(1,n||19));if(t==='adv')n=0;x.fx=[...(x.fx||[]).filter(f=>!(f[0]===t&&f[1]===k)),[t,k,n]]}
-    else if(a==='delfx'){const[i,j]=v.split('.').map(Number);sheet.items[i].fx.splice(j,1)}
-    else if(a==='itd'){const k='it'+v;ui.openSections.has(k)?ui.openSections.delete(k):ui.openSections.add(k)}
-    else if(a==='spc')sheet.spc=!sheet.spc;
-    else if(a==='inc')sheet.inc=!sheet.inc;
-    else if(a==='att'){const x=sheet.items[+v];if(!x.att&&activeGear(sheet).attuned>=3){ui.attunementRefused=+v;render();return}x.att=!x.att}
-    else if(a==='spd'){const k='sp'+v;ui.openSections.has(k)?ui.openSections.delete(k):ui.openSections.add(k)}
-    // The Library may have just downloaded (or imported) species, so the drop-down re-reads them afterwards.
-    else if(a==='lib'){openLibrary(()=>sheet,removed=>{if(removed){ui.openSections.clear();forgetListPlaces(ui)}save();render();cachedSpecies().then(l=>{ui.librarySpecies=l;render()}).catch(()=>{})});return}
-    else if(a==='addit'){const nm=g('itn').value.trim();if(!nm)return;sheet.items.push({n:nm,q:parseInt(g('itq').value)||1})}
-    else if(a==='delit'){sheet.items.splice(+v,1);[...ui.openSections].filter(k=>k.startsWith('it')).forEach(k=>ui.openSections.delete(k));ui.roll.criticalHit=null}
-    else if(a==='addft'){const nm=g('ftn-'+v).value.trim();if(!nm)return;const t=g('ftt-'+v);sheet[v].push({n:nm,t:t?t.value:'',d:''})}
-    else if(a==='delft'){const[k,i]=v.split('.');sheet[k].splice(+i,1);ui.openSections.clear()}
-    else if(a==='roll')rollCheck(sheet,ui,b);
-    else if(a==='rm')setRollMode(ui,v);
-    else if(a==='rmin'){toggleRollOptions(ui);renderRoll();return}
-    else if(a==='cx')rollCustomDice(sheet,ui,g('cx').value);
-    else if(a==='cp')copyLastRoll(sheet,ui);
-    else if(a==='exp'){ui.backupMessage=null;ui.backupText=JSON.stringify(sheet,null,1);markBackedUp();save();render();const ta=g('io');ta.select();try{navigator.clipboard.writeText(ui.backupText).catch(()=>{})}catch(x){}return}
-    else if(a==='dl'){ui.backupMessage=null;downloadSheet(sheet)}
-    else if(a==='imp'){ui.backupText=g('io').value;ui.backupMessage=null;if(!importBackup(ui.backupText)){render();return}}
-    else if(a==='rst'){if(!restoreVersion(+g('snp').value))return}
-    else if(a==='reset'){if(!confirm('Start a new character? The current one can be brought back from "Restore an earlier version".'))return;replaceSheet({},'before new character')}
-    save();render();
+    if (ui.attunementRefused >= 0 && action !== 'toggle-attunement') {
+        ui.attunementRefused = -1;
+        if (!button) render();
+    }
+    if (!button) return;
+    rememberHitPointAmount();
+    if (CLICK_ACTIONS[action](button) === NOTHING_TO_SAVE) return;
+    save();
+    render();
 });
+
+// The number in the Damage/Heal box, at least 0.
+function typedHitPointAmount() {
+    return Math.max(0, parseInt(document.getElementById('amt')?.value) || 0);
+}
+
+// The box keeps its number across redraws, unless it was cleared or set to 0.
+function rememberHitPointAmount() {
+    ui.hitPointAmount = typedHitPointAmount() || ui.hitPointAmount;
+}
+
+function toggleOpen(id) {
+    if (ui.openSections.has(id)) ui.openSections.delete(id);
+    else ui.openSections.add(id);
+}
+
+// The Library may download (or import) species, so the Species drop-down reads them again afterwards.
+// Removing something from the sheet there moves list places, so open sections are forgotten.
+function showLibrary() {
+    openLibrary(() => sheet, removedSomething => {
+        if (removedSomething) {
+            ui.openSections.clear();
+            forgetListPlaces(ui);
+        }
+        save();
+        render();
+        cachedSpecies()
+            .then(species => {
+                ui.librarySpecies = species;
+                render();
+            })
+            .catch(() => {});
+    });
+}
+
+// Export: the sheet as JSON in the Backup box, selected and copied, and now noted as the last backup.
+function exportToBox() {
+    ui.backupMessage = null;
+    ui.backupText = JSON.stringify(sheet, null, 1);
+    markBackedUp();
+    save();
+    render();
+    document.getElementById('io').select();
+    try {
+        navigator.clipboard.writeText(ui.backupText).catch(() => {});
+    } catch {
+        // No clipboard (an insecure page or an old browser): the text is selected for copying by hand.
+    }
+}
+
 document.addEventListener('change', event => {
     if (event.target.id === 'imf') openBackupFile(event.target);
 });

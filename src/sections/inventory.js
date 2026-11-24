@@ -59,9 +59,9 @@ export function inventorySection(sheet, { editing, proficiency }, ui) {
 
 function inventoryHeading(sheet, equippedCount) {
     const counts = `${plural(sheet.items.length, 'item')}, ${equippedCount} equipped`;
+    const button = html`<button class="hd" data-a="toggle-inventory" aria-expanded="${!sheet.inc}">Inventory</button>`;
     return html`
-        <h2><button class="hd" data-a="inc" aria-expanded="${!sheet.inc}">Inventory</button>${when(sheet.inc,
-            html`<small>${counts}</small>`)}</h2>`;
+        <h2>${button}${when(sheet.inc, html`<small>${counts}</small>`)}</h2>`;
 }
 
 // The lines under the heading: how much is equipped and attuned, and what the AC is made of.
@@ -125,7 +125,7 @@ function itemLine(item, index, inventory) {
         ? input(`items.${index}.q`, item.q, 'number', html`min=0 style="width:64px" aria-label="${item.n} quantity"`)
         : html`<span class="v">&times;${item.q}</span>`;
     const removeButton = html`
-        <button class="x" data-a="delit" data-v="${index}" aria-label="Remove ${item.n}">✕</button>`;
+        <button class="x" data-a="remove-item" data-v="${index}" aria-label="Remove ${item.n}">✕</button>`;
 
     return html`
         <div class="ln">
@@ -145,7 +145,7 @@ function itemLine(item, index, inventory) {
 function itemName(item, index, ui) {
     if (!item.d) return item.n;
     return html`
-        <button class="lk" data-a="itd" data-v="${index}"
+        <button class="lk" data-a="toggle-item-description" data-v="${index}"
             aria-expanded="${ui.isOpen('it' + index)}">${item.n}</button>`;
 }
 
@@ -167,7 +167,7 @@ function attuneButton(item, index) {
     const attuned = Boolean(item.att);
     const title = attuned ? 'Attuned. Click to end attunement' : 'Needs attunement. Click to attune';
     const label = attuned ? 'Attuned' : 'Attune';
-    return html` <button class="pill att${when(attuned, ' on')}" data-a="att" data-v="${index}"
+    return html` <button class="pill att${when(attuned, ' on')}" data-a="toggle-attunement" data-v="${index}"
         aria-label="Attune ${item.n}" aria-pressed="${attuned}" title="${title}">${label}</button>`;
 }
 
@@ -175,7 +175,8 @@ function attuneButton(item, index) {
 function attunementAndEffects(item, index) {
     const effects = (item.fx || []).map((effect, effectIndex) => {
         const label = effectLabel(effect);
-        return html`<span class="pill">${label} <button class="x" data-a="delfx" data-v="${index}.${effectIndex}"
+        return html`<span class="pill">${label} <button class="x" data-a="remove-effect"
+            data-v="${index}.${effectIndex}"
             aria-label="Remove ${label} from ${item.n}">✕</button></span>`;
     });
     const choices = ITEM_EFFECT_CHOICES.map(({ value, label }) => html`<option value="${value}">${label}</option>`);
@@ -187,7 +188,7 @@ function attunementAndEffects(item, index) {
             ${effects}
             <select id="fxt-${index}" aria-label="${item.n} effect">${choices}</select>
             <input id="fxv-${index}" type="number" value="1" style="width:64px" aria-label="${item.n} effect value">
-            <button data-a="addfx" data-v="${index}" aria-label="Add effect to ${item.n}">Add effect</button>
+            <button data-a="add-effect" data-v="${index}" aria-label="Add effect to ${item.n}">Add effect</button>
         </div>`;
 }
 
@@ -222,10 +223,11 @@ function weaponButtons(item, index, { sheet, proficiency }) {
     const modifier = weaponMod(sheet, item);
     return html`
         <div class="srl">
-            <button class="rb" data-a="iatk" data-v="${index}">Hit ${signed(proficiency + modifier)}</button>
-            <button class="rb" data-a="idmg" data-v="${index}">${withMod(weapon.d, modifier)} ${weapon.t}</button>
+            <button class="rb" data-a="weapon-attack" data-v="${index}">Hit ${signed(proficiency + modifier)}</button>
+            <button class="rb" data-a="weapon-damage"
+                data-v="${index}">${withMod(weapon.d, modifier)} ${weapon.t}</button>
             ${when(weapon.v, html`
-                <button class="rb" data-a="idmg" data-v="${index}" data-t="v">
+                <button class="rb" data-a="weapon-damage" data-v="${index}" data-two-handed="1">
                     ${withMod(weapon.v, modifier)} two-handed</button>`)}
         </div>`;
 }
@@ -235,6 +237,6 @@ function addItemRow() {
         <div class="add">
             <input class="n" id="itn" placeholder="Item name" aria-label="New item name">
             <input class="q" id="itq" type="number" value="1" min="0" aria-label="New item quantity">
-            <button class="pri" data-a="addit" aria-label="Add item">Add</button>
+            <button class="pri" data-a="add-item" aria-label="Add item">Add</button>
         </div>`;
 }
