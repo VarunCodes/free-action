@@ -3,13 +3,13 @@
 // A feature keeps its name in `n`, its type in `t` ("Class feature", "Feat"; racial traits have none) and
 // its description in `d`. Its effects come from featureEffects() (src/rules.js), and a skill it lets you
 // choose is stored in `ch`, one pick per choice.
-import { SK } from '../sheet.js';
+import { SKILLS } from '../sheet.js';
 import { featureEffects } from '../rules.js';
 import { md } from '../text.js';
 import { html, raw, when } from '../html.js';
 import { effectLabel } from '../effects.js';
 
-const ALL_SKILLS = SK.map(([skill]) => skill);
+const ALL_SKILLS = SKILLS.map(([skill]) => skill);
 
 /** Features and feats. ui.isOpen(id) says whether a feature is open in Play ('feats.' + index). */
 export function featuresSection(sheet, { editing }, ui) {

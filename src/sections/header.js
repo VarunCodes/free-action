@@ -1,6 +1,6 @@
 // The top of the sheet: the name and a one-line summary, the Play/Edit switch and the Library button.
 // In Edit, the character's identity fields: name, level, class, subclass, species and background.
-import { CLASSES } from '../sheet.js';
+import { CLASS_NAMES } from '../sheet.js';
 import { knownClass, knownSpecies, speciesNames } from '../rules.js';
 import { html, when, input, field } from '../html.js';
 
@@ -51,7 +51,7 @@ function identityFields(sheet, ui) {
 function classPicker(sheet, customPicked) {
     const known = knownClass(sheet.cls);
     const custom = customPicked || (!known && Boolean(sheet.cls.trim()));
-    const options = CLASSES.map(name => html`<option ${when(known === name, 'selected')}>${name}</option>`);
+    const options = CLASS_NAMES.map(name => html`<option ${when(known === name, 'selected')}>${name}</option>`);
     return html`
         <div>
             <label class="lab" for="f-clsp">Class</label>

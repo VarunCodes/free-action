@@ -1,6 +1,6 @@
 // What picking a class or a species changes on the sheet. Each change leaves a note under the header
 // (ui.headerMessage) that says what it did, so nothing on the sheet changes without the player seeing it.
-import { ABN as ABILITY_NAMES, CLS as STANDARD_CLASSES, DEF as newSheet } from '../sheet.js';
+import { ABILITY_NAMES, STANDARD_CLASSES, newSheet } from '../sheet.js';
 import { knownClass } from '../rules.js';
 import { swapSpecies } from '../libraryui.js';
 import { snapshots, snapshot } from '../storage.js';
@@ -21,29 +21,29 @@ export function setClass(sheet, ui, className) {
     if (!newClass) return;
 
     swapSaveProficiencies(sheet, oldClass, newClass);
-    const castingAbilityCameFromOldClass = oldClass && sheet.cast === oldClass.ca;
-    if (!sheet.cast || castingAbilityCameFromOldClass) sheet.cast = newClass.ca;
+    const castingAbilityCameFromOldClass = oldClass && sheet.cast === oldClass.spellcasting;
+    if (!sheet.cast || castingAbilityCameFromOldClass) sheet.cast = newClass.spellcasting;
     ui.headerMessage = classMessage(sheet, className, newClass, hadCastingAbility);
 }
 
 function swapSaveProficiencies(sheet, oldClass, newClass) {
-    const oldSaves = oldClass ? oldClass.sv : [];
+    const oldSaves = oldClass ? oldClass.saves : [];
     for (const ability of oldSaves) {
-        if (!newClass.sv.includes(ability)) delete sheet.sv[ability];
+        if (!newClass.saves.includes(ability)) delete sheet.sv[ability];
     }
-    for (const ability of newClass.sv) sheet.sv[ability] = true;
+    for (const ability of newClass.saves) sheet.sv[ability] = true;
 }
 
 // "Wizard: proficient in Intelligence and Wisdom saving throws, Intelligence for spellcasting. You can change…"
 function classMessage(sheet, className, newClass, hadCastingAbility) {
-    const saves = newClass.sv.map(ability => ABILITY_NAMES[ability]).join(' and ');
+    const saves = newClass.saves.map(ability => ABILITY_NAMES[ability]).join(' and ');
     const castingNote = classCastingNote(sheet, className, newClass, hadCastingAbility);
     const castingPart = castingNote ? `, ${castingNote}` : '';
     return `${className}: proficient in ${saves} saving throws${castingPart}. You can change these below.`;
 }
 
 function classCastingNote(sheet, className, newClass, hadCastingAbility) {
-    const usualAbility = newClass.ca;
+    const usualAbility = newClass.spellcasting;
     if (sheet.cast !== usualAbility) {
         const kept = `spellcasting stays ${ABILITY_NAMES[sheet.cast]}`;
         return usualAbility ? `${kept} (${className}s usually use ${ABILITY_NAMES[usualAbility]})` : kept;

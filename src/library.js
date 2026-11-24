@@ -1,6 +1,6 @@
 // Library: loads the 2024 SRD (5.2, CC-BY 4.0) from the Open5e API, caches it in IndexedDB,
 // and merges in any custom content packs the user has imported.
-import { cleanFx } from './sheet.js';
+import { cleanEffects } from './sheet.js';
 const BASE = 'https://api.open5e.com/v2';
 const SOURCE = 'srd-2024';
 const CACHE_VER = 10;
@@ -294,7 +294,7 @@ export async function importPack(text) {
             kind: d.kind, name: String(d.name), level: Number(d.level) || 0,
             sub: String(d.sub || (d.kind === 'spell' ? (Number(d.level) ? 'Level ' + d.level : 'Cantrip') : 'Custom')),
             desc: String(d.desc || ''), src: 'Custom',
-            ...(d.kind === 'race' && Array.isArray(d.traits) ? { traits: d.traits.map(t => { const fx = cleanFx(t.fx); return { n: String(t.n || t.name), d: String(t.d || t.desc || ''), ...(fx.length ? { fx } : {}) }; }) } : {}),
+            ...(d.kind === 'race' && Array.isArray(d.traits) ? { traits: d.traits.map(t => { const fx = cleanEffects(t.fx); return { n: String(t.n || t.name), d: String(t.d || t.desc || ''), ...(fx.length ? { fx } : {}) }; }) } : {}),
         };
     });
     const old = (await kvGet('packs')) || [];
