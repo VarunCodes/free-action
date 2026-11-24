@@ -45,8 +45,8 @@ function initiativeBox(sheet, { editing, checkBonus, checkBonusSources, advantag
     const tooltip = [checkBonusSources, advantage].filter(Boolean).join('. ');
     return html`
         <div class="vit">
-            <button class="bigb" data-a="roll" data-l="Initiative" data-b="${bonus}"
-                aria-label="Initiative ${signed(bonus)}" ${when(advantage, html`data-adv="1"`)}
+            <button class="bigb" data-action="roll" data-roll-label="Initiative" data-roll-bonus="${bonus}"
+                aria-label="Initiative ${signed(bonus)}" ${when(advantage, html`data-advantage="1"`)}
                 title="${tooltip}">${signed(bonus)}</button>
             <span class="lab">Initiative${when(advantage, html` <span class="pill adv">Adv</span>`)}</span>
         </div>`;
@@ -84,17 +84,17 @@ function hitPointsBox(sheet, { editing }, amount) {
             </div>
             <div class="bar ${when(percent < 25, 'low')}"><i style="width:${percent}%"></i></div>
             <div class="row">
-                <input id="amt" type="number" min="0" value="${amount}" aria-label="Amount">
-                <button class="bad" data-a="damage">Damage</button>
-                <button class="pri" data-a="heal">Heal</button>
-                <button data-a="set-temp-hp">Set temp</button>
+                <input id="hit-point-amount" type="number" min="0" value="${amount}" aria-label="Amount">
+                <button class="bad" data-action="damage">Damage</button>
+                <button class="pri" data-action="heal">Heal</button>
+                <button data-action="set-temp-hp">Set temp</button>
             </div>
             ${when(editing, () => hitPointFields(sheet))}
             ${when(hitDie(sheet), () => hitDiceRow(sheet))}
             <div class="row" style="margin-top:8px">
-                <button data-a="long-rest">Long rest</button>
+                <button data-action="long-rest">Long rest</button>
                 <label class="row" style="margin-left:auto">
-                    <input type="checkbox" data-k="insp" ${when(sheet.insp, 'checked')}> Heroic Inspiration</label>
+                    <input type="checkbox" data-field="insp" ${when(sheet.insp, 'checked')}> Heroic Inspiration</label>
             </div>
         </div>`;
 }
@@ -108,7 +108,8 @@ function hitPointFields(sheet) {
     if (!hitDie(sheet)) return fields;
     const average = averageHP(sheet);
     const alreadyUsed = average === sheet.hp.max;
-    const useButton = html`<button data-a="use-average-hp" ${when(alreadyUsed, 'disabled')}>Use ${average}</button>`;
+    const useButton = html`
+        <button data-action="use-average-hp" ${when(alreadyUsed, 'disabled')}>Use ${average}</button>`;
     const sources = averageHPSources(sheet);
     return html`
         ${fields}
@@ -134,7 +135,7 @@ function hitDiceRow(sheet) {
     return html`
         <div class="row hds" style="margin-top:8px">
             <span>Hit dice <b>${left}</b> of ${sheet.level} (d${die})</span>
-            <button data-a="spend-hit-die" ${when(!left || !hurt, 'disabled')}
+            <button data-action="spend-hit-die" ${when(!left || !hurt, 'disabled')}
                 title="${tooltip}">Spend a hit die</button>
         </div>`;
 }
@@ -146,7 +147,7 @@ function armorClassSettings(sheet) {
             ${input('acb', sheet.acb, 'number', 'min=-10 max=20 style="width:72px" aria-label="Other AC bonus"')}
         </label>`;
     const calculated = sheet.acAuto;
-    const checkbox = html`<input type="checkbox" data-k="acAuto" ${when(calculated, 'checked')}>`;
+    const checkbox = html`<input type="checkbox" data-field="acAuto" ${when(calculated, 'checked')}>`;
     return html`
         <div class="row acset">
             <label class="row">${checkbox} Calculate AC from equipped gear</label>

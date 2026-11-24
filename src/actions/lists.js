@@ -40,7 +40,7 @@ export function addSpell(sheet, name, level) {
 /** The spells after it move up a place, so what was open or picked by place is forgotten. */
 export function removeSpell(sheet, ui, index) {
     sheet.spells.splice(index, 1);
-    closeSectionsStartingWith(ui, 'sp');
+    closeSectionsStartingWith(ui, 'spell-');
     forgetListPlaces(ui);
 }
 
@@ -54,7 +54,7 @@ export function addItem(sheet, name, quantity) {
 /** The items after it move up a place, so open descriptions and a pending critical hit are forgotten. */
 export function removeItem(sheet, ui, index) {
     sheet.items.splice(index, 1);
-    closeSectionsStartingWith(ui, 'it');
+    closeSectionsStartingWith(ui, 'item-');
     ui.roll.criticalHit = null;
 }
 

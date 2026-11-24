@@ -70,5 +70,5 @@ test('a space on the same line as an inline element stays', () => {
 
 test('input() escapes its value but keeps the extra attributes as written', () => {
     assert.equal(text(input('hp.max', '5"', 'number', 'min=1 aria-label="Max HP"')),
-        '<input id="f-hp-max" data-k="hp.max" type="number" value="5&quot;" min=1 aria-label="Max HP">');
+        '<input id="field-hp-max" data-field="hp.max" type="number" value="5&quot;" min=1 aria-label="Max HP">');
 });

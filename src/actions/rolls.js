@@ -9,10 +9,13 @@ import { writeKey } from '../storage.js';
 
 const NATURAL_20 = 'Natural 20';
 
-/** A check, save or initiative roll: a button with data-l (its label) and data-b (its bonus). */
+/**
+ * A check, save or initiative roll: a button with data-roll-label and data-roll-bonus, and data-advantage or
+ * data-disadvantage set to '1' when a feature or item gives it.
+ */
 export function rollCheck(sheet, ui, button) {
-    const { l: label, b: bonus, dis: disadvantage, adv: advantage } = button.dataset;
-    rollD20Plus(ui.roll, label, Number(bonus), disadvantage === '1', advantage === '1');
+    const { rollLabel, rollBonus, disadvantage, advantage } = button.dataset;
+    rollD20Plus(ui.roll, rollLabel, Number(rollBonus), disadvantage === '1', advantage === '1');
     ui.roll.criticalHit = null;
     copyCommand(sheet, ui.roll);
 }

@@ -10,7 +10,7 @@ const DAY = 24 * 60 * 60 * 1000;
 export function notesSection(sheet) {
     return html`
         <h2>Notes</h2>
-        <textarea data-k="notes" aria-label="Notes"
+        <textarea data-field="notes" aria-label="Notes"
             placeholder="Features, backstory, session notes">${sheet.notes}</textarea>`;
 }
 
@@ -23,16 +23,16 @@ export function backupSection(ui) {
         <h2>Backup</h2>
         ${backupReminder()}
         <div class="row" style="margin-bottom:8px">
-            <button class="pri" data-a="download-backup">Download backup</button>
-            <label class="btn">Open backup file<input type="file" id="imf" class="vh"
+            <button class="pri" data-action="download-backup">Download backup</button>
+            <label class="btn">Open backup file<input type="file" id="backup-file" class="vh"
                 accept=".json,application/json"></label>
         </div>
-        <textarea id="io" aria-label="Backup JSON"
+        <textarea id="backup-json" aria-label="Backup JSON"
             placeholder="Exported JSON appears here. Paste JSON here to import.">${ui.backupText}</textarea>
         <div class="row" style="margin-top:8px">
-            <button data-a="export">Export</button>
-            <button data-a="import">Import</button>
-            <button class="bad" data-a="new-character">New character</button>
+            <button data-action="export">Export</button>
+            <button data-action="import">Import</button>
+            <button class="bad" data-action="new-character">New character</button>
         </div>
         ${when(ui.message, () => backupMessage(ui.message))}
         ${earlierVersions()}`;
@@ -71,7 +71,7 @@ function earlierVersions() {
     });
     return html`
         <div class="row" style="margin-top:8px">
-            <select id="snp" aria-label="Earlier version" style="flex:1">${options}</select>
-            <button data-a="restore">Restore an earlier version</button>
+            <select id="earlier-version" aria-label="Earlier version" style="flex:1">${options}</select>
+            <button data-action="restore">Restore an earlier version</button>
         </div>`;
 }
