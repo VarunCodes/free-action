@@ -7,7 +7,7 @@ A D&D 5.5e (2024 rules) character sheet in plain HTML, CSS and JS. Vite builds i
 - Dev server: `npm run dev`, then open http://localhost:5173/
 - Build (CI runs this, so it must pass): `npm run build`
 - Serve the build: `npm run serve` (http://localhost:4173/)
-- Lint: `npm run lint` (ESLint, `eslint.config.js`). Files listed in `READABLE` there also get the readability rules. Every file in `src/` is listed; add any new one. The Playwright tests are TypeScript, linted through typescript-eslint with the same readability rules. CI runs lint.
+- Lint: `npm run lint` (ESLint, `eslint.config.js`). Every file, `src/` and the config files included, gets the readability rules (see `docs/code-style.md`). The Playwright tests are TypeScript, linted through typescript-eslint with the same readability rules. CI runs lint.
 - Unit tests (functions that need no browser, such as `src/html.js`): `npm run test:unit`. They use Node's built-in `node:test`.
 - All e2e tests: `npx playwright test`. They reuse a running dev server; `CI=1` tests the build instead, as CI does.
 - One file: `npx playwright test tests/e2e/smoke.spec.ts`. One browser: `--project=chromium` (also `webkit`, `phone`).
@@ -32,12 +32,13 @@ A D&D 5.5e (2024 rules) character sheet in plain HTML, CSS and JS. Vite builds i
 - IMPORTANT: never weaken an assertion, add a timeout, or update a snapshot to make a failing test pass. Report the failure and why.
 - A known app bug gets `test.fail()` with an issue annotation, not a deleted test.
 - Playwright conventions: @docs/testing.md
+- Code style: @docs/code-style.md
 
 ## Gotchas
 
 - State is one object, `sheet`, in `src/main.js`. It's saved to localStorage under `sheet`, with up to 6 snapshots in `sheet-history`. The SRD cache and custom packs live in IndexedDB (`dnd-sheet`).
 - Every field must be handled in `cleanSheet()` (`src/sheet.js`). A field it doesn't handle is silently dropped on the next save.
-- Sheets saved before a change must still load. Upgrade them in `cleanSheet()` or in `backfill()`.
-- `render()` rebuilds the whole page with `innerHTML`. Sections in `src/sections/` write HTML with the ``html`…` `` tag from `src/html.js`, which escapes every value unless it's made by that tag or wrapped in `raw(…)` (only for already-safe markup, such as `md()` for descriptions). The Library dialog (`src/sections/libraryDialog.js`) works the same way.
+- Sheets saved before a change must still load. Upgrade them in `cleanSheet()`, or for gear in `fillGearFromLibrary()` (`src/gearUpgrade.js`).
+- `render()` rebuilds the whole page with `innerHTML`. Sections in `src/sections/` write HTML with the ``html`…` `` tag from `src/html.js`, which escapes every value unless it's made by that tag or wrapped in `raw(…)` (only for already-safe markup, such as `markdownToHtml()` for descriptions). The Library dialog (`src/sections/libraryDialog.js`) works the same way.
 - Inputs bind to state through `data-field="path"`. Buttons dispatch through `data-action="name"` (see `CLICK_ACTIONS` in `main.js`), with `data-value` saying which spell, item or ability.
 - Items, feats and traits change numbers only through effects: `[type, target, value]`. A new effect type must be added to `EFFECT_TYPES` and `cleanEffect` (`src/sheet.js`), to `effectLabel`, and wherever its sum is used.

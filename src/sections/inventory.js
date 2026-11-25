@@ -4,10 +4,11 @@
 // is equippable (`eq`) and equipped while `on`. A magic item may need attunement (`at`), given by `att`,
 // and has a rarity rank (`rr`). Weapons have `w` (damage dice, type, two-handed dice, magic bonus and the
 // ability they use), armor and other AC gear has `ar`, and magic items may have effects (`fx`).
-import { signed, score, armorClass, activeGear } from '../rules.js';
-import { weaponMod, withMod } from '../rolls.js';
-import { md, rarityTag, magicMark } from '../text.js';
-import { html, raw, when, input } from '../html.js';
+import {
+    signed, score, armorClass, activeGear, MAX_ATTUNED_ITEMS, MAX_ABILITY_SCORE, SPEED_LOST_TO_HEAVY_ARMOR,
+} from '../rules.js';
+import { weaponModifier, withModifier } from '../rolls.js';
+import { html, raw, when, input, markdownToHtml, rarityTag, magicMark } from '../html.js';
 import { effectLabel, ITEM_EFFECT_CHOICES } from '../effects.js';
 
 const BODY_ARMOR_AND_SHIELDS = ['light', 'medium', 'heavy', 'shield'];
@@ -68,14 +69,16 @@ function inventoryHeading(sheet, equippedCount) {
 // The lines under the heading: how much is equipped and attuned, and what the AC is made of.
 function inventorySummary(sheet, equippable, { gear, armor, equippedCount }) {
     const needsAttunement = sheet.items.some(item => item.at);
-    const overLimit = gear.over.length;
+    const overLimitCount = gear.overLimit.length;
+    const attunedShown = Math.min(MAX_ATTUNED_ITEMS, gear.attunedCount);
+    const overLimitNote = when(overLimitCount,
+        html` <span class="reqm">${overLimitCount} more than you can attune to</span>`);
     return html`
         ${when(equippable.length, () => html`
             <p class="sub prep">Equipped <b>${equippedCount}</b> of ${plural(equippable.length, 'equippable item')}.
                 Tick the box next to gear you are wearing or wielding.</p>`)}
         ${when(needsAttunement, () => html`
-            <p class="sub prep">Attuned <b>${Math.min(3, gear.attuned)}</b> of 3${when(overLimit,
-                html` <span class="reqm">${overLimit} more than you can attune to</span>`)}.
+            <p class="sub prep">Attuned <b>${attunedShown}</b> of ${MAX_ATTUNED_ITEMS}${overLimitNote}.
                 A magic item that needs attunement only works while equipped and attuned.</p>`)}
         ${when(sheet.acAuto && equippable.length, () => html`
             <p class="sub prep">Armor class <b>${armor.ac}</b>: ${armorBreakdown(armor.parts)}.</p>`)}`;
@@ -96,22 +99,28 @@ function itemRow(item, index, inventory) {
         <div class="spi${when(faded, ' unp')}${itemHighlight(item, inventory)}">
             ${itemLine(item, index, inventory)}
             ${when(ui.attunementRefused === index, html`
-                <p class="reqn srl" role="alert">Already attuned to 3 items. End attunement to one first.</p>`)}
+                <p class="reqn srl" role="alert">
+                    Already attuned to ${MAX_ATTUNED_ITEMS} items. End attunement to one first.</p>`)}
             ${when(!editing && item.fx?.length, () => html`
                 <div class="srl fxl">${item.fx.map(effectLabel).join(' · ')}</div>`)}
             ${when(editing && item.eq, () => attunementAndEffects(item, index))}
             ${when(editing, () => equippableSettings(item, index))}
             ${when(item.w && !editing, () => weaponButtons(item, index, inventory))}
-            ${when(item.d && ui.isOpen('item-' + index), () => html`<p class="sd">${raw(md(item.d))}</p>`)}
+            ${when(item.d && ui.isOpen('item-' + index), () => itemDescription(item))}
         </div>`;
 }
+
+const itemDescription = item => html`<p class="sd">${raw(markdownToHtml(item.d))}</p>`;
 
 const strengthTooLow = (item, { strength }) => item.eq && item.on && item.ar && item.ar.str > strength;
 
 // Red for a problem (too heavy, over the attunement limit, a second attuned copy), else the rarity's color.
 function itemHighlight(item, inventory) {
     const { gear } = inventory;
-    if (strengthTooLow(item, inventory) || gear.over.includes(item) || gear.dup.includes(item)) return ' req';
+    const hasProblem = strengthTooLow(item, inventory)
+        || gear.overLimit.includes(item)
+        || gear.duplicates.includes(item);
+    if (hasProblem) return ' req';
     return item.rr ? ` rs r${item.rr}` : '';
 }
 
@@ -132,9 +141,9 @@ function itemLine(item, index, inventory) {
         <div class="ln">
             ${equippedBox}
             <span class="g">
-                ${raw(magicMark(item.rr))}
+                ${magicMark(item.rr)}
                 ${itemName(item, index, inventory.ui)}
-                ${raw(rarityTag(item.rr))}
+                ${rarityTag(item.rr)}
                 ${itemNotes(item, index, inventory)}
             </span>
             ${quantity}
@@ -154,14 +163,16 @@ function itemName(item, index, ui) {
 function itemNotes(item, index, inventory) {
     const { gear, armor, strength, calculatedAc } = inventory;
     const unusedArmor = item.on && item.ar && BODY_ARMOR_AND_SHIELDS.includes(item.ar.k) && !armor.used.has(item);
+    const problem = text => html` <span class="reqm">${text}</span>`;
+    const note = text => html` <span class="a">${text}</span>`;
+    const tooHeavy = `Needs Str ${item.ar?.str} (you have ${strength}): Speed −${SPEED_LOST_TO_HEAVY_ARMOR} ft`;
     return html`
-        ${when(strengthTooLow(item, inventory), () =>
-            html` <span class="reqm">Needs Str ${item.ar.str} (you have ${strength}): Speed &minus;10 ft</span>`)}
+        ${when(strengthTooLow(item, inventory), () => problem(tooHeavy))}
         ${when(item.at, () => attuneButton(item, index))}
-        ${when(gear.over.includes(item), html` <span class="reqm">Over the 3-item attunement limit</span>`)}
-        ${when(gear.dup.includes(item), html` <span class="reqm">Already attuned to another copy, no effect</span>`)}
-        ${when(item.at && item.on && !item.att, html` <span class="a">not attuned, no effect</span>`)}
-        ${when(unusedArmor && calculatedAc, html` <span class="a">not counted, a better one is equipped</span>`)}`;
+        ${when(gear.overLimit.includes(item), () => problem(`Over the ${MAX_ATTUNED_ITEMS}-item attunement limit`))}
+        ${when(gear.duplicates.includes(item), () => problem('Already attuned to another copy, no effect'))}
+        ${when(item.at && item.on && !item.att, () => note('not attuned, no effect'))}
+        ${when(unusedArmor && calculatedAc, () => note('not counted, a better one is equipped'))}`;
 }
 
 function attuneButton(item, index) {
@@ -214,7 +225,8 @@ function armorFields(item, index) {
         html`${range} style="width:64px" aria-label="${item.n} ${label}"`);
     return html`
         <label class="row">AC ${number('ac', item.ar.ac, 'min=-10 max=30', 'AC value')}</label>
-        <label class="row">Str needed ${number('str', item.ar.str, 'min=0 max=30', 'strength needed')}</label>
+        <label class="row">Str needed
+            ${number('str', item.ar.str, `min=0 max=${MAX_ABILITY_SCORE}`, 'strength needed')}</label>
         <label class="row">Save bonus ${number('sb', item.ar.sb || 0, 'min=-5 max=10', 'saving throw bonus')}</label>
         <label class="row"><input type="checkbox" data-field="items.${index}.ar.stl" ${when(item.ar.stl, 'checked')}
             aria-label="${item.n} Stealth Disadvantage"> Stealth Disadvantage</label>`;
@@ -223,16 +235,16 @@ function armorFields(item, index) {
 // Play, weapons: attack and damage buttons, plus two-handed damage for versatile weapons.
 function weaponButtons(item, index, { sheet, proficiency }) {
     const weapon = item.w;
-    const modifier = weaponMod(sheet, item);
+    const modifier = weaponModifier(sheet, item);
     return html`
         <div class="srl">
             <button class="rb" data-action="weapon-attack"
                 data-value="${index}">Hit ${signed(proficiency + modifier)}</button>
             <button class="rb" data-action="weapon-damage"
-                data-value="${index}">${withMod(weapon.d, modifier)} ${weapon.t}</button>
+                data-value="${index}">${withModifier(weapon.d, modifier)} ${weapon.t}</button>
             ${when(weapon.v, html`
                 <button class="rb" data-action="weapon-damage" data-value="${index}" data-two-handed="1">
-                    ${withMod(weapon.v, modifier)} two-handed</button>`)}
+                    ${withModifier(weapon.v, modifier)} two-handed</button>`)}
         </div>`;
 }
 

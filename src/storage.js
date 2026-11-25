@@ -9,6 +9,8 @@ import { cleanSheet } from './sheet.js';
 
 const HISTORY_SIZE = 6;
 const AUTOSAVE_EVERY = 30 * 60 * 1000;
+// How long the downloaded file's address stays valid, so the browser has time to start saving it.
+const DOWNLOAD_LINK_LIFETIME_MS = 1000;
 
 export function readKey(key) {
     try {
@@ -91,7 +93,7 @@ export function downloadSheet(sheet) {
     document.body.appendChild(link);
     link.click();
     link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_LINK_LIFETIME_MS);
     markBackedUp();
 }
 

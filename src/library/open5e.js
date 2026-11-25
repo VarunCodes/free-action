@@ -3,6 +3,8 @@ const API = 'https://api.open5e.com/v2';
 export const SRD_2024 = 'srd-2024';
 const MAX_PAGES = 30;
 const PAGE_TIMEOUT_MS = 20000;
+// Items come in bigger pages: there are many more of them than of any other kind.
+const ITEM_PAGE_SIZE = 500;
 
 // The Open5e endpoint for each kind of Library entry.
 export const ENDPOINTS = { spell: 'spells', feat: 'feats', race: 'species', class: 'classes', item: 'items' };
@@ -10,7 +12,10 @@ export const ENDPOINTS = { spell: 'spells', feat: 'feats', race: 'species', clas
 /** Every Open5e row for one kind of entry. Items come from two endpoints: gear and magic items. */
 export async function downloadKind(kind) {
     if (kind !== 'item') return downloadAll(ENDPOINTS[kind]);
-    const [gear, magicItems] = await Promise.all([downloadAll('items', 500), downloadAll('magicitems', 500)]);
+    const [gear, magicItems] = await Promise.all([
+        downloadAll('items', ITEM_PAGE_SIZE),
+        downloadAll('magicitems', ITEM_PAGE_SIZE),
+    ]);
     return [...gear, ...magicItems];
 }
 

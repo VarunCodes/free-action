@@ -4,7 +4,7 @@ import type { Page } from '@playwright/test';
 // Hit Points, Temporary Hit Points, Hit Point Dice and rests, from the PHB 2024 rules glossary.
 // Brakka (fighter-5): Fighter 5 (d10 Hit Dice), Con 14 (+2), 44 of 44 HP.
 const brakka = (more: Sheet = {}) => ({ ...loadSheet('fighter-5'), ...more });
-const hp = (cur: number, max = 44, temp = 0) => ({ hp: { cur, max, temp } });
+const hp = (current: number, max = 44, temp = 0) => ({ hp: { cur: current, max, temp } });
 
 // Types an amount into the HP box and presses Damage, Heal or Set temp.
 async function hpAction(page: Page, button: 'Damage' | 'Heal' | 'Set temp', amount: number) {

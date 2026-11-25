@@ -1,9 +1,12 @@
 // Adding to and removing from the sheet's lists: spells, items and their effects, features and feats.
 // Also the proficiency marks and spell slot pips, which edit the sheet in place.
-import { activeGear, skillGranted, skillProf } from '../rules.js';
+import { activeGear, MAX_ATTUNED_ITEMS, MAX_ABILITY_SCORE, skillGranted, skillProficiency } from '../rules.js';
 import { forgetListPlaces } from '../ui.js';
 
-const MAX_ATTUNED_ITEMS = 3;
+// Skill proficiency levels: none, proficient, Expertise.
+const PROFICIENCY_LEVELS = 3;
+// A 'set' effect left empty sets the score to 19, as Gauntlets of Ogre Power and the Headband of Intellect do.
+const DEFAULT_SET_SCORE = 19;
 
 /** The proficiency mark in front of a save turns its proficiency on or off. */
 export function toggleSaveProficiency(sheet, ability) {
@@ -17,7 +20,7 @@ export function toggleSaveProficiency(sheet, ability) {
  */
 export function cycleSkillProficiency(sheet, skill) {
     const granted = skillGranted(sheet, skill);
-    const next = (skillProf(sheet, skill) + 1) % 3;
+    const next = (skillProficiency(sheet, skill) + 1) % PROFICIENCY_LEVELS;
     sheet.sk[skill] = next > granted ? next : 0;
 }
 
@@ -66,7 +69,7 @@ export function removeItem(sheet, ui, index) {
 export function addItemEffect(item, choice, typedValue) {
     const [type, target] = choice.split('|');
     let value = typedValue || 0;
-    if (type === 'set') value = Math.min(30, Math.max(1, value || 19));
+    if (type === 'set') value = Math.min(MAX_ABILITY_SCORE, Math.max(1, value || DEFAULT_SET_SCORE));
     if (type === 'adv') value = 0;
     const others = (item.fx || []).filter(([otherType, otherTarget]) => otherType !== type || otherTarget !== target);
     item.fx = [...others, [type, target, value]];
@@ -79,7 +82,7 @@ export function removeItemEffect(item, effectIndex) {
 /** At most three items can be attuned at once. Returns false if that limit refuses a new one. */
 export function toggleAttunement(sheet, index) {
     const item = sheet.items[index];
-    if (!item.att && activeGear(sheet).attuned >= MAX_ATTUNED_ITEMS) return false;
+    if (!item.att && activeGear(sheet).attunedCount >= MAX_ATTUNED_ITEMS) return false;
     item.att = !item.att;
     return true;
 }

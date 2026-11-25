@@ -5,17 +5,18 @@ import type { Page } from '@playwright/test';
 // Brakka (fighter-5), level 5 (proficiency +3): Str 16 (+3), Dex 12 (+1), Con 14 (+2), Int 8 (-1),
 // Wis 10 (+0), Cha 13 (+1). Proficient in Strength and Constitution saves, Athletics and Perception.
 const brakka = (more: Sheet = {}) => ({ ...loadSheet('fighter-5'), ...more });
-function trait(name: string, description: string, fx?: unknown[]) {
-  const effects = fx ? { fx } : {};
-  return { n: name, t: '', d: description, ...effects };
+function trait(name: string, description: string, effects?: unknown[]) {
+  const effectsKey = effects ? { fx: effects } : {};
+  return { n: name, t: '', d: description, ...effectsKey };
 }
 // An equipped magic item that needs attunement.
-const magic = (name: string, fx: unknown[], att = true) => ({ n: name, q: 1, eq: true, on: true, at: true, att, fx });
+const magic = (name: string, effects: unknown[], attuned = true) =>
+  ({ n: name, q: 1, eq: true, on: true, at: true, att: attuned, fx: effects });
 
 // SRD 5.2, Stone of Good Luck: +1 to ability checks and saving throws, requires attunement.
 const luckstone = (name = 'Stone of Good Luck') => magic(name, [['chk', '', 1], ['sv', '', 1]]);
 // SRD 5.2, Gauntlets of Ogre Power: your Strength is 19 (no effect if it's already 19 or more).
-const gauntlets = (att = true) => magic('Gauntlets of Ogre Power', [['set', 'str', 19]], att);
+const gauntlets = (attuned = true) => magic('Gauntlets of Ogre Power', [['set', 'str', 19]], attuned);
 
 // Names carry the number, so they must match exactly: a substring match would let "+12" pass for "+1".
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
@@ -116,8 +117,8 @@ test.describe('bonuses to checks and saves', () => {
   test('a repeatable feat taken twice applies twice', async ({ page, seedSheet }) => {
     // PHB 2024, Ability Score Improvement: repeatable; +2 to one score (max 20). Only magic item copies
     // are limited to one, so two ASIs on Strength: 16 + 2 + 2 = 20 (+5). Check +5; save +5, proficient +3 = +8.
-    const asi = { n: 'Ability Score Improvement', t: 'Feat', d: '', fx: [['ab', 'str', 2]] };
-    await seedSheet(brakka({ feats: [asi, { ...asi }] }));
+    const improvement = { n: 'Ability Score Improvement', t: 'Feat', d: '', fx: [['ab', 'str', 2]] };
+    await seedSheet(brakka({ feats: [improvement, { ...improvement }] }));
     await page.goto('/');
     await expect(button(page, 'Strength check +5')).toBeVisible();
     await expect(button(page, 'Strength save +8')).toBeVisible();

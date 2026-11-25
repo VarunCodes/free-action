@@ -4,7 +4,7 @@ import { cachedItems, cachedSpecies, loadLibrary } from './library.js';
 import { dateAndTime } from './text.js';
 import { newSheet, cleanSheet } from './sheet.js';
 import {
-    abilityMod, profBonus, knownClass, knownSpecies, effectsOf, effectTotal, advantageFrom, score,
+    abilityModifier, proficiencyBonus, knownClass, knownSpecies, effectsOf, effectTotal, advantageFrom, score,
 } from './rules.js';
 import { sourcesText } from './html.js';
 import { abilitiesSection, savesSection, skillsSection } from './sections/stats.js';
@@ -15,6 +15,7 @@ import { headerSection } from './sections/header.js';
 import { vitalsSection } from './sections/vitals.js';
 import { notesSection, backupSection } from './sections/backup.js';
 import { rollBarSection } from './sections/rollBar.js';
+import { pageLayout } from './sections/page.js';
 import { createUi, forgetListPlaces } from './ui.js';
 import {
     rollCheck, rollSpellAttack, rollSpellEffect, rollWeaponAttack, rollWeaponDamage, spendHitDie,
@@ -152,15 +153,15 @@ function fitPageAboveRollBar() {
 //   spellDcBonus        bonuses to spell save DCs
 //   checkBonusSources   "Includes Stone of Good Luck +1", or '' with no check bonus
 //   advantageSources    a function: what gives Advantage on a roll ('init' or a skill name), as text
-function sheetView(){
+function sheetView() {
     const castingAbility = sheet.cast;
     const checkBonus = effectTotal(sheet, 'chk');
     const checkSources = effectsOf(sheet, 'chk').map(([source, [, , value]]) => [source.n, value]);
     return {
         editing: sheet.mode === 'edit',
-        proficiency: profBonus(sheet),
+        proficiency: proficiencyBonus(sheet),
         castingAbility,
-        castingModifier: castingAbility ? abilityMod(score(sheet, castingAbility)) : 0,
+        castingModifier: castingAbility ? abilityModifier(score(sheet, castingAbility)) : 0,
         checkBonus,
         spellAttackBonus: effectTotal(sheet, 'sa'),
         spellDcBonus: effectTotal(sheet, 'dc'),
@@ -172,8 +173,6 @@ function sheetView(){
     };
 }
 
-// Sections go into three columns: stats, inventory and spells, everything else. On phones the columns
-// dissolve and each section's order puts them back into one reading order.
 function render() {
     const view = sheetView();
     for (const spell of sheet.spells) spell.r = { ...newSpellRoll(), ...spell.r };
@@ -184,34 +183,21 @@ function render() {
         librarySpecies: ui.librarySpecies,
         message: ui.headerMessage,
     });
-    const vitals = vitalsSection(sheet, view, { amount: ui.hitPointAmount });
-    const abilities = abilitiesSection(sheet, view);
-    const saves = savesSection(sheet, view);
-    const skills = skillsSection(sheet, view);
-    const features = featuresSection(sheet, view, { isOpen });
-    const racialFeatures = racialFeaturesSection(sheet, view, { isOpen });
-    const spells = spellsSection(sheet, view, { isOpen, slotFor: index => ui.spellSlotLevels[index] });
-    const inventory = inventorySection(sheet, view, { isOpen, attunementRefused: ui.attunementRefused });
-    const notes = notesSection(sheet);
-    const backup = backupSection({ backupText: ui.backupText, message: ui.backupMessage });
-
-    const statsColumn = column(section(1, vitals), section(2, abilities), section(3, saves), section(4, skills));
-    const gearColumn = column(section(7, inventory), section(8, spells));
-    const otherColumn = column(
-        section(5, features), section(6, racialFeatures), section(9, notes), section(10, backup));
-    const grid = `<div class="grid">${statsColumn}${gearColumn}${otherColumn}</div>`;
-    document.getElementById('app').innerHTML = header + grid;
+    const page = pageLayout({
+        vitals: vitalsSection(sheet, view, { amount: ui.hitPointAmount }),
+        abilities: abilitiesSection(sheet, view),
+        saves: savesSection(sheet, view),
+        skills: skillsSection(sheet, view),
+        features: featuresSection(sheet, view, { isOpen }),
+        racialFeatures: racialFeaturesSection(sheet, view, { isOpen }),
+        spells: spellsSection(sheet, view, { isOpen, slotFor: index => ui.spellSlotLevels[index] }),
+        inventory: inventorySection(sheet, view, { isOpen, attunementRefused: ui.attunementRefused }),
+        notes: notesSection(sheet),
+        backup: backupSection({ backupText: ui.backupText, message: ui.backupMessage }),
+    });
+    document.getElementById('app').innerHTML = `${header}${page}`;
     renderRoll();
     document.title = `${sheet.name.trim() || 'Unnamed'} · Character Sheet`;
-}
-
-// The order is where the section goes when the columns dissolve into one on phones.
-function section(order, content) {
-    return `<section class="c" style="order:${order}">${content}</section>`;
-}
-
-function column(...sections) {
-    return `<div class="col">${sections.join('')}</div>`;
 }
 
 // Boxes that only change what the page shows: the Damage/Heal amount, the custom dice and a spell's slot level.

@@ -75,10 +75,10 @@ test('the chat command follows the chosen virtual tabletop format, which is save
 test('a custom roll accepts dice and numbers, and refuses anything else', async ({ page }) => {
   await openRollOptions(page);
   const custom = page.getByLabel('Custom dice', { exact: true });
-  const go = button(page, 'Roll');
+  const rollButton = button(page, 'Roll');
   const customRoll = async (text: string) => {
     await custom.fill(text);
-    await go.click();
+    await rollButton.click();
   };
   // Each refused roll comes after a good one, so the test shows the old command is cleared each time.
   const refused = async (text: string, error: string) => {

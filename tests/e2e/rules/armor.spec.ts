@@ -7,7 +7,8 @@ import type { Page } from '@playwright/test';
 // Magic items here are seeded without attunement to isolate their AC effect; attunement is tested in gear.spec.ts.
 
 type Gear = { n: string; on?: boolean; ar: Record<string, unknown> };
-const item = ({ n, on = true, ar }: Gear) => ({ n, q: 1, eq: true, on, ar: { str: 0, ...ar } });
+const item = ({ n: name, on: equipped = true, ar: armor }: Gear) =>
+  ({ n: name, q: 1, eq: true, on: equipped, ar: { str: 0, ...armor } });
 const leather = { n: 'Leather Armor', ar: { k: 'light', ac: 11 } };
 const scale = { n: 'Scale Mail', ar: { k: 'medium', ac: 14 } };
 const chain = { n: 'Chain Mail', ar: { k: 'heavy', ac: 16 } };
@@ -16,9 +17,9 @@ const shield = { n: 'Shield', ar: { k: 'shield', ac: 2 } };
 const robe = { n: 'Robe of the Archmagi', ar: { k: 'unarm', ac: 15 } };
 
 // Brakka (fighter-5) with a chosen Dexterity score and gear.
-const brakka = (dex: number, gear: Gear[] = [], extra: Sheet = {}) => {
+const brakka = (dexterity: number, gear: Gear[] = [], extra: Sheet = {}) => {
   const base = loadSheet('fighter-5');
-  return { ...base, ab: { ...(base.ab as object), dex }, items: gear.map(item), ...extra };
+  return { ...base, ab: { ...(base.ab as object), dex: dexterity }, items: gear.map(item), ...extra };
 };
 
 const ac = (page: Page) => page.getByRole('group', { name: 'Armor class', exact: true });
