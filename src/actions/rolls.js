@@ -1,13 +1,11 @@
 // What the roll buttons do: checks, saves and attacks with a d20, damage and healing dice, hit dice,
 // custom rolls, and the roll bar's own buttons. Each roll shows on the roll bar, and its chat command
 // is copied for pasting into a virtual tabletop.
-import { abilityMod, signed, profBonus, effectTotal, score, hitDie, hitDiceLeft } from '../rules.js';
+import { abilityModifier, signed, proficiencyBonus, effectTotal, score, hitDie, hitDiceLeft } from '../rules.js';
 import {
-    rollMode, rollD20, rollDice, customRollError, chatCommand, spellDice, weaponMod, withMod,
+    rollMode, rollD20, rollDice, customRollError, chatCommand, spellDice, weaponModifier, withModifier, NATURAL_20,
 } from '../rolls.js';
 import { writeKey } from '../storage.js';
-
-const NATURAL_20 = 'Natural 20';
 
 /**
  * A check, save or initiative roll: a button with data-roll-label and data-roll-bonus, and data-advantage or
@@ -22,10 +20,10 @@ export function rollCheck(sheet, ui, button) {
 
 export function rollSpellAttack(sheet, ui, index) {
     const spell = sheet.spells[index];
-    const castingModifier = sheet.cast ? abilityMod(score(sheet, sheet.cast)) : 0;
-    const bonus = profBonus(sheet) + castingModifier + effectTotal(sheet, 'sa');
+    const castingModifier = sheet.cast ? abilityModifier(score(sheet, sheet.cast)) : 0;
+    const bonus = proficiencyBonus(sheet) + castingModifier + effectTotal(sheet, 'sa');
     rollD20Plus(ui.roll, `${spell.n} attack`, bonus);
-    ui.roll.criticalHit = ui.roll.last.crit === NATURAL_20 ? `s${index}` : null;
+    ui.roll.criticalHit = ui.roll.last.critical === NATURAL_20 ? `spell-${index}` : null;
     copyCommand(sheet, ui.roll);
 }
 
@@ -34,7 +32,7 @@ export function rollSpellEffect(sheet, ui, index) {
     const slotLevel = ui.spellSlotLevels[index] ?? spell.l;
     const { dice } = spellDice(sheet, spell, slotLevel);
     const label = spell.n + (spell.r.h ? ' healing' : ' damage');
-    const rolled = rollDiceAndShow(ui.roll, label, dice, ui.roll.criticalHit === `s${index}`);
+    const rolled = rollDiceAndShow(ui.roll, label, dice, ui.roll.criticalHit === `spell-${index}`);
     if (rolled) copyCommand(sheet, ui.roll);
     else showRollError(ui.roll, `${spell.n} has no valid dice. Use dice like 1d10 or 2d6+3; fix them in Edit.`);
     ui.roll.criticalHit = null;
@@ -42,16 +40,16 @@ export function rollSpellEffect(sheet, ui, index) {
 
 export function rollWeaponAttack(sheet, ui, index) {
     const item = sheet.items[index];
-    rollD20Plus(ui.roll, `${item.n} attack`, profBonus(sheet) + weaponMod(sheet, item));
-    ui.roll.criticalHit = ui.roll.last.crit === NATURAL_20 ? `i${index}` : null;
+    rollD20Plus(ui.roll, `${item.n} attack`, proficiencyBonus(sheet) + weaponModifier(sheet, item));
+    ui.roll.criticalHit = ui.roll.last.critical === NATURAL_20 ? `item-${index}` : null;
     copyCommand(sheet, ui.roll);
 }
 
 export function rollWeaponDamage(sheet, ui, index, twoHanded) {
     const item = sheet.items[index];
     const label = item.n + ' damage' + (twoHanded ? ' (two-handed)' : '');
-    const dice = withMod(twoHanded ? item.w.v : item.w.d, weaponMod(sheet, item));
-    const rolled = rollDiceAndShow(ui.roll, label, dice, ui.roll.criticalHit === `i${index}`);
+    const dice = withModifier(twoHanded ? item.w.v : item.w.d, weaponModifier(sheet, item));
+    const rolled = rollDiceAndShow(ui.roll, label, dice, ui.roll.criticalHit === `item-${index}`);
     if (rolled) copyCommand(sheet, ui.roll);
     else showRollError(ui.roll, `${item.n} has no valid damage dice.`);
     ui.roll.criticalHit = null;
@@ -61,7 +59,7 @@ export function rollWeaponDamage(sheet, ui, index, twoHanded) {
 export function spendHitDie(sheet, ui) {
     const sides = hitDie(sheet);
     if (!sides || !hitDiceLeft(sheet)) return;
-    const dice = `1d${sides}${signed(abilityMod(score(sheet, 'con')))}`;
+    const dice = `1d${sides}${signed(abilityModifier(score(sheet, 'con')))}`;
     if (!rollDiceAndShow(ui.roll, `Hit die (d${sides})`, dice, false, true)) return;
     const roll = ui.roll.last;
     roll.total = Math.max(1, roll.total);
@@ -102,8 +100,8 @@ function rollD20Plus(roll, label, bonus, disadvantage = false, advantage = false
 }
 
 // Returns false, changing nothing, if the dice can't be read.
-function rollDiceAndShow(roll, label, dice, criticalHit, asTyped = false) {
-    const result = rollDice(label, dice, criticalHit, asTyped);
+function rollDiceAndShow(roll, label, dice, isCriticalHit, allowNegative = false) {
+    const result = rollDice(label, dice, isCriticalHit, allowNegative);
     if (!result) return false;
     roll.error = '';
     roll.last = result;

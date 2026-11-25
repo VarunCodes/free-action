@@ -5,8 +5,7 @@
 // choose is stored in `ch`, one pick per choice.
 import { SKILLS } from '../sheet.js';
 import { featureEffects } from '../rules.js';
-import { md } from '../text.js';
-import { html, raw, when } from '../html.js';
+import { html, raw, when, markdownToHtml } from '../html.js';
 import { effectLabel } from '../effects.js';
 
 const ALL_SKILLS = SKILLS.map(([skill]) => skill);
@@ -37,7 +36,7 @@ function featureRow(feature, id, editing, ui) {
     const removeButton = html`
         <button class="x" data-action="remove-feature" data-value="${id}"
             aria-label="Remove ${feature.n}">✕</button>`;
-    const description = md(feature.d);
+    const description = markdownToHtml(feature.d);
     const body = editing
         ? html`<textarea data-field="${id}.d" placeholder="Description"
             aria-label="${feature.n} description">${feature.d}</textarea>`

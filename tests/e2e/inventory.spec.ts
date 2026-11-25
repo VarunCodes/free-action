@@ -11,8 +11,8 @@ const longsword = {
 const shield = { n: 'Shield', q: 1, eq: true, on: false, ar: { k: 'shield', ac: 2, str: 0 } };
 const rope = { n: 'Rope', q: 1, d: '50 feet of **hempen** rope.' };
 // PHB 2024, Ring of Protection: +1 to AC and saving throws, requires attunement.
-const ring = (name: string, att: boolean) => ({
-  n: name, q: 1, eq: true, on: true, at: true, att, ar: { k: 'bonus', ac: 1, str: 0, sb: 1 },
+const ring = (name: string, attuned: boolean) => ({
+  n: name, q: 1, eq: true, on: true, at: true, att: attuned, ar: { k: 'bonus', ac: 1, str: 0, sb: 1 },
 });
 
 // Brakka (fighter-5): Str 16, Dex 12 (+1), Int 8 (-1), proficient in Strength saves, level 5 (+3).

@@ -23,7 +23,7 @@ function rollResult({ last, error }) {
         return html`
             <output class="tot" aria-label="Roll total">${last.total}</output>
             <span>${last.label} ${last.detail}</span>
-            ${when(last.crit, () => html`<span class="crit">${last.crit}</span>`)}`;
+            ${when(last.critical, () => html`<span class="crit">${last.critical}</span>`)}`;
     }
     if (error) return html`<span class="reqn" role="alert">${error}</span>`;
     return html`<span class="sub">Tap any modifier to roll</span>`;

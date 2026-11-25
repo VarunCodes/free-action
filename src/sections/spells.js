@@ -10,13 +10,19 @@
 // The spell save DC is 8 + proficiency + the spellcasting modifier, and the spell attack is
 // proficiency + the spellcasting modifier (PHB 2024), each plus any bonuses from items.
 import { ABILITIES, ABILITY_NAMES } from '../sheet.js';
-import { esc, md } from '../text.js';
 import { signed, effectsOf } from '../rules.js';
 import { spellDice } from '../rolls.js';
-import { html, raw, when, input, sourcesText } from '../html.js';
+import { html, raw, when, input, sourcesText, markdownToHtml } from '../html.js';
 
 const SLOT_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 const SPELL_LEVELS = [0, ...SLOT_LEVELS];
+// The most slots of one level the sheet allows.
+const MAX_SLOTS_OF_A_LEVEL = 9;
+
+// The spell save DC: 8 + proficiency + the spellcasting modifier + bonuses from items (PHB 2024).
+const SPELL_SAVE_DC_BASE = 8;
+const spellSaveDc = ({ proficiency, castingModifier, spellDcBonus }) =>
+    SPELL_SAVE_DC_BASE + proficiency + castingModifier + spellDcBonus;
 
 // ui: isOpen(id) says whether a spell's description is open ('spell-' + its index), and
 // slotFor(index) is the slot level picked for a spell, if any.
@@ -38,11 +44,11 @@ export function spellsSection(sheet, view, ui) {
 }
 
 // The heading toggles the section. Collapsed, it says how many spells there are and the save DC.
-function spellsHeading(sheet, { proficiency, castingAbility, castingModifier, spellDcBonus }) {
+function spellsHeading(sheet, view) {
     const count = sheet.spells.length;
-    const dc = 8 + proficiency + castingModifier + spellDcBonus;
+    const dc = spellSaveDc(view);
     const spells = count === 1 ? '1 spell' : `${count} spells`;
-    const summary = html`<small>${spells}${when(castingAbility, `, save DC ${dc}`)}</small>`;
+    const summary = html`<small>${spells}${when(view.castingAbility, `, save DC ${dc}`)}</small>`;
     return html`
         <h2>
             <button class="hd" data-action="toggle-spellcasting" aria-expanded="${!sheet.spc}">Spellcasting</button>
@@ -68,7 +74,7 @@ function castingAbilityField(castingAbility) {
 // Save DC, the spell attack (tap to roll), any item bonuses to either, and the modifier.
 function castingSummary(sheet, view) {
     const { proficiency, castingModifier, spellAttackBonus, spellDcBonus } = view;
-    const dc = 8 + proficiency + castingModifier + spellDcBonus;
+    const dc = spellSaveDc(view);
     const attack = proficiency + castingModifier + spellAttackBonus;
     const bonuses = [...effectsOf(sheet, 'sa'), ...effectsOf(sheet, 'dc')].map(([source, [type, , value]]) =>
         [`${source.n} (${type === 'sa' ? 'attack' : 'DC'})`, value]);
@@ -108,7 +114,7 @@ function slotRow(slots, level, editing) {
                         aria-label="Level ${level} slot ${pip + 1}"></button>`)}
             </div>
             ${when(editing, () => input(`slots.${index}.m`, slots.m, 'number',
-                `min=0 max=9 aria-label="Level ${level} max slots"`))}
+                `min=0 max=${MAX_SLOTS_OF_A_LEVEL} aria-label="Level ${level} max slots"`))}
         </div>`;
 }
 
@@ -154,7 +160,7 @@ function spellEntry(sheet, view, ui, spell, index, anyPrepared) {
                         aria-label="Remove ${spell.n}">✕</button>`)}
             </div>
             ${editing ? spellRollFields(spell, index) : spellRollButtons(sheet, view, ui, spell, index)}
-            ${when(spell.d && descriptionOpen, () => html`<p class="sd">${raw(md(spell.d))}</p>`)}
+            ${when(spell.d && descriptionOpen, () => html`<p class="sd">${raw(markdownToHtml(spell.d))}</p>`)}
         </div>`;
 }
 
@@ -189,8 +195,8 @@ function spellRollFields(spell, index) {
                         ${when(roll.s === ability, 'selected')}>${ABILITY_NAMES[ability].slice(0, 3)} save</option>`)}
             </select>
             ${input(key + 'd', roll.d, 'text',
-                `class="dmg" placeholder="Dice, e.g. 1d10" aria-label="${esc(name)} damage dice"`)}
-            ${input(key + 't', roll.t, 'text', `class="dmt" placeholder="Type" aria-label="${esc(name)} damage type"`)}
+                html`class="dmg" placeholder="Dice, e.g. 1d10" aria-label="${name} damage dice"`)}
+            ${input(key + 't', roll.t, 'text', html`class="dmt" placeholder="Type" aria-label="${name} damage type"`)}
             <label class="row"><input type="checkbox" data-field="${key}m" ${when(roll.m, 'checked')}
                 aria-label="${name} adds modifier"> + modifier</label>
         </div>`;
@@ -199,7 +205,7 @@ function spellRollFields(spell, index) {
 // Play: the attack button, the save DC, the damage or healing button, how many attacks, and for
 // spells that scale with the slot, a slot picker. Nothing if the spell has none of these.
 function spellRollButtons(sheet, view, ui, spell, index) {
-    const { proficiency, castingModifier, spellAttackBonus, spellDcBonus } = view;
+    const { proficiency, castingModifier, spellAttackBonus } = view;
     const roll = spell.r;
     const slot = ui.slotFor(index) ?? spell.l;
     const { dice, attacks } = spellDice(sheet, spell, slot);
@@ -207,7 +213,7 @@ function spellRollButtons(sheet, view, ui, spell, index) {
     if (!roll.a && !saveName && !dice) return '';
 
     const attack = proficiency + castingModifier + spellAttackBonus;
-    const dc = 8 + proficiency + castingModifier + spellDcBonus;
+    const dc = spellSaveDc(view);
     const effect = roll.h || roll.t ? ` ${roll.h ? 'healing' : roll.t}` : '';
     return html`
         <div class="srl">

@@ -8,7 +8,8 @@ to the author and the reviewer.
 
 - Whole words that a reader or a player would use: `oldSpecies`, not `ob`; `speciesName`, not `n`. No
   abbreviations, except ones the game itself uses (`hp`, `ac`, `dc`).
-- Functions are verb phrases that say what they do: `takeDamage`, `fillGearFromLibrary`, `swapSaveProficiencies`.
+- A function that does something is a verb phrase: `takeDamage`, `fillGearFromLibrary`, `swapSaveProficiencies`.
+  A function that only returns a value is named for that value: `proficiencyBonus`, `spellsSection`.
 - True/false values read as questions: `isLoaded`, `hasSpeciesToLose`, `castingAbilityCameFromOldClass`.
 - No bare numbers or strings with a meaning: name them. `MAX_ATTUNED_ITEMS`, `GEAR_DATA_VERSION`,
   `NOTHING_TO_SAVE`.
@@ -27,8 +28,9 @@ to the author and the reviewer.
   - `src/library/`: reading, filtering and storing Library content.
   - Plain modules (`rules.js`, `rolls.js`, `sheet.js`, `gearUpgrade.js`): logic that needs no browser, so it can
     have unit tests.
-- HTML is built only in `src/sections/`, with the `html` tag, which escapes every value. Never build markup in a
-  logic file or call `esc()` by hand: custom packs are pasted-in JSON, and one missed value puts their markup on
+- HTML is built only in `src/sections/`, with the `html` tag, which escapes every value. `src/html.js`, which
+  provides the tag, escaping and the markdown renderer, is the one other place. Never build markup in a logic
+  file or call `escapeHtml()` by hand: custom packs are pasted-in JSON, and one missed value puts their markup on
   the page.
 - Return an object with named fields, not an array whose positions carry meaning: `{ list, index }`, not
   `[list, index]`.
@@ -51,16 +53,19 @@ to the author and the reviewer.
 
 ## What lint checks
 
-Every file listed in `READABLE` in `eslint.config.js` must pass these rules. `npm run lint` runs them, and so does
-CI:
+Every JavaScript and TypeScript file (`src/`, the tests and the config files) must pass these rules.
+`npm run lint` runs them, and so does CI:
 
 - Lines of at most 120 characters, and one statement per line.
 - Functions of at most 40 lines, a complexity of at most 12, and nesting at most 3 deep.
-- No one-letter names except the loop counters `i` and `j` (`id-length`). Object keys are left alone because of
-  the saved short keys.
+- Names of at least three letters (`id-length`), except the loop counters `i` and `j` and the two-letter names
+  everyone knows (`ui`, `id`) or the game uses (`hp`, `ac`, `dc`). Object keys are left alone because of the
+  saved short keys.
+- None of the old abbreviations the refactor removed (`id-denylist`: `esc`, `md`, `crit`, `expr`, `lib`, …).
+- Outside `src/sections/` and `src/html.js`: no HTML tags in strings, and no importing `escapeHtml`.
 - `const` over `let`, never `var`, and `===`.
 
-A new file goes in `READABLE` from its first commit. A file that is rewritten is added in the same PR.
+New files are covered automatically.
 
 ## Refactor PRs
 

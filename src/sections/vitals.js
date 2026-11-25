@@ -1,10 +1,13 @@
 // Vitals: Armor Class, Initiative, Speed and proficiency, then hit points and hit dice.
 // In Edit, most boxes become fields, and the AC settings appear underneath.
 import {
-    abilityMod, signed, score, hitDie, hitDiceLeft, averageHP, effectsOf,
+    abilityModifier, signed, score, hitDie, hitDiceLeft, averageHP, effectsOf,
     armorClass, currentAC, currentSpeed, unmetStrength,
 } from '../rules.js';
 import { html, when, input, field } from '../html.js';
+
+// Below this share of maximum hit points, the bar turns red.
+const LOW_HIT_POINTS_PERCENT = 25;
 
 /** The Vitals section. ui.amount is the number in the Damage/Heal box, kept between renders. */
 export function vitalsSection(sheet, view, ui) {
@@ -40,7 +43,7 @@ function initiativeBox(sheet, { editing, checkBonus, checkBonusSources, advantag
         const bonusField = field('Init bonus', 'init', sheet.init, 'number', 'min=-20 max=20');
         return html`<div class="vit">${bonusField}</div>`;
     }
-    const bonus = abilityMod(score(sheet, 'dex')) + sheet.init + checkBonus;
+    const bonus = abilityModifier(score(sheet, 'dex')) + sheet.init + checkBonus;
     const advantage = advantageSources('init');
     const tooltip = [checkBonusSources, advantage].filter(Boolean).join('. ');
     return html`
@@ -82,7 +85,7 @@ function hitPointsBox(sheet, { editing }, amount) {
             <div class="hpn" role="group" aria-label="Hit points">
                 <b>${current}</b><span>/ ${max} HP</span>${tempPill}
             </div>
-            <div class="bar ${when(percent < 25, 'low')}"><i style="width:${percent}%"></i></div>
+            <div class="bar ${when(percent < LOW_HIT_POINTS_PERCENT, 'low')}"><i style="width:${percent}%"></i></div>
             <div class="row">
                 <input id="hit-point-amount" type="number" min="0" value="${amount}" aria-label="Amount">
                 <button class="bad" data-action="damage">Damage</button>
@@ -118,7 +121,7 @@ function hitPointFields(sheet) {
 
 // "d10, Con +2, Dwarven Toughness +1/level"
 function averageHPSources(sheet) {
-    const conModifier = abilityMod(score(sheet, 'con'));
+    const conModifier = abilityModifier(score(sheet, 'con'));
     const perLevel = effectsOf(sheet, 'hp').map(([source, [, , value]]) => `, ${source.n} ${signed(value)}/level`);
     return `d${hitDie(sheet)}, Con ${signed(conModifier)}${perLevel.join('')}`;
 }
@@ -128,7 +131,7 @@ function hitDiceRow(sheet) {
     const left = hitDiceLeft(sheet);
     const hurt = sheet.hp.cur < sheet.hp.max;
     const die = hitDie(sheet);
-    const conModifier = abilityMod(score(sheet, 'con'));
+    const conModifier = abilityModifier(score(sheet, 'con'));
     let tooltip = 'Already at full HP';
     if (!left) tooltip = 'No hit dice left. A long rest gives them all back.';
     else if (hurt) tooltip = `Short rest: roll d${die} ${signed(conModifier)} and heal that much`;

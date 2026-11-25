@@ -2,8 +2,8 @@
 // packs, and the credits. libraryui.js draws it and handles its buttons, which use data-library="…" (and
 // data-filter, data-entry, data-add, data-remove), never the page's own action attribute, so the page's click
 // handler leaves them alone.
-import { html, raw, when } from '../html.js';
-import { md, rarityTag, magicMark } from '../text.js';
+import { html, raw, when, markdownToHtml, rarityTag, magicMark } from '../html.js';
+
 import { KINDS } from '../library.js';
 import { chipRow, isLaterClassFeature } from '../library/filters.js';
 import { isOnSheet, ownedCount } from '../actions/library.js';
@@ -78,12 +78,12 @@ function entryRow({ sheet, kind, openEntries }, entry, index) {
         <div class="lrow${when(isLater, ' later')}">
             <div class="lhd">
                 <button class="lk" data-entry="${id}" aria-expanded="${isOpen}">
-                    <span>${raw(magicMark(entry.rr))}${entry.name}${raw(rarityTag(entry.rr))}</span>
+                    <span>${magicMark(entry.rr)}${entry.name}${rarityTag(entry.rr)}</span>
                     <small>${entry.sub}${notes}</small>
                 </button>
                 ${isOnSheet(sheet, entry) ? removeButton(kind, index) : addButton(sheet, kind, entry, index)}
             </div>
-            ${when(isOpen, () => html`<p class="sd">${raw(md(entry.desc) || 'No description.')}</p>`)}
+            ${when(isOpen, () => html`<p class="sd">${raw(markdownToHtml(entry.desc) || 'No description.')}</p>`)}
         </div>`;
 }
 

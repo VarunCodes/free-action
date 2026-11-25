@@ -9,14 +9,14 @@ export function createUi() {
             error: '',
             copied: false,
             customDice: '',
-            // The attack whose damage roll doubles its dice: 's2' for spell 2, 'i0' for item 0.
+            // The attack whose damage roll doubles its dice: 'spell-2' for spell 2, 'item-0' for item 0.
             criticalHit: null,
             // Kept per device, not in the sheet.
             minimized: readKey('roll-min') === '1',
         },
         // The slot level picked for each spell, by its place in the list, when cast with a higher slot.
         spellSlotLevels: {},
-        // The ids of the sections and descriptions the user opened, like 'sp2' or 'roll-options'.
+        // The ids of the sections and descriptions the user opened, like 'spell-2' or 'roll-options'.
         openSections: new Set(),
         // The number in the Damage/Heal box.
         hitPointAmount: 1,
@@ -27,7 +27,7 @@ export function createUi() {
         customSpecies: false,
         // The species the Library has downloaded, for the Species picker.
         librarySpecies: [],
-        // The place in the item list of the item that couldn't be attuned (the limit is 3), or -1.
+        // The place in the item list of the item that couldn't be attuned (the limit is MAX_ATTUNED_ITEMS), or -1.
         attunementRefused: -1,
         // What the Backup JSON box holds, and the result of the last import or restore: { text, isError }.
         backupText: '',

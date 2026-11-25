@@ -4,9 +4,9 @@ import type { Page } from '@playwright/test';
 // Attack and damage rolls for weapons and spells, and critical hits. (The roll bar's modes, chat
 // formats and custom rolls are in tests/e2e/roll-bar.spec.ts, which runs in every browser.)
 // Brakka (fighter-5), level 5 (proficiency +3): Str 16 (+3), Dex 12 (+1), Con 14 (+2), Int 8 (-1), Wis 10 (+0).
-const brakka = (more: Sheet = {}, ab: Sheet = {}) => {
+const brakka = (changes: Sheet = {}, abilityScores: Sheet = {}) => {
   const base = loadSheet('fighter-5');
-  return { ...base, ...more, ab: { ...(base.ab as object), ...ab } };
+  return { ...base, ...changes, ab: { ...(base.ab as object), ...abilityScores } };
 };
 // A Charisma caster with Cha 18 (+4), a modifier none of Brakka's other abilities has.
 const caster = (spells: Sheet[], level = 5) => brakka({ level, cast: 'cha', spells }, { cha: 18 });

@@ -91,8 +91,8 @@ test('a Speed typed by hand is kept when the species changes', async ({ page, se
 });
 
 test('clearing the species removes its traits and puts Speed back to 30', async ({ page, seedSheet, savedSheet }) => {
-  const own = { n: 'Lucky Find', t: '', d: 'Not from a species.' };
-  await seedSheet(brakka({ species: 'Stoneborn', speed: 25, race: [...stoneborn, own] }));
+  const ownTrait = { n: 'Lucky Find', t: '', d: 'Not from a species.' };
+  await seedSheet(brakka({ species: 'Stoneborn', speed: 25, race: [...stoneborn, ownTrait] }));
   await page.goto('/');
   // Wait until the species list has loaded from the Library store; before that the app can't tell
   // which traits are Stoneborn's.
@@ -111,9 +111,9 @@ test('the sheet from before a species change can be restored', async ({ page, se
   await page.goto('/');
 
   await test.step('edit the Background, then change species', async () => {
-    const bg = page.getByLabel('Background', { exact: true });
-    await bg.fill('Sailor');
-    await bg.blur();
+    const background = page.getByLabel('Background', { exact: true });
+    await background.fill('Sailor');
+    await background.blur();
     await speciesBox(page).selectOption('Windkin');
     await expect.poll(savedSheet).toMatchObject({ species: 'Windkin', bg: 'Sailor' });
   });

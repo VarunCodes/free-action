@@ -10,8 +10,11 @@
 //   w    weapon stats: d damage dice, t damage type, v two-handed dice, b magic bonus, ab ability
 //   ar   armor class: see armorClassOf() below
 import { textOf, listOf, sentencesOf, ABILITY_KEYS } from './values.js';
+import { RARITY } from '../text.js';
 
 // Gear you wear or wield. Everything else (rope, potions, tools, ammunition...) just sits in inventory.
+// A shield adds 2 to Armor Class, before any magic bonus (PHB 2024).
+const SHIELD_AC = 2;
 const EQUIPPABLE_CATEGORY = /^(weapon|armor|shield|ring|wondrous item|staff|rod|wand|spellcasting focus)$/i;
 
 /** Every item from Open5e. Magic staves and rods can borrow the stats of the plain weapon they're used as. */
@@ -41,7 +44,7 @@ function libraryItem(row, weaponsByName) {
         eq: EQUIPPABLE_CATEGORY.test(category),
         ...(row.requires_attunement ? { at: true } : {}),
         ...(effects.length ? { fx: effects } : {}),
-        rr: Math.min(6, Math.max(0, Number(row.rarity?.rank) || 0)),
+        rr: Math.min(RARITY.length - 1, Math.max(0, Number(row.rarity?.rank) || 0)),
         ...(weapon && weapon.damage_dice ? { w: weaponStats(weapon, weaponBonus) } : {}),
         ...armorClassOf(row, category, nameBonus, isMithral),
     };
@@ -216,16 +219,16 @@ function armorClassOf(row, category, nameBonus, isMithral) {
     const bonuses = armorClassBonuses(description);
     const textBonus = sum(bonuses);
     // "+1 bonus to Armor Class and saving throws" (Ring/Cloak of Protection, Staff of Power) also raises saves.
-    const sb = sum(bonuses.filter(({ sentence }) => /saving throws/i.test(sentence)));
+    const saveBonus = sum(bonuses.filter(({ sentence }) => /saving throws/i.test(sentence)));
 
-    const isShield = /\bShield\b/.test(row.name) && /^armor$/i.test(category) && (!armor || armor.ac_base <= 2);
-    if (isShield) return { ar: { k: 'shield', ac: 2 + nameBonus, str: 0, sb } };
-    if (armor && armor.ac_base) return { ar: bodyArmor(armor, nameBonus + textBonus, sb, isMithral) };
+    const isShield = /\bShield\b/.test(row.name) && /^armor$/i.test(category) && (!armor || armor.ac_base <= SHIELD_AC);
+    if (isShield) return { ar: { k: 'shield', ac: SHIELD_AC + nameBonus, str: 0, sb: saveBonus } };
+    if (armor && armor.ac_base) return { ar: bodyArmor(armor, nameBonus + textBonus, saveBonus, isMithral) };
     const unarmoredBase = /base Armor Class is (\d+) plus your Dexterity/i.exec(description);
-    if (unarmoredBase) return { ar: { k: 'unarm', ac: Number(unarmoredBase[1]), str: 0, sb } };
+    if (unarmoredBase) return { ar: { k: 'unarm', ac: Number(unarmoredBase[1]), str: 0, sb: saveBonus } };
     if (textBonus) {
         const onlyWithoutArmor = bonuses.some(({ sentence }) => /no armor/i.test(sentence));
-        return { ar: { k: 'bonus', ac: textBonus, str: 0, sb, nu: onlyWithoutArmor } };
+        return { ar: { k: 'bonus', ac: textBonus, str: 0, sb: saveBonus, nu: onlyWithoutArmor } };
     }
     return {};
 }
@@ -244,12 +247,12 @@ function armorClassBonuses(description) {
 
 const sum = bonuses => bonuses.reduce((total, { amount }) => total + amount, 0);
 
-function bodyArmor(armor, bonus, sb, isMithral) {
+function bodyArmor(armor, bonus, saveBonus, isMithral) {
     return {
         k: ['light', 'medium', 'heavy'].includes(armor.category) ? armor.category : 'heavy',
         ac: armor.ac_base + bonus,
         str: isMithral ? 0 : armor.strength_score_required || 0,
-        sb,
+        sb: saveBonus,
         stl: !isMithral && Boolean(armor.grants_stealth_disadvantage),
     };
 }

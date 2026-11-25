@@ -5,14 +5,14 @@ import type { Page } from '@playwright/test';
 // Chain Mail, from the PHB 2024 Armor table: AC 16, Strength 13, Disadvantage on Stealth.
 const chain = { n: 'Chain Mail', q: 1, eq: true, on: true, ar: { k: 'heavy', ac: 16, str: 13, stl: true } };
 // PHB 2024, Ring of Protection: +1 to AC and saving throws, requires attunement.
-const ring = (name: string, att: boolean) => ({
-  n: name, q: 1, eq: true, on: true, at: true, att, ar: { k: 'bonus', ac: 1, str: 0, sb: 1 },
+const ring = (name: string, attuned: boolean) => ({
+  n: name, q: 1, eq: true, on: true, at: true, att: attuned, ar: { k: 'bonus', ac: 1, str: 0, sb: 1 },
 });
 
 // Brakka (fighter-5): Str set per test, Dex 12 (+1), proficient in Strength saves, not in Stealth.
-const brakka = (str: number, items: Sheet[]) => {
+const brakka = (strength: number, items: Sheet[]) => {
   const base = loadSheet('fighter-5');
-  return { ...base, ab: { ...(base.ab as object), str }, items };
+  return { ...base, ab: { ...(base.ab as object), str: strength }, items };
 };
 
 const speed = (page: Page) => page.getByRole('group', { name: 'Speed', exact: true });
